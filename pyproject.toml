@@ -1,0 +1,22 @@
+[project]
+name = "StacAPIServerless"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+dependencies = [
+    
+]
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit>=3.6.2,<4.0"
+]
+
+[tool.isort]
+profile = "black"
+
+[tool.ruff.lint]
+extend-select = ["I"]
+
+[tool.ruff.format]
+quote-style = "double"
