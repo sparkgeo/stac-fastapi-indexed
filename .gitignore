@@ -1,3 +1,8 @@
 **/*.egg-info
+**/__pycache__
+
+data/STAC/pc_partial_data/**
+!**/.gitkeep
 
 .autoenv*.zsh
+.vscode
