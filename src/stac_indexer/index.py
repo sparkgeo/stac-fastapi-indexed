@@ -1,6 +1,7 @@
 from os import linesep
 from typing import Final, List, Type
 
+from stac_indexer.index_creator import IndexCreator
 from stac_indexer.readers.local_file_reader.local_file_reader import LocalFileReader
 from stac_indexer.readers.reader import Reader
 
@@ -19,11 +20,12 @@ def execute(
     ]
     if len(available_readers) == 0:
         raise Exception(f"No readers able to handle {root_catalog_url}")
-    if len(available_readers) > 0:
-        reader = available_readers[0]
-        _, errors = reader.process()
-        if len(errors) > 0:
-            print(linesep.join(errors) + linesep)
+    reader = available_readers[0]
+    stac_data, errors = reader.process()
+    if len(errors) > 0:
+        print(linesep.join(errors) + linesep)
+    index_creator = IndexCreator(stac_data=stac_data)
+    index_creator.create()
 
 
 if __name__ == "__main__":

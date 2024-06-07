@@ -4,6 +4,7 @@ version = "0.1.0"
 requires-python = ">=3.12"
 
 dependencies = [
+    "pydantic-settings",    # don't specify a version, determined by stac-pydantic
     "stac-pydantic~=3.1.0"
 ]
 
