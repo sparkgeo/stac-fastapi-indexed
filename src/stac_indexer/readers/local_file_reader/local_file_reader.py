@@ -23,7 +23,7 @@ _settings: Final = get_settings()
 
 
 class LocalFileReader(Reader):
-    def __init__(self, root_catalog_url):
+    def __init__(self, root_catalog_url: str):
         self._provided_root_catalog_url = root_catalog_url
 
     @classmethod
