@@ -1,3 +1,10 @@
 **/*.egg-info
+**/__pycache__
+
+data/STAC/pc_partial_data/**
+src/stac_indexer/index_data/**
+!**/.gitkeep
 
 .autoenv*.zsh
+.vscode
+**/.DS_Store
