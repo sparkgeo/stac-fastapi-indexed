@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional, Tuple
 
-from stac_indexer.stac_data import StacData
+from stac_indexer.types.stac_data import StacData
 
 
 class Reader(ABC):

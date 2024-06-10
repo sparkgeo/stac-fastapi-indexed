@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from stac_indexer.stac_data import StacData
+from stac_indexer.types.stac_data import StacData
 
 
 @dataclass

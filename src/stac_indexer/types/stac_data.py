@@ -4,7 +4,7 @@ from typing import List
 from pydantic import BaseModel
 from stac_pydantic import Catalog, Collection, Item
 
-from stac_indexer.data_access_type import DataAccessType
+from stac_indexer.types.data_access_type import DataAccessType
 
 
 class WithLocation(BaseModel):

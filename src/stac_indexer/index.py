@@ -1,9 +1,9 @@
 from os import linesep
 from typing import Final, List, Type
 
-from stac_indexer.index_creator import IndexCreator
 from stac_indexer.readers.local_file_reader.local_file_reader import LocalFileReader
 from stac_indexer.readers.reader import Reader
+from stac_indexer.types.index_creator import IndexCreator
 
 _readers: Final[List[Type[Reader]]] = [
     LocalFileReader,

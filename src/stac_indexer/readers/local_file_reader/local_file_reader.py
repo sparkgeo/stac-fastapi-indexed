@@ -7,10 +7,10 @@ from typing import Final, List, Optional, Tuple, cast
 
 from stac_pydantic import Catalog, Collection, Item
 
-from stac_indexer.data_access_type import DataAccessType
 from stac_indexer.readers.reader import Reader
 from stac_indexer.settings import get_settings
-from stac_indexer.stac_data import (
+from stac_indexer.types.data_access_type import DataAccessType
+from stac_indexer.types.stac_data import (
     CatalogWithLocation,
     CollectionWithLocation,
     ItemWithLocation,
