@@ -1,7 +1,9 @@
 from os import getenv
 
+from fastapi.middleware import Middleware
 from fastapi.responses import ORJSONResponse
 from stac_fastapi.api.app import StacApi
+from stac_fastapi.api.middleware import CORSMiddleware, ProxyHeaderMiddleware
 from stac_fastapi.api.models import create_get_request_model, create_post_request_model
 from stac_fastapi.extensions.core import (  # FilterExtension,
     FieldsExtension,
@@ -39,6 +41,7 @@ api = StacApi(
     response_class=ORJSONResponse,
     search_get_request_model=create_get_request_model(extensions),
     search_post_request_model=post_request_model,
+    middlewares=[Middleware(CORSMiddleware), Middleware(ProxyHeaderMiddleware)],
 )
 app = api.app
 

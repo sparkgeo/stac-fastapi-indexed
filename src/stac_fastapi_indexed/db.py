@@ -14,30 +14,32 @@ _logger: Final[Logger] = getLogger(__file__)
 
 
 def connect_to_db(app: FastAPI) -> None:
-    start = utc_now()
     times = {}
-    app.state.db_connection = duckdb_connect()
+    start = utc_now()
+    duckdb_connection = duckdb_connect()
     times["create db connection"] = utc_now()
-    app.state.db_connection.execute("INSTALL spatial")
-    app.state.db_connection.execute("LOAD spatial")
+    duckdb_connection.execute("INSTALL spatial")
+    duckdb_connection.execute("LOAD spatial")
     times["load spatial extension"] = utc_now()
-    app.state.db_connection.execute("INSTALL httpfs")
-    app.state.db_connection.execute("LOAD httpfs")
+    duckdb_connection.execute("INSTALL httpfs")
+    duckdb_connection.execute("LOAD httpfs")
     times["load httpfs extension"] = utc_now()
-    _establish_data_connection(app.state.db_connection)
+    for parquet_path in glob(
+        path.join(get_settings().parquet_source_data_dir, "*.parquet")
+    ):
+        view_name = path.basename(".".join(parquet_path.split(".")[:-1]))
+        duckdb_connection.execute(
+            f"CREATE VIEW {view_name} AS SELECT * FROM '{parquet_path}'"
+        )
     times["create views from parquet"] = utc_now()
-    for row in app.state.db_connection.execute("SELECT COUNT(*) FROM items").fetchall():
-        _logger.debug(row)
-    times["count items"] = utc_now()
-
-    reference_point = start
     for operation, completed_at in times.items():
         _logger.debug(
             "'{}' completed in {}ms".format(
-                operation, (completed_at - reference_point).microseconds / 1000
+                operation, (completed_at - start).microseconds / 1000
             )
         )
-        reference_point = completed_at
+        start = completed_at
+    app.state.db_connection = duckdb_connection
 
 
 def disconnect_from_db(app: FastAPI) -> None:
@@ -46,11 +48,3 @@ def disconnect_from_db(app: FastAPI) -> None:
             cast(DuckDBPyConnection, app.state.db_connection).close()
         except Exception as e:
             _logger.error(e)
-
-
-def _establish_data_connection(connection: DuckDBPyConnection) -> None:
-    for parquet_path in glob(
-        path.join(get_settings().parquet_source_data_dir, "*.parquet")
-    ):
-        view_name = path.basename(".".join(parquet_path.split(".")[:-1]))
-        connection.execute(f"CREATE VIEW {view_name} AS SELECT * FROM '{parquet_path}'")

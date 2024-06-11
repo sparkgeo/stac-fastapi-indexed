@@ -1,6 +1,10 @@
-from typing import List, Optional
+from asyncio import gather
+from json import loads
+from logging import Logger, getLogger
+from typing import Final, List, Optional, cast
 
 import attr
+from duckdb import DuckDBPyConnection
 from fastapi import Request
 from stac_fastapi.types.core import AsyncBaseCoreClient
 from stac_fastapi.types.rfc3339 import DateTimeType
@@ -8,11 +12,44 @@ from stac_fastapi.types.search import BaseSearchPostRequest
 from stac_fastapi.types.stac import Collection, Collections, Item, ItemCollection
 from stac_pydantic.shared import BBox
 
+from stac_fastapi_indexed.constants import rel_parent, rel_root, rel_self
+from stac_fastapi_indexed.fetchers import fetch
+from stac_fastapi_indexed.links.catalog import get_catalog_link
+from stac_fastapi_indexed.links.collection import (
+    fix_collection_links,
+    get_collections_link,
+)
+
+_logger: Final[Logger] = getLogger(__file__)
+
 
 @attr.s
 class CoreCrudClient(AsyncBaseCoreClient):
     async def all_collections(self, request: Request, **kwargs) -> Collections:
-        pass
+        fetch_tasks = [
+            fetch(url)
+            for url in [
+                row[1]
+                for row in cast(DuckDBPyConnection, request.app.state.db_connection)
+                .execute("SELECT * FROM collections")
+                .fetchall()
+            ]
+        ]
+        collections = [
+            fix_collection_links(
+                Collection(**loads(collection_json)),
+                request,
+            )
+            for collection_json in await gather(*fetch_tasks)
+        ]
+        return Collections(
+            collections=collections,
+            links=[
+                get_catalog_link(request, rel_root),
+                get_catalog_link(request, rel_parent),
+                get_collections_link(request, rel_self),
+            ],
+        )
 
     async def get_collection(
         self, collection_id: str, request: Request, **kwargs

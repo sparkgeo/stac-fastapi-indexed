@@ -5,12 +5,13 @@ requires-python = ">=3.12"
 
 dependencies = [
     "duckdb~=1.0.0",
+    "orjson",
     "pydantic-settings",    # don't specify a version, determined by stac-pydantic
     "pytz",
     "stac-fastapi.api~=3.0.0a2",
     "stac-fastapi.extensions~=3.0.0a2",
     "stac-fastapi.types~=3.0.0a2",
-    "stac-pydantic~=3.1.0"
+    "stac-pydantic~=3.1.0",
 ]
 
 [project.optional-dependencies]
