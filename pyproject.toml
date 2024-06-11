@@ -15,7 +15,11 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pre-commit>=3.6.2,<4.0"
+    "pre-commit>=3.6.2,<4.0",
+    "uvicorn~=0.30.1",
+]
+lambda = [
+    "mangum~=0.17.0",
 ]
 
 [tool.isort]
