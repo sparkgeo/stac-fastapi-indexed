@@ -27,6 +27,18 @@ def get_collections_link(request: Request, rel_type: str) -> Dict[str, Any]:
     }
 
 
+def get_collection_link(
+    request: Request, collection_id: str, rel_type: str
+) -> Dict[str, Any]:
+    return {
+        "rel": rel_type,
+        "type": type_json,
+        "href": urljoin(
+            get_base_href(request), "/collections/{}".format(collection_id)
+        ),
+    }
+
+
 def fix_collection_links(collection: Collection, request: Request) -> Collection:
     base_href = get_base_href(request)
     collection["links"] = [
@@ -42,20 +54,13 @@ def fix_collection_links(collection: Collection, request: Request) -> Collection
     ] + [
         get_catalog_link(request, rel_root),
         get_catalog_link(request, rel_parent),
+        get_collection_link(request, collection["id"], rel_self),
         {
             "rel": rel_items,
             "type": type_geojson,
             "href": urljoin(
                 base_href,
                 "/collections/{}/items".format(collection["id"]),
-            ),
-        },
-        {
-            "rel": rel_self,
-            "type": type_json,
-            "href": urljoin(
-                base_href,
-                "/collections/{}".format(collection["id"]),
             ),
         },
     ]

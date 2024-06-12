@@ -19,6 +19,7 @@ from stac_fastapi_indexed.links.collection import (
     fix_collection_links,
     get_collections_link,
 )
+from stac_fastapi_indexed.search.search_handler import SearchHandler
 
 _logger: Final[Logger] = getLogger(__file__)
 
@@ -29,9 +30,9 @@ class CoreCrudClient(AsyncBaseCoreClient):
         fetch_tasks = [
             fetch(url)
             for url in [
-                row[1]
+                row[0]
                 for row in cast(DuckDBPyConnection, request.app.state.db_connection)
-                .execute("SELECT * FROM collections")
+                .execute("SELECT stac_location FROM collections")
                 .fetchall()
             ]
         ]
@@ -76,9 +77,9 @@ class CoreCrudClient(AsyncBaseCoreClient):
     async def post_search(
         self, search_request: BaseSearchPostRequest, request: Request, **kwargs
     ) -> ItemCollection:
-        pass
+        return await self._base_search(search_request, request)
 
-    async def get_search(  # noqa: C901
+    async def get_search(
         self,
         request: Request,
         collections: Optional[List[str]] = None,
@@ -96,3 +97,10 @@ class CoreCrudClient(AsyncBaseCoreClient):
         **kwargs,
     ) -> ItemCollection:
         pass
+
+    async def _base_search(
+        self, search_request: BaseSearchPostRequest, request: Request
+    ) -> ItemCollection:
+        return await SearchHandler(
+            search_request=search_request, request=request
+        ).search()

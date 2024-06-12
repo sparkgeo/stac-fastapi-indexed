@@ -7,7 +7,9 @@ dependencies = [
     "duckdb~=1.0.0",
     "orjson",
     "pydantic-settings",    # don't specify a version, determined by stac-pydantic
+    "pyjwt~=2.8.0",
     "pytz",
+    "shapely~=2.0.4",
     "stac-fastapi.api~=3.0.0a2",
     "stac-fastapi.extensions~=3.0.0a2",
     "stac-fastapi.types~=3.0.0a2",

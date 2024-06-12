@@ -3,9 +3,10 @@ from glob import glob
 from json import dump
 from logging import Logger, getLogger
 from os import makedirs, path
-from typing import Final
+from typing import Dict, Final, cast
 
 from duckdb import connect
+from shapely.wkt import loads as wkt_loads
 
 from stac_indexer.index_creators.index_creator import IndexCreator
 from stac_indexer.settings import get_settings
@@ -55,8 +56,22 @@ class ParquetIndexCreator(IndexCreator):
             "access_properties",
             "audit",
         ):
+            geometry_column_name = None  # assumes max 1 geometry column per table
+            for row in self._conn.execute(
+                f"SELECT column_name, column_type FROM (DESCRIBE {table_name})"
+            ).fetchall():
+                column_name, column_type = row
+                if cast(str, column_type).upper() == "GEOMETRY":
+                    geometry_column_name = column_name
+                    break
+            if geometry_column_name is None:
+                export_select = "*"
+            else:
+                export_select = "* EXCLUDE ({col}), ST_AsWKB({col}) as {col}".format(
+                    col=geometry_column_name
+                )
             self._conn.execute(f"""
-                COPY (SELECT * FROM {table_name}) 
+                COPY (SELECT {export_select} FROM {table_name}) 
                   TO '{output_dir}/{table_name}.parquet'
                   (FORMAT PARQUET)
                 ;
@@ -102,25 +117,27 @@ class ParquetIndexCreator(IndexCreator):
                 id
               , collection_id
               , geometry
-              , bbox_llx
-              , bbox_lly
-              , bbox_urx
-              , bbox_ury
               , datetime
               , datetime_end
               , cloud_cover
               , stac_location
             ) VALUES (
-                ?, ?, {geom}, {bbox_llx}, {bbox_lly}, {bbox_urx}, {bbox_ury}, ?, ?, ?, ?
+                ?, ?, {geom}, ?, ?, ?, ?
             );
         """
+        counts: Dict[str, int] = {
+            "inserted": 0,
+            "invalid": 0,
+        }
         for item in self._stac_data.items:
+            if not wkt_loads(item.geometry.wkt).is_valid:
+                _logger.debug(
+                    f"skipping invalid geometry '{item.collection}'/'{item.id}'"
+                )
+                counts["invalid"] += 1
+                continue
             insert_sql = insert_sql_template.format(
-                geom=f"ST_GeomFromText('{item.geometry.wkt}')",
-                bbox_llx=f"ST_XMin(ST_GeomFromText('{item.geometry.wkt}'))",
-                bbox_lly=f"ST_YMin(ST_GeomFromText('{item.geometry.wkt}'))",
-                bbox_urx=f"ST_XMax(ST_GeomFromText('{item.geometry.wkt}'))",
-                bbox_ury=f"ST_YMax(ST_GeomFromText('{item.geometry.wkt}'))",
+                geom=f"ST_GeomFromText('{item.geometry.wkt}')"
             )
             try:
                 self._conn.execute(
@@ -134,10 +151,12 @@ class ParquetIndexCreator(IndexCreator):
                         item.location,
                     ),
                 )
+                counts["inserted"] += 1
             except Exception as e:
                 _logger.warn(
                     f"failed to insert into '{item.collection}'/'{item.id}': {e}"
                 )
+        _logger.info(counts)
 
     def _insert_metadata(self) -> None:
         self._conn.execute(

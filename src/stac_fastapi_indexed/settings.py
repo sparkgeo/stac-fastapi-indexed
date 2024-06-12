@@ -9,6 +9,7 @@ class _Settings(ApiSettings):
     )
     log_level: str = "info"
     parquet_source_data_dir: str
+    token_jwt_secret: str
 
 
 @lru_cache(maxsize=1)
