@@ -8,7 +8,7 @@ class _Settings(ApiSettings):
         env_prefix="stac_api_indexed_",
     )
     log_level: str = "info"
-    parquet_source_data_dir: str
+    parquet_index_source_url: str
     token_jwt_secret: str
 
 

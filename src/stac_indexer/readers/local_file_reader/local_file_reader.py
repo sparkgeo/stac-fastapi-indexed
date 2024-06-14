@@ -22,6 +22,7 @@ _logger: Final[Logger] = getLogger(__file__)
 _settings: Final = get_settings()
 
 
+# TODO: some duplication between this and S3Reader, needs DRYing
 class LocalFileReader(Reader):
     def __init__(self, root_catalog_url: str):
         self._provided_root_catalog_url = root_catalog_url
