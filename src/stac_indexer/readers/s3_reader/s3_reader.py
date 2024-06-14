@@ -1,18 +1,22 @@
 import re
 from concurrent.futures import ThreadPoolExecutor
-from json import loads
 from logging import Logger, getLogger
 from threading import Lock
-from typing import Any, Callable, Dict, Final, List, Optional, Tuple, cast
+from typing import Callable, Final, List, Optional, Tuple, cast
 
 from boto3 import client
 from stac_pydantic import Catalog, Collection, Item
 
+from stac_index_common.data_stores.s3 import (
+    get_json_object_from_url,
+    get_s3_key_parts,
+    list_objects_from_url,
+    url_prefix_regex,
+)
 from stac_indexer.readers.reader import Reader
 from stac_indexer.settings import get_settings
 from stac_indexer.types.stac_data import CollectionWithLocation, ItemWithLocation
 
-_url_prefix: Final[str] = r"^s3://(.+)"
 _logger: Final[Logger] = getLogger(__file__)
 _settings: Final = get_settings()
 _item_processor_mutex: Final[Lock] = Lock()
@@ -26,7 +30,7 @@ class S3Reader(Reader):
 
     @classmethod
     def create_reader(cls, url: str) -> Optional[Reader]:
-        if re.match(_url_prefix, url):
+        if re.match(url_prefix_regex, url):
             return cast(Reader, cls(root_catalog_url=url))
         return None
 
@@ -35,49 +39,16 @@ class S3Reader(Reader):
     ) -> bool:
         for link in with_links.links.link_iterator():
             if link.rel == "self":
-                href_match = re.match(_url_prefix, link.href)
+                href_match = re.match(url_prefix_regex, link.href)
                 if href_match:
                     return link.href == expected_url
         return False
 
-    def _get_s3_key_parts(self, url: str) -> Tuple[str, str]:
-        return cast(re.Match, re.match(r"^s3://([^/]+)/(.+)", url)).groups()
-
-    def _get_json_object(self, url: str) -> Dict[str, Any]:
-        try:
-            bucket, key = self._get_s3_key_parts(url)
-        except Exception as e:
-            raise ValueError(f"'{url}' is not in the expected format", e)
-        response = (
-            self._s3.get_object(Bucket=bucket, Key=key)["Body"].read().decode("UTF-8")
-        )
-        return loads(response)
-
-    def _list_json_objects(self, bucket: str, prefix: str) -> List[str]:
-        next_token = None
-        all_keys: List[str] = []
-        while True:
-            list_kwargs = {
-                "Bucket": bucket,
-                "Prefix": prefix,
-            }
-            if next_token:
-                list_kwargs["ContinuationToken"] = next_token
-            response = self._s3.list_objects_v2(**list_kwargs)
-            if "Contents" in response:
-                for object in response["Contents"]:
-                    key = object["Key"]
-                    if cast(str, key).endswith(".json"):
-                        all_keys.append(key)
-            if response.get("IsTruncated"):
-                next_token = response.get("NextContinuationToken")
-            else:
-                break
-        return all_keys
-
     def get_root_catalog(self) -> Catalog:
         _logger.info("reading root catalog")
-        dict_catalog = self._get_json_object(self._provided_root_catalog_url)
+        dict_catalog = get_json_object_from_url(
+            self._s3, self._provided_root_catalog_url
+        )
         try:
             catalog = Catalog(**dict_catalog)
         except Exception as e:
@@ -100,11 +71,13 @@ class S3Reader(Reader):
         for link in root_catalog.links.link_iterator():
             if link.rel == "child":
                 link_title = link.title or "[untitled]"
-                href_match = re.match(_url_prefix, link.href)
+                href_match = re.match(url_prefix_regex, link.href)
                 if href_match:
                     collection_path = link.href
                     _logger.debug(f"reading collection '{collection_path}'")
-                    dict_collection = self._get_json_object(collection_path)
+                    dict_collection = get_json_object_from_url(
+                        self._s3, collection_path
+                    )
                     try:
                         collection = Collection(**dict_collection)
                     except Exception as e:
@@ -149,10 +122,10 @@ class S3Reader(Reader):
             item_count = 0
             for link in collection.links.link_iterator():
                 if link.rel == "items":
-                    href_match = re.match(_url_prefix, link.href)
+                    href_match = re.match(url_prefix_regex, link.href)
                     if href_match:
-                        bucket, prefix = self._get_s3_key_parts(link.href)
-                        for key in self._list_json_objects(bucket, prefix):
+                        bucket, _ = get_s3_key_parts(link.href)
+                        for key in list_objects_from_url(self._s3, link.href, ".json"):
                             if (
                                 _settings.test_collection_item_limit is not None
                                 and item_count > _settings.test_collection_item_limit
@@ -166,7 +139,7 @@ class S3Reader(Reader):
 
         def process_item(url) -> List[str]:
             item_errors = []
-            dict_item = self._get_json_object(url)
+            dict_item = get_json_object_from_url(self._s3, url)
             try:
                 item = Item(**dict_item)
             except Exception as e:

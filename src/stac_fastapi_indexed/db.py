@@ -1,22 +1,40 @@
-from glob import glob
 from logging import Logger, getLogger
-from os import path
-from typing import Final, cast
+from typing import Final, List, Type, cast
 
 from duckdb import DuckDBPyConnection
 from duckdb import connect as duckdb_connect
 from fastapi import FastAPI
 
+from stac_fastapi_indexed.index_source.file import FileIndexSource
+from stac_fastapi_indexed.index_source.index_source import IndexSource
+from stac_fastapi_indexed.index_source.s3 import S3IndexSource
 from stac_fastapi_indexed.settings import get_settings
 from stac_fastapi_indexed.util import utc_now
 
 _logger: Final[Logger] = getLogger(__file__)
+_index_sources: Final[List[Type[IndexSource]]] = [
+    S3IndexSource,
+    FileIndexSource,
+]
 
 
 def connect_to_db(app: FastAPI) -> None:
+    index_source_url = get_settings().parquet_index_source_url
+    compatible_index_sources = [
+        index_source
+        for index_source in [
+            candidate.create_index_source(index_source_url)
+            for candidate in _index_sources
+        ]
+        if index_source is not None
+    ]
+    if len(compatible_index_sources) == 0:
+        raise Exception(f"no index sources support source URL '{index_source_url}'")
+    index_source = cast(IndexSource, compatible_index_sources[0])
     times = {}
     start = utc_now()
     duckdb_connection = duckdb_connect()
+    index_source.configure_duckdb(duckdb_connection)
     times["create db connection"] = utc_now()
     duckdb_connection.execute("INSTALL spatial")
     duckdb_connection.execute("LOAD spatial")
@@ -24,12 +42,12 @@ def connect_to_db(app: FastAPI) -> None:
     duckdb_connection.execute("INSTALL httpfs")
     duckdb_connection.execute("LOAD httpfs")
     times["load httpfs extension"] = utc_now()
-    for parquet_path in glob(
-        path.join(get_settings().parquet_source_data_dir, "*.parquet")
-    ):
-        view_name = path.basename(".".join(parquet_path.split(".")[:-1]))
+    parquet_urls = index_source.get_parquet_urls()
+    if len(parquet_urls.keys()) == 0:
+        raise Exception(f"no URLs found at '{index_source_url}'")
+    for view_name, source_url in parquet_urls.items():
         duckdb_connection.execute(
-            f"CREATE VIEW {view_name} AS SELECT * FROM '{parquet_path}'"
+            f"CREATE VIEW {view_name} AS SELECT * FROM '{source_url}'"
         )
     times["create views from parquet"] = utc_now()
     for operation, completed_at in times.items():

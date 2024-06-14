@@ -45,14 +45,9 @@ class IndexCreator:
             )
             raise e
         # TODO: generate a hash or other unique identifier for a Parquet file collection to guarantee consistency / compatibility between files
-
-        _logger.warn("** can this list be retrieved via `show tables`?")
-
-        for table_name in (
-            "collections",
-            "items",
-            "audit",
-        ):
+        for table_name in [
+            row[0] for row in self._conn.execute("SHOW tables").fetchall()
+        ]:
             geometry_column_name = None  # assumes max 1 geometry column per table
             for row in self._conn.execute(
                 f"SELECT column_name, column_type FROM (DESCRIBE {table_name})"
