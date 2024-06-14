@@ -9,3 +9,4 @@ src/stac_indexer/index_data/**
 .autoenv*.zsh
 .vscode
 **/.DS_Store
+todo.md

@@ -1,6 +1,8 @@
+from concurrent.futures import ThreadPoolExecutor
 from json import dump
 from os import makedirs, path
 from re import sub
+from time import sleep
 from typing import Final, List
 
 import requests
@@ -11,10 +13,6 @@ def s3_join(parts: List[str]) -> str:
 
 
 base_source_url: Final[str] = "https://planetarycomputer.microsoft.com/api/stac/v1/"
-collection_ids: Final[List[str]] = [
-    "ecmwf-forecast",
-    "modis-17A2HGF-061",
-]
 json_type: Final[str] = "application/json"
 geojson_type: Final[str] = "application/geo+json"
 s3_base_url: Final[str] = "s3://tchristian-stac-serverless-data/pc_partial_data"
@@ -23,6 +21,10 @@ base_source_path: Final[str] = path.abspath(
     path.join(path.dirname(__file__), "pc_partial_data", "s3")
 )
 catalog_path: Final[str] = s3_join([s3_base_url, "catalog.json"])
+
+max_collection_threads: Final[int] = 10
+item_fetch_retry_limit: Final[int] = 3
+item_fetch_retry_seconds: Final[int] = 1
 
 
 def collection_source_path(collection_id: str) -> str:
@@ -41,7 +43,174 @@ def collection_items_access_path(collection_id: str) -> str:
     return s3_join([s3_base_url, "collections", collection_id, "items"])
 
 
+def process_collection(collection_id: str) -> None:
+    print(f"fetching collection {collection_id}")
+    collection_response = requests.get(f"{base_source_url}collections/{collection_id}")
+    if collection_response.status_code != 200:
+        print(f"problem fetching {collection_id}: {collection_response.status_code}")
+        return
+    try:
+        collection = collection_response.json()
+    except Exception as e:
+        print(f"problem parsing {collection_id}: {e}")
+        return
+    collection = {
+        **collection,
+        **{
+            "links": [
+                link
+                for link in collection["links"]
+                if link["rel"]
+                in [
+                    "license",
+                    "describedBy",
+                ]
+            ]
+            + [
+                {
+                    "rel": "items",
+                    "type": geojson_type,
+                    "href": collection_items_access_path(collection_id),
+                },
+                {
+                    "rel": "parent",
+                    "type": json_type,
+                    "href": catalog_path,
+                },
+                {
+                    "rel": "root",
+                    "type": json_type,
+                    "href": catalog_path,
+                },
+                {
+                    "rel": "self",
+                    "type": json_type,
+                    "href": collection_access_path(collection_id),
+                },
+            ]
+        },
+    }
+    makedirs(collection_items_source_path(collection_id), exist_ok=True)
+    with open(collection_source_path(collection_id), "w") as f:
+        dump(
+            collection,
+            f,
+            indent=2,
+        )
+
+    next_items_url = f"{base_source_url}collections/{collection_id}/items"
+    page_count = 0
+    item_fetch_retry_count = 0
+    while next_items_url is not None:
+        page_count += 1
+        items_response = None
+        while True:
+            print(
+                f"fetching items page {page_count} (attempt {item_fetch_retry_count + 1}) in {collection_id} with {next_items_url}"
+            )
+            items_response = requests.get(next_items_url)
+            if items_response.status_code == 200:
+                break
+            else:
+                if item_fetch_retry_count == item_fetch_retry_limit:
+                    print(
+                        f"problem after {item_fetch_retry_limit} attempts getting {next_items_url}: {items_response.status_code}"
+                    )
+                    break
+                else:
+                    delay = pow(item_fetch_retry_seconds, item_fetch_retry_count)
+                    print(
+                        f"sleeping for {delay} seconds before retry with {next_items_url}"
+                    )
+                    sleep(delay)
+                    item_fetch_retry_count += 1
+        if items_response is None:
+            break
+        try:
+            items = items_response.json()
+        except Exception as e:
+            print(f"problem parsing {next_items_url}: {e}")
+            break
+        next_link_entries = [
+            link
+            for link in items["links"]
+            if link["rel"] == "next" and link["method"] == "GET"
+        ]
+        next_items_url = (
+            next_link_entries[0]["href"] if len(next_link_entries) == 1 else None
+        )
+        # Microsoft Planetary Computer STAC API is currently broken and returning broken next links - fix:
+        next_items_url = sub(
+            "^.+/(collections/.+)", rf"{base_source_url}\1", next_items_url
+        )
+        # end fix
+        for feature in items["features"]:
+            feature = {
+                **feature,
+                **{
+                    "links": [
+                        link
+                        for link in feature["links"]
+                        if link["rel"]
+                        in [
+                            "cite-as",
+                            "via",
+                            "preview",
+                        ]
+                    ]
+                    + [
+                        {
+                            "rel": "collection",
+                            "type": json_type,
+                            "href": collection_access_path(collection_id),
+                        },
+                        {
+                            "rel": "parent",
+                            "type": json_type,
+                            "href": collection_access_path(collection_id),
+                        },
+                        {
+                            "rel": "root",
+                            "type": json_type,
+                            "href": catalog_path,
+                        },
+                        {
+                            "rel": "self",
+                            "type": geojson_type,
+                            "href": s3_join(
+                                [
+                                    collection_items_access_path(collection_id),
+                                    "{}.json".format(feature["id"]),
+                                ]
+                            ),
+                        },
+                    ]
+                },
+            }
+
+            with open(
+                path.join(
+                    collection_items_source_path(collection_id),
+                    "{}.json".format(feature["id"]),
+                ),
+                "w",
+            ) as f:
+                dump(
+                    feature,
+                    f,
+                    indent=2,
+                )
+
+
 def execute():
+    makedirs(base_source_path, exist_ok=True)
+    collection_ids = [
+        collection["id"]
+        for collection in requests.get(f"{base_source_url}collections").json()[
+            "collections"
+        ]
+    ]
+    print(f"collection count: {len(collection_ids)}")
     with open(path.join(base_source_path, "catalog.json"), "w") as f:
         dump(
             {
@@ -76,151 +245,8 @@ def execute():
             f,
             indent=2,
         )
-
-    for collection_id in collection_ids:
-        print(f"fetching collection {collection_id}")
-        collection_response = requests.get(
-            f"{base_source_url}collections/{collection_id}"
-        )
-        if collection_response.status_code != 200:
-            print(
-                f"problem fetching {collection_id}: {collection_response.status_code}"
-            )
-            continue
-        try:
-            collection = collection_response.json()
-        except Exception as e:
-            print(f"problem parsing {collection_id}: {e}")
-            continue
-        collection = {
-            **collection,
-            **{
-                "links": [
-                    link
-                    for link in collection["links"]
-                    if link["rel"]
-                    in [
-                        "license",
-                        "describedBy",
-                    ]
-                ]
-                + [
-                    {
-                        "rel": "items",
-                        "type": geojson_type,
-                        "href": collection_items_access_path(collection_id),
-                    },
-                    {
-                        "rel": "parent",
-                        "type": json_type,
-                        "href": catalog_path,
-                    },
-                    {
-                        "rel": "root",
-                        "type": json_type,
-                        "href": catalog_path,
-                    },
-                    {
-                        "rel": "self",
-                        "type": json_type,
-                        "href": collection_access_path(collection_id),
-                    },
-                ]
-            },
-        }
-        makedirs(collection_items_source_path(collection_id), exist_ok=True)
-        with open(collection_source_path(collection_id), "w") as f:
-            dump(
-                collection,
-                f,
-                indent=2,
-            )
-
-        next_items_url = f"{base_source_url}collections/{collection_id}/items"
-        page_count = 0
-        while next_items_url is not None:
-            page_count += 1
-            print(
-                f"fetching items page {page_count} in {collection_id} with {next_items_url}"
-            )
-            items_response = requests.get(next_items_url)
-            if items_response.status_code != 200:
-                print(f"problem getting {next_items_url}: {items_response.status_code}")
-                break
-            try:
-                items = items_response.json()
-            except Exception as e:
-                print(f"problem parsing {next_items_url}: {e}")
-                break
-            next_link_entries = [
-                link
-                for link in items["links"]
-                if link["rel"] == "next" and link["method"] == "GET"
-            ]
-            next_items_url = (
-                next_link_entries[0]["href"] if len(next_link_entries) == 1 else None
-            )
-            # Microsoft Planetary Computer STAC API is currently broken and returning broken next links - fix:
-            next_items_url = sub(
-                "^.+/(collections/.+)", rf"{base_source_url}\1", next_items_url
-            )
-            # end fix
-            for feature in items["features"]:
-                feature = {
-                    **feature,
-                    **{
-                        "links": [
-                            link
-                            for link in feature["links"]
-                            if link["rel"]
-                            in [
-                                "cite-as",
-                                "via",
-                                "preview",
-                            ]
-                        ]
-                        + [
-                            {
-                                "rel": "collection",
-                                "type": json_type,
-                                "href": collection_access_path(collection_id),
-                            },
-                            {
-                                "rel": "parent",
-                                "type": json_type,
-                                "href": collection_access_path(collection_id),
-                            },
-                            {
-                                "rel": "root",
-                                "type": json_type,
-                                "href": catalog_path,
-                            },
-                            {
-                                "rel": "self",
-                                "type": geojson_type,
-                                "href": s3_join(
-                                    [
-                                        collection_items_access_path(collection_id),
-                                        "{}.json".format(feature["id"]),
-                                    ]
-                                ),
-                            },
-                        ]
-                    },
-                }
-
-                with open(
-                    path.join(
-                        collection_items_source_path(collection_id),
-                        "{}.json".format(feature["id"]),
-                    ),
-                    "w",
-                ) as f:
-                    dump(
-                        feature,
-                        f,
-                        indent=2,
-                    )
+    with ThreadPoolExecutor(max_workers=max_collection_threads) as executor:
+        executor.map(process_collection, collection_ids)
 
 
 if __name__ == "__main__":
