@@ -5,8 +5,8 @@ set -e
 pushd $(dirname $0)/..
 
 . scripts/gpq/build.sh
-input_dir=$(pwd)/src/stac_indexer/index_data/parquet
-output_dir=$(pwd)/src/stac_indexer/index_data/geoparquet
+input_dir=${index_output_dir:-$(pwd)/src/stac_indexer/index_data/s3}/parquet
+output_dir=$input_dir/../geoparquet
 mkdir -p $output_dir
 
 geo_filenames=("items.parquet")
@@ -38,5 +38,6 @@ for filepath in $input_dir/*.parquet; do
         cp $filepath $output_dir/
     fi
 done
+cp $input_dir/manifest.json $output_dir/
 
 ls -Alh $output_dir

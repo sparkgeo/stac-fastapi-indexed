@@ -30,7 +30,7 @@ def collection_source_path(collection_id: str) -> str:
 
 
 def collection_access_path(collection_id: str) -> str:
-    return s3_join([s3_base_url, "collections", collection_id])
+    return "{}.json".format(s3_join([s3_base_url, "collections", collection_id]))
 
 
 def collection_items_source_path(collection_id: str) -> str:
@@ -80,7 +80,7 @@ def execute():
     for collection_id in collection_ids:
         print(f"fetching collection {collection_id}")
         collection_response = requests.get(
-            f"{base_source_url}/collections/{collection_id}"
+            f"{base_source_url}collections/{collection_id}"
         )
         if collection_response.status_code != 200:
             print(
@@ -136,7 +136,7 @@ def execute():
                 indent=2,
             )
 
-        next_items_url = f"{base_source_url}/collections/{collection_id}/items"
+        next_items_url = f"{base_source_url}collections/{collection_id}/items"
         page_count = 0
         while next_items_url is not None:
             page_count += 1
@@ -160,6 +160,11 @@ def execute():
             next_items_url = (
                 next_link_entries[0]["href"] if len(next_link_entries) == 1 else None
             )
+            # Microsoft Planetary Computer STAC API is currently broken and returning broken next links - fix:
+            next_items_url = sub(
+                "^.+/(collections/.+)", rf"{base_source_url}\1", next_items_url
+            )
+            # end fix
             for feature in items["features"]:
                 feature = {
                     **feature,
