@@ -1,11 +1,14 @@
 from asyncio import gather
 from json import loads
 from logging import Logger, getLogger
+from re import match
 from typing import Final, List, Optional, cast
+from urllib.parse import unquote_plus
 
 import attr
 from duckdb import DuckDBPyConnection
-from fastapi import Request
+from fastapi import HTTPException, Request
+from pydantic import ValidationError
 from stac_fastapi.types.core import AsyncBaseCoreClient
 from stac_fastapi.types.rfc3339 import DateTimeType
 from stac_fastapi.types.search import BaseSearchPostRequest
@@ -96,7 +99,43 @@ class CoreCrudClient(AsyncBaseCoreClient):
         intersects: Optional[str] = None,
         **kwargs,
     ) -> ItemCollection:
-        pass
+        base_args = {
+            "collections": collections,
+            "ids": ids,
+            "bbox": bbox,
+            "datetime": datetime,
+            "limit": limit,
+            "token": token,
+        }
+        if sortby:
+            # https://github.com/radiantearth/stac-spec/tree/master/api-spec/extensions/sort#http-get-or-post-form
+            sort_param = []
+            for sort in sortby:
+                sortparts = match(r"^([+-]?)(.*)$", sort)
+                if sortparts:
+                    sort_param.append(
+                        {
+                            "field": sortparts.group(2).strip(),
+                            "direction": "desc" if sortparts.group(1) == "-" else "asc",
+                        }
+                    )
+            base_args["sortby"] = sort_param
+        if intersects:
+            base_args["intersects"] = unquote_plus(intersects)
+        try:
+            search_request = self.post_request_model(
+                **{
+                    key: value
+                    for key, value in base_args.items()
+                    if value is not None and value != []
+                }
+            )
+        except ValidationError as e:
+            raise HTTPException(
+                status_code=400, detail=f"Invalid parameters provided {e}"
+            ) from e
+
+        return await self._base_search(search_request, request)
 
     async def _base_search(
         self, search_request: BaseSearchPostRequest, request: Request

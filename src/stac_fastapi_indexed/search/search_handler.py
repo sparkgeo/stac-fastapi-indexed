@@ -4,21 +4,25 @@ from datetime import datetime
 from json import loads
 from logging import Logger, getLogger
 from re import sub
-from typing import Any, Final, List, Optional, Tuple, Union, cast
+from typing import Any, Final, List, Optional, Union, cast
 
 from duckdb import DuckDBPyConnection
 from fastapi import Request
+from stac_fastapi.extensions.core.pagination.token_pagination import POSTTokenPagination
+from stac_fastapi.extensions.core.sort.sort import SortExtensionPostRequest
 from stac_fastapi.types.search import BaseSearchPostRequest
 from stac_fastapi.types.stac import Item, ItemCollection
+from stac_pydantic.api.extensions.sort import SortDirections
 
 from stac_fastapi_indexed.constants import rel_root, rel_self
 from stac_fastapi_indexed.fetchers import fetch
 from stac_fastapi_indexed.links.catalog import get_catalog_link
 from stac_fastapi_indexed.links.item import fix_item_links
 from stac_fastapi_indexed.links.search import get_search_link, get_token_link
+from stac_fastapi_indexed.search.query_info import QueryInfo
 from stac_fastapi_indexed.search.token import (
-    create_token_from_query_with_limit_offset_placeholders,
-    get_query_with_limit_offset_placeholders_from_token,
+    create_token_from_query,
+    get_query_from_token,
 )
 from stac_fastapi_indexed.search.types import SearchDirection, SearchMethod
 
@@ -36,43 +40,37 @@ class SearchHandler:
     search_request: BaseSearchPostRequest
     request: Request
 
-    async def search(self, token: Optional[str] = None) -> ItemCollection:
-        if token is None:
+    async def search(self) -> ItemCollection:
+        if cast(POSTTokenPagination, self.search_request).token is None:
             _logger.debug("no token, building new query")
-            query_with_placeholders, params = (
-                self._new_query_with_limit_offset_placeholders()
-            )
+            query_info = self._new_query()
         else:
             _logger.debug("token provided")
-            query_with_placeholders, params = (
-                get_query_with_limit_offset_placeholders_from_token(token)
+            query_info = get_query_from_token(
+                cast(POSTTokenPagination, self.search_request).token
             )
-
-        # logic still to figure out here
-
-        debug_token = create_token_from_query_with_limit_offset_placeholders(
-            query_with_placeholders, params
+        limit_text = f"LIMIT {query_info.limit + 1}"  # request one more so that we know if there's a next page of results, extra row is not included in response
+        offset_text = (
+            f"OFFSET {query_info.offset}" if query_info.offset is not None else ""
         )
-        query = query_with_placeholders.format(offset="", limit="LIMIT 10")
-
-        # ... look up
-
-        _logger.debug(f"{query} [{params}]")
+        current_query = query_info.query_with_limit_offset_placeholders.format(
+            limit=limit_text,
+            offset=offset_text,
+        )
+        _logger.debug(f"{current_query}: {query_info.params}")
+        rows = (
+            cast(DuckDBPyConnection, self.request.app.state.db_connection)
+            .execute(
+                current_query,
+                query_info.params,
+            )
+            .fetchall()
+        )
+        has_next_page = len(rows) > query_info.limit
+        has_previous_page = query_info.offset is not None
         fetch_tasks = [
-            fetch(url)
-            for url in [
-                row[0]
-                for row in cast(
-                    DuckDBPyConnection, self.request.app.state.db_connection
-                )
-                .execute(
-                    query,
-                    params,
-                )
-                .fetchall()
-            ]
+            fetch(url) for url in [row[0] for row in rows[0 : query_info.limit]]
         ]
-
         items = [
             fix_item_links(
                 Item(**loads(item_json)),
@@ -80,31 +78,39 @@ class SearchHandler:
             )
             for item_json in await gather(*fetch_tasks)
         ]
-        return ItemCollection(
-            features=items,
-            links=[
-                get_catalog_link(self.request, rel_root),
-                get_search_link(self.request, rel_self),
+        links = [
+            get_catalog_link(self.request, rel_root),
+            get_search_link(self.request, rel_self),
+        ]
+        if has_next_page:
+            links.append(
                 get_token_link(
-                    self.request, SearchDirection.Next, SearchMethod.POST, debug_token
-                ),
+                    self.request,
+                    SearchDirection.Next,
+                    SearchMethod.from_str(self.request.method),
+                    create_token_from_query(query_info.next()),
+                )
+            )
+        if has_previous_page:
+            links.append(
                 get_token_link(
                     self.request,
                     SearchDirection.Previous,
-                    SearchMethod.POST,
-                    debug_token,
-                ),
-            ],
+                    SearchMethod.from_str(self.request.method),
+                    create_token_from_query(query_info.previous()),
+                )
+            )
+        return ItemCollection(
+            features=items,
+            links=links,
         )
 
-    def _new_query_with_limit_offset_placeholders(
+    def _new_query(
         self,
-    ) -> Tuple[
-        str,
-        List[Any],
-    ]:
+    ) -> QueryInfo:
         clauses: List[str] = []
         params: List[Any] = []
+        sorts: List[str] = self._determine_order()
         for addition in [
             addition
             for addition in [
@@ -121,16 +127,37 @@ class SearchHandler:
         query = """
             SELECT stac_location
             FROM items
-              {where} {{offset}} {{limit}}
+              {where}
+              {order}
+              {{limit}}
+              {{offset}}
             """.format(
             where="WHERE {}".format(" AND ".join(clauses)) if len(clauses) > 0 else "",
+            order="ORDER BY {}".format(", ".join(sorts)),
         )
-        return (
-            sub(
-                r"\s+", " ", query
-            ).strip(),  # cut down whitespace for better tokenization
-            params,
+        return QueryInfo(
+            query_with_limit_offset_placeholders=sub(r"\s+", " ", query).strip(),
+            params=params,
+            limit=self.search_request.limit,
+            offset=None,
         )
+
+    def _determine_order(self) -> List[str]:
+        sort_fields: List[str] = []
+        user_provided_sorts = cast(SortExtensionPostRequest, self.search_request).sortby
+        if user_provided_sorts is not None and len(user_provided_sorts) > 0:
+            for user_provided_sort in user_provided_sorts:
+                sort_fields.append(
+                    "{} {}".format(
+                        user_provided_sort.field,
+                        "ASC"
+                        if user_provided_sort.direction == SortDirections.asc
+                        else "DESC",
+                    )
+                )
+        else:
+            sort_fields.append("id ASC")
+        return sort_fields
 
     def _include_ids(self) -> Optional[_SearchAddition]:
         if self.search_request.ids is not None:

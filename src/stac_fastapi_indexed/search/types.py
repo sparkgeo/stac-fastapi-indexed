@@ -6,6 +6,13 @@ class SearchDirection(Enum):
     Previous = 1
 
 
-class SearchMethod(Enum):
-    GET = 0
-    POST = 1
+class SearchMethod(str, Enum):
+    GET = "GET"
+    POST = "POST"
+
+    @classmethod
+    def from_str(cls, method: str):
+        for member in cls:
+            if member.value == method.upper():
+                return member
+        raise ValueError(f"{method} is not a valid {cls.__name__}")

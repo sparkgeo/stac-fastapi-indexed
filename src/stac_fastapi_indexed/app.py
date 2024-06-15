@@ -5,8 +5,7 @@ from fastapi.responses import ORJSONResponse
 from stac_fastapi.api.app import StacApi
 from stac_fastapi.api.middleware import CORSMiddleware, ProxyHeaderMiddleware
 from stac_fastapi.api.models import create_get_request_model, create_post_request_model
-from stac_fastapi.extensions.core import (  # FilterExtension,
-    FieldsExtension,
+from stac_fastapi.extensions.core import (  # FilterExtension,; FieldsExtension,
     SortExtension,
     TokenPaginationExtension,
 )
@@ -26,7 +25,7 @@ from stac_fastapi_indexed.settings import get_settings
 extensions_map = {
     # "query": QueryExtension(),
     "sort": SortExtension(),
-    "fields": FieldsExtension(),
+    # "fields": FieldsExtension(),
     "pagination": TokenPaginationExtension(),
     # "filter": FilterExtension(client=FiltersClient()),
 }
