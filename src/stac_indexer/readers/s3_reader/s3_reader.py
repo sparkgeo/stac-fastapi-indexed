@@ -75,10 +75,10 @@ class S3Reader(Reader):
                 if href_match:
                     collection_path = link.href
                     _logger.debug(f"reading collection '{collection_path}'")
-                    dict_collection = get_json_object_from_url(
-                        self._s3, collection_path
-                    )
                     try:
+                        dict_collection = get_json_object_from_url(
+                            self._s3, collection_path
+                        )
                         collection = Collection(**dict_collection)
                     except Exception as e:
                         errors.append(
@@ -112,11 +112,11 @@ class S3Reader(Reader):
     def process_items(
         self,
         collections: List[Collection],
-        item_processor: Callable[[ItemWithLocation], List[str]],
+        item_ingestor: Callable[[ItemWithLocation], List[str]],
     ) -> List[str]:
         _logger.info("reading items for collections")
         all_errors: List[str] = []
-        urls: List[str] = []
+        item_urls: List[str] = []
         for collection in collections:
             _logger.info(f"identifying items for collection '{collection.id}'")
             item_count = 0
@@ -134,13 +134,13 @@ class S3Reader(Reader):
                                     f"exiting item count early due to test limit ({_settings.test_collection_item_limit})"
                                 )
                                 break
-                            urls.append(f"s3://{bucket}/{key}")
+                            item_urls.append(f"s3://{bucket}/{key}")
                             item_count += 1
 
-        def process_item(url) -> List[str]:
+        def fetch_and_ingest(url) -> List[str]:
             item_errors = []
-            dict_item = get_json_object_from_url(self._s3, url)
             try:
+                dict_item = get_json_object_from_url(self._s3, url)
                 item = Item(**dict_item)
             except Exception as e:
                 item_errors.append(
@@ -163,14 +163,14 @@ class S3Reader(Reader):
                 # from different threads
                 with _item_processor_mutex:
                     item_errors.extend(
-                        item_processor(ItemWithLocation(**dict_item, location=url))
+                        item_ingestor(ItemWithLocation(**dict_item, location=url))
                     )
             return item_errors
 
         with ThreadPoolExecutor(max_workers=get_settings().max_threads) as executor:
             all_errors.extend(
                 item_errors
-                for sublist in executor.map(process_item, urls)
+                for sublist in executor.map(fetch_and_ingest, item_urls)
                 for item_errors in sublist
             )
 

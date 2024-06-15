@@ -30,6 +30,6 @@ class Reader(ABC):
     def process_items(
         self,
         collections: List[Collection],
-        item_processor: Callable[[ItemWithLocation], List[str]],
+        item_ingestor: Callable[[ItemWithLocation], List[str]],
     ) -> List[str]:
         pass
