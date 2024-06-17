@@ -4,14 +4,14 @@ from typing import Any, Dict, List, Optional, cast
 
 @dataclass(kw_only=True)
 class QueryInfo:
-    query_with_limit_offset_placeholders: str
+    query: str
     params: List[Any] = field(default_factory=list)
     limit: int
     offset: Optional[int] = None
 
     def next(self) -> "QueryInfo":
         return QueryInfo(
-            query_with_limit_offset_placeholders=self.query_with_limit_offset_placeholders,
+            query=self.query,
             params=self.params,
             limit=self.limit,
             offset=(self.offset + self.limit)
@@ -24,7 +24,7 @@ class QueryInfo:
         # Technically we could apply that logic here, but we cannot determine if a "next" link is required in this module, so that would be insconsistent.
         current_offset = cast(int, self.offset)
         return QueryInfo(
-            query_with_limit_offset_placeholders=self.query_with_limit_offset_placeholders,
+            query=self.query,
             params=self.params,
             limit=self.limit,
             offset=(current_offset - self.limit)

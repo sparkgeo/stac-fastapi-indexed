@@ -25,12 +25,11 @@ def get_token_link(
     search_method: SearchMethod,
     token: str,
 ) -> Dict[str, Any]:
-    common_search_href = urljoin(get_base_href(request), "/search{link_append}")
     link_dict_append = {}
     if search_method == SearchMethod.GET:
-        search_href = common_search_href.format(link_append=f"?token={token}")
+        search_href = _add_token_to_get_url(request, token)
     elif search_method == SearchMethod.POST:
-        search_href = common_search_href.format(link_append="")
+        search_href = str(request.url)
         link_dict_append = {"body": {"token": token}}
     return {
         **{
@@ -43,3 +42,14 @@ def get_token_link(
         },
         **link_dict_append,
     }
+
+
+def _add_token_to_get_url(request: Request, token: str) -> str:
+    return str(
+        request.url.replace_query_params(
+            **{
+                **dict(request.query_params),
+                "token": token,
+            }
+        )
+    )

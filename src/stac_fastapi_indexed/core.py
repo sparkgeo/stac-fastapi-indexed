@@ -85,7 +85,25 @@ class CoreCrudClient(AsyncBaseCoreClient):
         token: Optional[str] = None,
         **kwargs,
     ) -> ItemCollection:
-        pass
+        try:
+            search_request = self.post_request_model(
+                **{
+                    key: value
+                    for key, value in {
+                        "collections": [collection_id],
+                        "bbox": bbox,
+                        "datetime": datetime,
+                        "limit": limit,
+                        "token": token,
+                    }.items()
+                    if value is not None
+                }
+            )
+        except ValidationError as e:
+            raise HTTPException(
+                status_code=400, detail=f"Invalid parameters provided {e}"
+            ) from e
+        return await self._base_search(search_request, request)
 
     async def get_item(
         self, item_id: str, collection_id: str, request: Request, **kwargs
