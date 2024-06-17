@@ -4,6 +4,5 @@ CREATE TABLE items (
     geometry GEOMETRY NOT NULL,
     datetime TIMESTAMPTZ NOT NULL,
     datetime_end TIMESTAMPTZ,
-    cloud_cover FLOAT,
     stac_location VARCHAR NOT NULL,
 );

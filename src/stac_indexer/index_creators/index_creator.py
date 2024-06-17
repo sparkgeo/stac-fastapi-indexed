@@ -125,7 +125,6 @@ class IndexCreator:
                 , geometry
                 , datetime
                 , datetime_end
-                , cloud_cover
                 , stac_location
                 ) VALUES (
                     ?, ?, {geom}, ?, ?, ?, ?
@@ -148,7 +147,6 @@ class IndexCreator:
                         item.collection,
                         item.properties.datetime or item.properties.start_datetime,
                         item.properties.end_datetime,
-                        getattr(item, "eo:cloud_cover", None),
                         item.location,
                     ),
                 )
