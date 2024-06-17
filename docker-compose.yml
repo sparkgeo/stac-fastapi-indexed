@@ -12,4 +12,3 @@ services:
       - "~/.aws:/root/.aws:ro"
     ports:
       - "8123:8000"
-    command: tail -f /dev/null

@@ -1,13 +1,10 @@
 FROM python:3.12-slim
 
-WORKDIR /app/src
-COPY src/stac_fastapi_indexed ./stac_fastapi_indexed
-COPY src/stac_index_common ./stac_index_common
-
 WORKDIR /app
-COPY pyproject.toml .
-COPY setup.py .
+COPY stac_index_common ./stac_index_common
+COPY stac_fastapi_indexed ./stac_fastapi_indexed
 
-RUN pip install .[s3_source,server]
+RUN pip install -e stac_index_common
+RUN pip install -e stac_fastapi_indexed[server,s3_source]
 
 CMD ["uvicorn", "stac_fastapi_indexed.app:app", "--host", "0.0.0.0", "--port", "8000"]
