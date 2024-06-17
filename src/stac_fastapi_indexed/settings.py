@@ -10,6 +10,7 @@ class _Settings(ApiSettings):
     log_level: str = "info"
     parquet_index_source_url: str
     token_jwt_secret: str
+    permit_boto_debug: bool = False
 
 
 @lru_cache(maxsize=1)

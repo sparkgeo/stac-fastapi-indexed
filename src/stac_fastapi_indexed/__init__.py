@@ -1,4 +1,12 @@
-from logging import INFO, StreamHandler, basicConfig, getLevelName, getLevelNamesMapping
+from logging import (
+    DEBUG,
+    INFO,
+    StreamHandler,
+    basicConfig,
+    getLevelName,
+    getLevelNamesMapping,
+    getLogger,
+)
 from sys import stdout
 from typing import Final
 
@@ -16,8 +24,12 @@ if requested_log_level not in getLevelNamesMapping():
 handlers = [
     StreamHandler(stream=stdout),
 ]
+log_level = getLevelNamesMapping()[requested_log_level]
 basicConfig(
     handlers=handlers,
-    level=getLevelNamesMapping()[requested_log_level],
+    level=log_level,
     format="%(levelname)s %(asctime)s %(message)s",
 )
+if log_level == DEBUG and not get_settings().permit_boto_debug:
+    for logger in [getLogger("botocore"), getLogger("boto3")]:
+        logger.setLevel(INFO)
