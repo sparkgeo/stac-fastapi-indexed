@@ -53,7 +53,7 @@ class SearchHandler:
         offset_text = (
             f"OFFSET {query_info.offset}" if query_info.offset is not None else ""
         )
-        current_query = query_info.query_with_limit_offset_placeholders.format(
+        current_query = query_info.query.format(
             limit=limit_text,
             offset=offset_text,
         )
@@ -136,7 +136,7 @@ class SearchHandler:
             order="ORDER BY {}".format(", ".join(sorts)),
         )
         return QueryInfo(
-            query_with_limit_offset_placeholders=sub(r"\s+", " ", query).strip(),
+            query=sub(r"\s+", " ", query).strip(),
             params=params,
             limit=self.search_request.limit,
             offset=None,
