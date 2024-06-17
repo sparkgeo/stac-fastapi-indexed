@@ -2,6 +2,6 @@
 
 set -e
 
-pip install .[dev]
+pip install .[dev,server]
 
 pre-commit install
