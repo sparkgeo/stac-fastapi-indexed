@@ -60,7 +60,20 @@ class CoreCrudClient(AsyncBaseCoreClient):
     async def get_collection(
         self, collection_id: str, request: Request, **kwargs
     ) -> Collection:
-        pass
+        row = (
+            cast(DuckDBPyConnection, request.app.state.db_connection)
+            .execute(
+                "SELECT stac_location FROM collections WHERE id = ?",
+                [collection_id],
+            )
+            .fetchone()
+        )
+        if row is not None:
+            return fix_collection_links(
+                Collection(**loads(await fetch(row[0]))),
+                request,
+            )
+        raise NotFoundError(f"Collection {collection_id} does not exist.")
 
     async def item_collection(
         self,
