@@ -10,6 +10,7 @@ from duckdb import DuckDBPyConnection
 from fastapi import HTTPException, Request
 from pydantic import ValidationError
 from stac_fastapi.types.core import AsyncBaseCoreClient
+from stac_fastapi.types.errors import NotFoundError
 from stac_fastapi.types.rfc3339 import DateTimeType
 from stac_fastapi.types.search import BaseSearchPostRequest
 from stac_fastapi.types.stac import Collection, Collections, Item, ItemCollection
@@ -22,6 +23,7 @@ from stac_fastapi_indexed.links.collection import (
     fix_collection_links,
     get_collections_link,
 )
+from stac_fastapi_indexed.links.item import fix_item_links
 from stac_fastapi_indexed.search.search_handler import SearchHandler
 
 _logger: Final[Logger] = getLogger(__file__)
@@ -75,7 +77,25 @@ class CoreCrudClient(AsyncBaseCoreClient):
     async def get_item(
         self, item_id: str, collection_id: str, request: Request, **kwargs
     ) -> Item:
-        pass
+        await self.get_collection(
+            collection_id, request=request
+        )  # will error if collection does not exist
+        row = (
+            cast(DuckDBPyConnection, request.app.state.db_connection)
+            .execute(
+                "SELECT stac_location FROM items WHERE collection_id = ? and id = ?",
+                [collection_id, item_id],
+            )
+            .fetchone()
+        )
+        if row is not None:
+            return fix_item_links(
+                Item(**loads(await fetch(row[0]))),
+                request,
+            )
+        raise NotFoundError(
+            f"Item {item_id} in Collection {collection_id} does not exist."
+        )
 
     async def post_search(
         self, search_request: BaseSearchPostRequest, request: Request, **kwargs
