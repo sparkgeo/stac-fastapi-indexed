@@ -1,7 +1,7 @@
 from setuptools import find_packages, setup
 
 setup(
-    name="stac-fastapi.indexed",
+    name="stac_fastapi_indexed",
     version="0.1.0",
     python_requires=">=3.12",
     package_dir={"": "src"},

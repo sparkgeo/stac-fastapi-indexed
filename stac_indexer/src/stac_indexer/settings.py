@@ -14,6 +14,8 @@ class _Settings(BaseSettings):
     test_collection_limit: Optional[int] = None
     index_output_dir: str = path.join(path.dirname(__file__), "index_data")
     max_threads: int = 10
+    s3_endpoint: Optional[str] = None
+    permit_boto_debug: bool = False
 
 
 @lru_cache(maxsize=1)

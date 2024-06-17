@@ -46,9 +46,9 @@ def connect_to_db(app: FastAPI) -> None:
     if len(parquet_urls.keys()) == 0:
         raise Exception(f"no URLs found at '{index_source_url}'")
     for view_name, source_url in parquet_urls.items():
-        duckdb_connection.execute(
-            f"CREATE VIEW {view_name} AS SELECT * FROM '{source_url}'"
-        )
+        command = f"CREATE VIEW {view_name} AS SELECT * FROM '{source_url}'"
+        _logger.debug(command)
+        duckdb_connection.execute(command)
     times["create views from parquet"] = utc_now()
     for operation, completed_at in times.items():
         _logger.debug(

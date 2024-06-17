@@ -25,7 +25,13 @@ _item_processor_mutex: Final[Lock] = Lock()
 # TODO: some duplication between this and LocalFileReader, needs DRYing
 class S3Reader(Reader):
     def __init__(self, root_catalog_url: str):
-        self._s3 = client("s3")
+        client_args = {}
+        s3_endpoint = get_settings().s3_endpoint
+        if s3_endpoint is not None:
+            client_args["endpoint_url"] = s3_endpoint
+            if s3_endpoint.startswith("http://"):
+                client_args["use_ssl"] = False
+        self._s3 = client("s3", **client_args)
         self._provided_root_catalog_url = root_catalog_url
 
     @classmethod

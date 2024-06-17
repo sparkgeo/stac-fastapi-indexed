@@ -6,9 +6,12 @@ services:
     image: sparkgeo/stac_fastapi_indexed
     environment:
       stac_api_indexed_parquet_index_source_url: s3://tchristian-stac-serverless-data/index/
-      stac_api_indexed_token_jwt_secret: z6wpXGxDbG/l1mHjlUgnhp/VMkiSZUEDDdnIfrPpWfk=
+      stac_api_indexed_token_jwt_secret: z6wpXGxDbG/l1mHjlUgnhp/VMkiSZUEDDdnIfrPpWfk= # random, not a secret
+      stac_api_indexed_log_level: debug
       AWS_PROFILE: ${AWS_PROFILE:-not-set}
     volumes:
       - "~/.aws:/root/.aws:ro"
+      - "./stac_index_common:/app/stac_index_common:rw"
+      - "./stac_fastapi_indexed:/app/stac_fastapi_indexed:rw"
     ports:
       - "8123:8000"
