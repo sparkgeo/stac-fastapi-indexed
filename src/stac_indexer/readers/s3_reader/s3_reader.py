@@ -117,6 +117,8 @@ class S3Reader(Reader):
         _logger.info("reading items for collections")
         all_errors: List[str] = []
         item_urls: List[str] = []
+        if _settings.test_collection_limit is not None:
+            collections = collections[: _settings.test_collection_limit]
         for collection in collections:
             _logger.info(f"identifying items for collection '{collection.id}'")
             item_count = 0

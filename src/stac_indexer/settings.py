@@ -11,6 +11,7 @@ class _Settings(BaseSettings):
     )
     log_level: str = "info"
     test_collection_item_limit: Optional[int] = None
+    test_collection_limit: Optional[int] = None
     index_output_dir: str = path.join(path.dirname(__file__), "index_data")
     max_threads: int = 10
 
