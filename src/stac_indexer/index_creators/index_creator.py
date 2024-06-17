@@ -120,14 +120,14 @@ class IndexCreator:
             errors: List[str] = []
             insert_sql_template = """
                 INSERT INTO items (
-                    id
+                  id
                 , collection_id
                 , geometry
                 , datetime
                 , datetime_end
                 , stac_location
                 ) VALUES (
-                    ?, ?, {geom}, ?, ?, ?, ?
+                    ?, ?, {geom}, ?, ?, ?
                 );
             """
             if not wkt_loads(item.geometry.wkt).is_valid:

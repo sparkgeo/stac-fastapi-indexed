@@ -156,7 +156,7 @@ class SearchHandler:
                     )
                 )
         else:
-            sort_fields.append("id ASC")
+            sort_fields.append("collection_id ASC, id ASC")
         return sort_fields
 
     def _include_ids(self) -> Optional[_SearchAddition]:
