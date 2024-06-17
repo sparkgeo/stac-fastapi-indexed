@@ -1,7 +1,13 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
-from stac_indexer.types.stac_data import StacData
+from stac_fastapi.types.stac import Catalog
+
+from stac_indexer.types.stac_data import (
+    Collection,
+    CollectionWithLocation,
+    ItemWithLocation,
+)
 
 
 class Reader(ABC):
@@ -11,5 +17,19 @@ class Reader(ABC):
         pass
 
     @abstractmethod
-    def process(self) -> Tuple[StacData, List[str]]:
+    def get_root_catalog(self) -> Catalog:
+        pass
+
+    @abstractmethod
+    def get_collections(
+        self, root_catalog: Catalog
+    ) -> Tuple[List[CollectionWithLocation], List[str]]:
+        pass
+
+    @abstractmethod
+    def process_items(
+        self,
+        collections: List[Collection],
+        item_ingestor: Callable[[ItemWithLocation], List[str]],
+    ) -> List[str]:
         pass

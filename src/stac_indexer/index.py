@@ -1,14 +1,15 @@
 from os import linesep
 from typing import Final, List, Type
 
-from stac_indexer.index_creators.parquet_index_creator.parquet_index_creator import (
-    ParquetIndexCreator,
-)
-from stac_indexer.readers.local_file_reader.local_file_reader import LocalFileReader
+from stac_indexer.index_creators.index_creator import IndexCreator
 from stac_indexer.readers.reader import Reader
 
+# from stac_indexer.readers.local_file_reader.local_file_reader import LocalFileReader
+from stac_indexer.readers.s3_reader.s3_reader import S3Reader
+
 _readers: Final[List[Type[Reader]]] = [
-    LocalFileReader,
+    # LocalFileReader,
+    S3Reader,
 ]
 
 
@@ -22,12 +23,10 @@ def execute(
     ]
     if len(available_readers) == 0:
         raise Exception(f"No readers able to handle {root_catalog_url}")
-    reader = available_readers[0]
-    stac_data, errors = reader.process()
+    indexer = IndexCreator()
+    errors = indexer.process(available_readers[0])
     if len(errors) > 0:
         print(linesep.join(errors) + linesep)
-    index_creator = ParquetIndexCreator.create_index_creator(stac_data)
-    index_creator.process()
 
 
 if __name__ == "__main__":
