@@ -14,4 +14,4 @@ services:
       - "./stac_index_common:/app/stac_index_common:rw"
       - "./stac_fastapi_indexed:/app/stac_fastapi_indexed:rw"
     ports:
-      - "8123:8000"
+      - "8123:80"
