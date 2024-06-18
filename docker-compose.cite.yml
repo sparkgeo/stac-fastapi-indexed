@@ -1,0 +1,15 @@
+services:
+  cite:
+    image: sparkgeo/ets-ogcapi-features10
+    build:
+      dockerfile: ./docker/cite/Dockerfile
+      context: .
+    ports: 
+      - 8080:8080
+    volumes:
+      - ./docker/cite/test-run-props.xml:/config/test-run-props.xml:ro
+      - ./docker/cite/cite-test-result:/result:rw
+    command: java -jar ets-ogcapi-features10-1.8-SNAPSHOT-aio.jar -o /result /config/test-run-props.xml
+    depends_on:
+      api:
+        condition: service_healthy

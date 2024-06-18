@@ -32,7 +32,7 @@ services:
         condition: service_healthy
     command: mc cp --recursive /stac/sample minio/stac
 
-  indexer-sample:
+  sample-indexer:
     build:
       dockerfile: docker/indexer/Dockerfile
       context: .
@@ -62,7 +62,7 @@ services:
       - "./minio/mc/entrypoint.sh:/entrypoint.sh:ro"
       - "indexer-output:/index:rw"
     depends_on:
-      indexer-sample:
+      sample-indexer:
         condition: service_completed_successfully
     command: mc cp --recursive /index minio/index
 

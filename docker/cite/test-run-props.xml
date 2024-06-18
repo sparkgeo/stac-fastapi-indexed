@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">
+<properties version="1.0">
+  <comment>test Run arguments (ets-ogcapi-features10)</comment>
+  <entry key="iut">http://api</entry>
+  <entry key="noofcollections">1</entry>
+</properties>

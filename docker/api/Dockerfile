@@ -1,5 +1,10 @@
 FROM python:3.12-slim
 
+RUN apt-get update --fix-missing \
+  && apt-get install -y --no-install-recommends \
+  curl \
+  && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 COPY stac_index_common ./stac_index_common
 COPY stac_fastapi_indexed ./stac_fastapi_indexed

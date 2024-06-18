@@ -7,6 +7,8 @@ src/stac_indexer/index_data/**
 
 minio/mc/config/**
 
+docker/cite/cite-test-result/**
+
 !**/.gitkeep
 
 .autoenv*.zsh
