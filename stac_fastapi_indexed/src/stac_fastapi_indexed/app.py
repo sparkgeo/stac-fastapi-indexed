@@ -5,29 +5,21 @@ from fastapi.responses import ORJSONResponse
 from stac_fastapi.api.app import StacApi
 from stac_fastapi.api.middleware import CORSMiddleware, ProxyHeaderMiddleware
 from stac_fastapi.api.models import create_get_request_model, create_post_request_model
-from stac_fastapi.extensions.core import (  # FilterExtension,; FieldsExtension,
+from stac_fastapi.extensions.core import (
+    FilterExtension,
     SortExtension,
     TokenPaginationExtension,
 )
 
 from stac_fastapi_indexed.core import CoreCrudClient
 from stac_fastapi_indexed.db import connect_to_db, disconnect_from_db
+from stac_fastapi_indexed.filter.filter_client import FiltersClient
 from stac_fastapi_indexed.settings import get_settings
 
-# from stac_fastapi.pgstac.config import Settings
-# from stac_fastapi.pgstac.core import CoreCrudClient
-# from stac_fastapi.pgstac.db import close_db_connection, connect_to_db
-# from stac_fastapi.pgstac.extensions import QueryExtension
-# from stac_fastapi.pgstac.extensions.filter import FiltersClient
-# from stac_fastapi.pgstac.transactions import BulkTransactionsClient, TransactionsClient
-# from stac_fastapi.pgstac.types.search import PgstacSearch
-
 extensions_map = {
-    # "query": QueryExtension(),
     "sort": SortExtension(),
-    # "fields": FieldsExtension(),
     "pagination": TokenPaginationExtension(),
-    # "filter": FilterExtension(client=FiltersClient()),
+    "filter": FilterExtension(client=FiltersClient()),
 }
 
 extensions = list(extensions_map.values())
