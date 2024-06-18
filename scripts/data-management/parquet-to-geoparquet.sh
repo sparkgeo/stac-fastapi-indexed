@@ -2,9 +2,9 @@
 
 set -e
 
-pushd $(dirname $0)/..
+pushd $(dirname $0)/../..
 
-. scripts/gpq/build.sh
+. scripts/data-management/gpq/build.sh
 input_dir=${index_output_dir:-$(pwd)/src/stac_indexer/index_data/s3}/parquet
 output_dir=$input_dir/../geoparquet
 mkdir -p $output_dir
