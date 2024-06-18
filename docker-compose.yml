@@ -13,5 +13,10 @@ services:
       - "~/.aws:/root/.aws:ro"
       - "./stac_index_common:/app/stac_index_common:rw"
       - "./stac_fastapi_indexed:/app/stac_fastapi_indexed:rw"
+    healthcheck:
+      test: curl --fail http://localhost/_mgmt/ping
+      interval: 5s
+      timeout: 1s
+      retries: 50
     ports:
       - "8123:80"
