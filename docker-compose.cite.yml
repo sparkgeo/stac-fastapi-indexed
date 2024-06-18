@@ -1,0 +1,8 @@
+services:
+  cite:
+    image: ogccite/ets-ogcapi-features10
+    ports:
+      - 8080:8080
+    depends_on:
+      api:
+        condition: service_healthy

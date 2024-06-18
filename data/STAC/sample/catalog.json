@@ -1,0 +1,32 @@
+{
+    "type": "Catalog",
+    "id": "sample-joplin",
+    "title": "Sample Joplin Data",
+    "description": "Exists to verify proper function of the STAC API backend",
+    "stac_version": "1.0.0",
+    "conformsTo": [],
+    "links": [
+      {
+        "rel": "self",
+        "type": "application/json",
+        "href": "s3://stac/sample/catalog.json"
+      },
+      {
+        "rel": "root",
+        "type": "application/json",
+        "href": "s3://stac/sample/catalog.json"
+      },
+      {
+        "rel": "data",
+        "type": "application/json",
+        "href": "s3://stac/sample/collections"
+      },
+      {
+        "rel": "child",
+        "type": "application/json",
+        "title": "Joplin Collection",
+        "href": "s3://stac/sample/collections/joplin.json"
+      }
+    ],
+    "stac_extensions": []
+  }
