@@ -2,7 +2,7 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 from logging import Logger, getLogger
 from threading import Lock
-from typing import Callable, Final, List, Optional, Tuple, cast
+from typing import Any, Callable, Dict, Final, List, Optional, Tuple, cast
 
 from boto3 import client
 from stac_pydantic import Catalog, Collection, Item
@@ -25,7 +25,7 @@ _item_processor_mutex: Final[Lock] = Lock()
 # TODO: some duplication between this and LocalFileReader, needs DRYing
 class S3Reader(Reader):
     def __init__(self, root_catalog_url: str):
-        client_args = {}
+        client_args: Dict[str, Any] = {}
         s3_endpoint = get_settings().s3_endpoint
         if s3_endpoint is not None:
             client_args["endpoint_url"] = s3_endpoint

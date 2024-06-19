@@ -1,0 +1,18 @@
+{
+    "root_catalog_url": "s3://stac/sample/catalog.json",
+    "queryables": {
+        "collection": {
+            "joplin": {
+                "gsd": {
+                    "storage_type": "DOUBLE",
+                    "description": "Ground Sample Distance",
+                    "json_path": "properties.gsd",
+                    "json_schema":  {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                    }
+                }
+            }
+        }
+    }
+}
