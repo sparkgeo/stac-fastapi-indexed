@@ -10,6 +10,7 @@ setup(
         "duckdb~=1.0.0",
         "orjson",
         "pydantic-settings",  # don't specify a version, determined by stac-pydantic
+        "pygeofilter[backend-native]==0.2.1",
         "pyjwt~=2.8.0",
         "pytz",
         "shapely~=2.0.4",

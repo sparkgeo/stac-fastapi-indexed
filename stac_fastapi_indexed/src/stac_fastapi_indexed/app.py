@@ -13,7 +13,7 @@ from stac_fastapi.extensions.core import (
 
 from stac_fastapi_indexed.core import CoreCrudClient
 from stac_fastapi_indexed.db import connect_to_db, disconnect_from_db
-from stac_fastapi_indexed.filter.filter_client import FiltersClient
+from stac_fastapi_indexed.search.filter.filter_client import FiltersClient
 from stac_fastapi_indexed.settings import get_settings
 
 extensions_map = {

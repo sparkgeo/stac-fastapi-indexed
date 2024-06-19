@@ -9,9 +9,11 @@ from duckdb import connect
 from shapely.wkt import loads as wkt_loads
 from stac_fastapi.types.stac import Collection
 
-from stac_index_common.queryables import queryable_field_name_to_column_name
 from stac_indexer.index_config import IndexConfig, collection_wildcard
 from stac_indexer.index_creators.queryables.configurer import configure
+from stac_indexer.index_creators.queryables.fields import (
+    queryable_field_name_to_column_name,
+)
 from stac_indexer.readers.reader import Reader
 from stac_indexer.settings import get_settings
 from stac_indexer.types.stac_data import ItemWithLocation

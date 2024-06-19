@@ -2,8 +2,10 @@ from json import dumps
 
 from duckdb import DuckDBPyConnection
 
-from stac_index_common.queryables import queryable_field_name_to_column_name
 from stac_indexer.index_config import IndexConfig
+from stac_indexer.index_creators.queryables.fields import (
+    queryable_field_name_to_column_name,
+)
 
 
 def configure(config: IndexConfig, connection: DuckDBPyConnection) -> None:
@@ -11,8 +13,8 @@ def configure(config: IndexConfig, connection: DuckDBPyConnection) -> None:
         for field_name, queryable in queryables_by_field_name.items():
             connection.execute(
                 """
-                INSERT INTO queryables (collection_id, name, description, json_path, json_schema)
-                    VALUES (?, ?, ?, ?, ?)
+                INSERT INTO queryables (collection_id, name, description, json_path, json_schema, items_column)
+                    VALUES (?, ?, ?, ?, ?, ?)
             """,
                 [
                     collection_id,
@@ -20,6 +22,7 @@ def configure(config: IndexConfig, connection: DuckDBPyConnection) -> None:
                     queryable.description,
                     queryable.json_path,
                     dumps(queryable.json_schema),
+                    queryable_field_name_to_column_name(field_name),
                 ],
             )
             connection.execute(

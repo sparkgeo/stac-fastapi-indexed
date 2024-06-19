@@ -1,8 +1,12 @@
 CREATE TABLE queryables (
-    collection_id VARCHAR NOT NULL, -- '*' value indicates all collections
     name VARCHAR NOT NULL,
+    collection_id VARCHAR NOT NULL, -- '*' value indicates all collections
     description VARCHAR NOT NULL,
     json_path VARCHAR NOT NULL,
     json_schema VARCHAR NOT NULL,
-    UNIQUE (collection_id, name),
+    items_column VARCHAR,
+    is_geometry BOOLEAN DEFAULT false,
+    PRIMARY KEY(name, collection_id),
+    UNIQUE(json_path),
+    UNIQUE(items_column),
 );
