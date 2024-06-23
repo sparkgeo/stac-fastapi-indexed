@@ -13,6 +13,12 @@ class NotAGeometryField(Exception):
         self.argument = argument
 
 
+class NotATemporalField(Exception):
+    def __init__(self, argument: Any):
+        super().__init__(self)
+        self.argument = argument
+
+
 class UnknownFunction(Exception):
     def __init__(self, function_name: str):
         super().__init__(self)

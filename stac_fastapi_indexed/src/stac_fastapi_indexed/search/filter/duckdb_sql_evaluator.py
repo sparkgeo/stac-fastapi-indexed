@@ -39,6 +39,7 @@ from shapely import geometry
 
 from stac_fastapi_indexed.search.filter.errors import (
     NotAGeometryField,
+    NotATemporalField,
     UnknownField,
     UnknownFunction,
 )
@@ -72,6 +73,10 @@ _SPATIAL_COMPARISON_OP_MAP: Final[Dict[ast.SpatialComparisonOp, str]] = {
     ast.SpatialComparisonOp.EQUALS: "ST_Equals",
 }
 
+_TEMPORAL_COMPARISON_OP_MAP: Final[Dict[ast.TemporalComparisonOp, str]] = {
+    ast.TemporalComparisonOp.TOVERLAPS: "{point_comparator} >= {interval_start} AND {point_comparator} <= {interval_end}"
+}
+
 _param_placeholder: Final[str] = "?"
 
 
@@ -84,10 +89,12 @@ class DubkDBSQLEvaluator(Evaluator):
     def __init__(
         self,
         geometry_attributes: List[str],
+        temporal_attributes: List[str],
         attribute_map: Dict[str, str],
         function_map: Dict[str, str],
     ):
         self.geometry_attributes = geometry_attributes
+        self.temporal_attributes = temporal_attributes
         self.attribute_map = attribute_map
         self.function_map = function_map
 
@@ -159,9 +166,45 @@ class DubkDBSQLEvaluator(Evaluator):
             sql=f"{lhs_identifier} IS {'NOT ' if node.not_ else ''}NULL"
         )
 
-    # @handle(ast.TemporalPredicate, subclasses=True)
-    # def temporal(self, node, lhs, rhs):
-    #     pass
+    # This originally handled ast.TemporalPredicate, but has been restricted to only TimeOverlaps as this is all the STAC API filter extension requires.
+    # Expected behaviour for other relationships theretically supported by pygeofilter is not well documented and it is unclear how the caller
+    # could compare against multiple fields in the data source, as would be required for some relationships.
+    @handle(ast.TimeOverlaps, subclasses=True)
+    def temporal(self, node: ast.TimeOverlaps, lhs, rhs):
+        lhs_identifier, lhs_params = self._parameterise_node_part(node.lhs, lhs)
+        rhs_identifier, rhs_params = self._parameterise_node_part(node.rhs, rhs)
+        if (
+            type(node.lhs) is ast.Attribute
+            and node.lhs.name not in self.temporal_attributes
+        ):
+            raise NotATemporalField(node.lhs.name)
+        if (
+            type(node.rhs) is ast.Attribute
+            and node.rhs.name not in self.temporal_attributes
+        ):
+            raise NotATemporalField(node.rhs.name)
+        if type(node.lhs) is ast.Attribute:
+            point_comparator = lhs_identifier
+        elif type(node.lhs) is values.Interval:
+            interval_start = interval_end = lhs_identifier
+            lhs_params = [lhs_params[0].start, lhs_params[0].end]
+        if type(node.rhs) is ast.Attribute:
+            point_comparator = rhs_identifier
+        elif type(node.rhs) is values.Interval:
+            interval_start = interval_end = rhs_identifier
+            rhs_params = [rhs_params[0].start, rhs_params[0].end]
+        return SearchClause(
+            sql=_TEMPORAL_COMPARISON_OP_MAP[node.op].format(
+                point_comparator=point_comparator,
+                interval_start=interval_start,
+                interval_end=interval_end,
+            ),
+            params=lhs_params + rhs_params,
+        )
+
+    @handle(values.Interval, subclasses=True)
+    def interval(self, node: values.Interval, lhs, rhs) -> SearchClause:
+        return node
 
     @handle(ast.SpatialComparisonPredicate, subclasses=True)
     def spatial_operation(
@@ -267,8 +310,12 @@ class DubkDBSQLEvaluator(Evaluator):
 def to_search_clause(
     root: ast.Node,
     geometry_fields: List[str],
+    temporal_fields: List[str],
     field_mapping: Dict[str, str],
 ) -> SearchClause:
     return DubkDBSQLEvaluator(
-        geometry_fields, cast(Dict[str, str], field_mapping), cast(Dict[str, str], {})
+        geometry_fields,
+        temporal_fields,
+        cast(Dict[str, str], field_mapping),
+        cast(Dict[str, str], {}),
     ).evaluate(root)

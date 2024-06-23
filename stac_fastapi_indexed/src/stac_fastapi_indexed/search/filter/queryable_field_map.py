@@ -16,6 +16,7 @@ class QueryableConfig:
     json_schema: str
     items_column: str
     is_geometry: bool
+    is_temporal: bool
 
 
 @lru_cache(maxsize=1)
@@ -31,6 +32,7 @@ def get_queryable_config_by_name(
              , json_schema
              , items_column
              , is_geometry
+             , is_temporal
           FROM queryables_by_collection
     """).fetchall():
         field_config[row[0]] = QueryableConfig(
@@ -40,5 +42,6 @@ def get_queryable_config_by_name(
             json_schema=row[3],
             items_column=row[4],
             is_geometry=row[5],
+            is_temporal=row[6],
         )
     return field_config

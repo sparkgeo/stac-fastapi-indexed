@@ -151,7 +151,7 @@ class IndexCreator:
                 item.id,
                 item.collection,
                 item.properties.datetime or item.properties.start_datetime,
-                item.properties.end_datetime,
+                item.properties.end_datetime or item.properties.datetime,
                 item.location,
             ]
             for (
@@ -164,22 +164,30 @@ class IndexCreator:
                         collection_id == collection_wildcard
                         or collection_id == item.collection
                     ):
-                        path_parts = queryable.json_path.split(".")
-                        path_parents, path_key = path_parts[:-1], path_parts[-1:][0]
-                        param_source = item.to_dict()
-                        for parent_part in path_parents:
+                        for path_option in queryable.json_path.split("|"):
+                            # where multiple JSON paths are possible accept the first that is not-None
+                            path_parts = path_option.split(".")
+                            path_parents, path_key = path_parts[:-1], path_parts[-1:][0]
+                            param_source = item.to_dict()
+                            for parent_part in path_parents:
+                                try:
+                                    param_source = param_source[parent_part]
+                                except KeyError:
+                                    break
                             try:
-                                param_source = param_source[parent_part]
+                                insert_param = param_source[path_key]
+                                break
                             except KeyError:
-                                errors.append(
-                                    "could not locate path '{}' for field '{}' in '{}'/'{}'".format(
-                                        queryable.json_path,
-                                        field_name,
-                                        item.collection,
-                                        item.id,
-                                    )
-                                )
-                        insert_param = param_source.get(path_key, None)
+                                pass
+                    if insert_param is None:
+                        errors.append(
+                            "could not locate path '{}' for field '{}' in '{}'/'{}'".format(
+                                queryable.json_path,
+                                field_name,
+                                item.collection,
+                                item.id,
+                            )
+                        )
                     insert_params.append(insert_param)
             try:
                 self._conn.execute(

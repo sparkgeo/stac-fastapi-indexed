@@ -23,6 +23,7 @@ from stac_fastapi_indexed.links.item import fix_item_links
 from stac_fastapi_indexed.links.search import get_search_link, get_token_link
 from stac_fastapi_indexed.search.filter.errors import (
     NotAGeometryField,
+    NotATemporalField,
     UnknownField,
     UnknownFunction,
 )
@@ -220,12 +221,7 @@ class SearchHandler:
         if self.search_request.datetime:
             if isinstance(self.search_request.datetime, datetime):
                 return SearchClause(
-                    sql="""
-                        CASE
-                            WHEN datetime_end IS NULL THEN datetime = ?
-                            ELSE datetime <= ? AND datetime_end >= ?
-                        END
-                    """,
+                    sql="datetime <= ? AND datetime_end >= ?",
                     params=[self.search_request.datetime for _ in range(3)],
                 )
             elif isinstance(self.search_request.datetime, tuple):
@@ -250,15 +246,8 @@ class SearchHandler:
                     and self.search_request[1] is not None
                 ):
                     return SearchClause(
-                        sql="""
-                            CASE
-                                WHEN datetime_end IS NULL THEN datetime >= ? and datetime <= ?
-                                ELSE datetime_end >= ? AND datetime <= ?
-                            END
-                        """,
+                        sql="NOT (datetime_end < ? OR datetime > ?)",
                         params=[
-                            self.search_request.datetime[0],
-                            self.search_request.datetime[1],
                             self.search_request.datetime[0],
                             self.search_request.datetime[1],
                         ],
@@ -282,6 +271,11 @@ class SearchHandler:
                         for key, value in queryable_config.items()
                         if value.is_geometry
                     ],
+                    temporal_fields=[
+                        key
+                        for key, value in queryable_config.items()
+                        if value.is_temporal
+                    ],
                     field_mapping={
                         key: value.items_column
                         for key, value in queryable_config.items()
@@ -289,7 +283,7 @@ class SearchHandler:
                 )
             except UnknownField as e:
                 raise InvalidQueryParameter(e.field_name)
-            except NotAGeometryField as e:
+            except (NotAGeometryField, NotATemporalField) as e:
                 raise InvalidQueryParameter(e.argument)
             except UnknownFunction as e:
                 raise InvalidQueryParameter(e.function_name)

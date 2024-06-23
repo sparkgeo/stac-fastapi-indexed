@@ -5,7 +5,8 @@ CREATE VIEW queryables_by_collection AS
          , q.json_path
          , q.json_schema
          , COALESCE(q.items_column, q.name) as items_column
-         , is_geometry
+         , q.is_geometry
+         , q.is_temporal
       FROM queryables q
       JOIN collections c ON c.id = q.collection_id
      UNION
@@ -15,7 +16,8 @@ CREATE VIEW queryables_by_collection AS
          , q.json_path
          , q.json_schema
          , COALESCE(q.items_column, q.name) as items_column
-         , is_geometry
+         , q.is_geometry
+         , q.is_temporal
       FROM collections c 
 CROSS JOIN queryables q
      WHERE q.collection_id = '*';

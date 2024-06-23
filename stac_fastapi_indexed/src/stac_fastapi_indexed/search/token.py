@@ -21,7 +21,7 @@ def get_query_from_token(
                 key=get_settings().token_jwt_secret,
                 algorithms=[_hashing_algorithm],
             )
-        )
+        ).json_post_decoder()
     except Exception as e:
         _logger.warn("error decoding query token", e)
         raise InvalidQueryParameter("invalid search token")
@@ -32,4 +32,5 @@ def create_token_from_query(query_info: QueryInfo) -> str:
         payload=(query_info.to_dict()),
         key=get_settings().token_jwt_secret,
         algorithm=_hashing_algorithm,
+        json_encoder=QueryInfo.json_encoder(),
     )

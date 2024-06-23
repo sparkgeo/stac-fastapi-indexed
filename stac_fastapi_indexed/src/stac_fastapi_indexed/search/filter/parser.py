@@ -32,6 +32,9 @@ def filter_to_ast(filter_lang_name: str, filter: str) -> Node:
 
 
 def ast_to_search_clause(
-    ast: Node, geometry_fields: List[str], field_mapping: Dict[str, str]
+    ast: Node,
+    geometry_fields: List[str],
+    temporal_fields: List[str],
+    field_mapping: Dict[str, str],
 ) -> SearchClause:
-    return to_search_clause(ast, geometry_fields, field_mapping)
+    return to_search_clause(ast, geometry_fields, temporal_fields, field_mapping)
