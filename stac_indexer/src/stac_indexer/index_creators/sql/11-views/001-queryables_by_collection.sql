@@ -10,7 +10,7 @@ CREATE VIEW queryables_by_collection AS
       JOIN collections c ON c.id = q.collection_id
      UNION
     SELECT q.name
-         , c.id AS collection_id
+         , q.collection_id
          , q.description
          , q.json_path
          , q.json_schema

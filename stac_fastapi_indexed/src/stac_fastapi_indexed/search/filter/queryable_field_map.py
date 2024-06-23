@@ -10,6 +10,10 @@ _logger: Final[Logger] = getLogger(__file__)
 
 @dataclass
 class QueryableConfig:
+    name: str
+    collection_id: str
+    description: str
+    json_schema: str
     items_column: str
     is_geometry: bool
 
@@ -20,11 +24,21 @@ def get_queryable_config_by_name(
 ) -> Dict[str, QueryableConfig]:
     _logger.debug("fetching queryable field config")
     field_config = {}
-    for row in connection.execute(
-        "SELECT name, items_column, is_geometry FROM queryables_by_collection"
-    ).fetchall():
+    for row in connection.execute("""
+        SELECT name
+             , collection_id
+             , description
+             , json_schema
+             , items_column
+             , is_geometry
+          FROM queryables_by_collection
+    """).fetchall():
         field_config[row[0]] = QueryableConfig(
-            items_column=row[1],
-            is_geometry=row[2],
+            name=row[0],
+            collection_id=row[1],
+            description=row[2],
+            json_schema=row[3],
+            items_column=row[4],
+            is_geometry=row[5],
         )
     return field_config

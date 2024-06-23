@@ -1,9 +1,15 @@
 from json import loads
-from typing import Any, Dict, Optional, cast
+from typing import Any, Dict, Final, Optional, cast
 
 from duckdb import DuckDBPyConnection
 from fastapi import Request
 from stac_fastapi.types.core import AsyncBaseFiltersClient
+
+from stac_fastapi_indexed.search.filter.queryable_field_map import (
+    get_queryable_config_by_name,
+)
+
+_collection_wildcard: Final[str] = "*"
 
 
 class FiltersClient(AsyncBaseFiltersClient):
@@ -14,28 +20,21 @@ class FiltersClient(AsyncBaseFiltersClient):
         **kwargs: Any,
     ) -> Dict[str, Any]:
         queryables = {}
-        for row in (
+        for field_config in get_queryable_config_by_name(
             cast(DuckDBPyConnection, request.app.state.db_connection)
-            .execute(
-                """
-            SELECT name
-                 , description
-                 , json_schema
-              FROM queryables_by_collection
-                {}
-        """.format(
-                    f"WHERE collection_id = '{collection_id}'"
-                    if collection_id is not None
-                    else ""
-                )
-            )
-            .fetchall()
-        ):
-            queryables[row[0]] = {
-                **loads(row[2]),
-                "title": row[0],
-                "description": row[1],
-            }
+        ).values():
+            if (
+                collection_id is None
+                and field_config.collection_id == _collection_wildcard
+            ) or (
+                collection_id is not None
+                and field_config.collection_id in [collection_id, _collection_wildcard]
+            ):
+                queryables[field_config.name] = {
+                    **loads(field_config.json_schema),
+                    "title": field_config.name,
+                    "description": field_config.description,
+                }
         return {
             "$id": str(request.url),
             "type": "object",
