@@ -30,14 +30,14 @@ from stac_fastapi_indexed.search.filter.errors import (
 )
 from stac_fastapi_indexed.search.filter.parser import (
     FilterLanguages,
-    ast_to_search_clause,
+    ast_to_filter_clause,
     filter_to_ast,
 )
 from stac_fastapi_indexed.search.filter.queryable_field_map import (
     get_queryable_config_by_name,
 )
+from stac_fastapi_indexed.search.filter_clause import FilterClause
 from stac_fastapi_indexed.search.query_info import QueryInfo
-from stac_fastapi_indexed.search.search_clause import SearchClause
 from stac_fastapi_indexed.search.token import (
     create_token_from_query,
     get_query_from_token,
@@ -179,9 +179,9 @@ class SearchHandler:
             sort_fields.append("collection_id ASC, id ASC")
         return sort_fields
 
-    def _include_ids(self) -> Optional[SearchClause]:
+    def _include_ids(self) -> Optional[FilterClause]:
         if self.search_request.ids is not None:
-            return SearchClause(
+            return FilterClause(
                 sql="id IN ({})".format(
                     ", ".join(["?" for _ in range(len(self.search_request.ids))])
                 ),
@@ -189,9 +189,9 @@ class SearchHandler:
             )
         return None
 
-    def _include_collections(self) -> Optional[SearchClause]:
+    def _include_collections(self) -> Optional[FilterClause]:
         if self.search_request.collections is not None:
-            return SearchClause(
+            return FilterClause(
                 sql="collection_id IN ({})".format(
                     ", ".join(
                         ["?" for _ in range(len(self.search_request.collections))]
@@ -201,11 +201,11 @@ class SearchHandler:
             )
         return None
 
-    def _include_bbox(self) -> Optional[SearchClause]:
+    def _include_bbox(self) -> Optional[FilterClause]:
         if self.search_request.bbox is not None:
             bbox_2d = self._get_bbox_2d(self.search_request.bbox)
             if bbox_2d is not None:
-                return SearchClause(
+                return FilterClause(
                     sql="ST_Intersects(ST_GeomFromText('{}'), ST_GeomFromWKB(geometry))".format(
                         "POLYGON (({xmin} {ymin}, {xmax} {ymin}, {xmax} {ymax}, {xmin} {ymax}, {xmin} {ymin}))".format(
                             xmin=bbox_2d[0],
@@ -217,19 +217,19 @@ class SearchHandler:
                 )
         return None
 
-    def _include_intersects(self) -> Optional[SearchClause]:
+    def _include_intersects(self) -> Optional[FilterClause]:
         if self.search_request.intersects is not None:
-            return SearchClause(
+            return FilterClause(
                 sql="ST_Intersects(ST_GeomFromGeoJSON('{}', ST_GeomFromWKB(geometry)))".format(
                     self.search_request.intersects
                 )
             )
         return None
 
-    def _include_datetime(self) -> Optional[SearchClause]:
+    def _include_datetime(self) -> Optional[FilterClause]:
         if self.search_request.datetime:
             if isinstance(self.search_request.datetime, datetime):
-                return SearchClause(
+                return FilterClause(
                     sql="datetime <= ? AND datetime_end >= ?",
                     params=[self.search_request.datetime for _ in range(3)],
                 )
@@ -238,7 +238,7 @@ class SearchHandler:
                     self.search_request.datetime[0] is None
                     and self.search_request.datetime[1] is not None
                 ):
-                    return SearchClause(
+                    return FilterClause(
                         sql="datetime <= ?",
                         params=[self.search_request.datetime[1]],
                     )
@@ -246,7 +246,7 @@ class SearchHandler:
                     self.search_request.datetime[0] is not None
                     and self.search_request.datetime[1] is None
                 ):
-                    return SearchClause(
+                    return FilterClause(
                         sql="datetime >= ?",
                         params=[self.search_request.datetime[0]],
                     )
@@ -254,7 +254,7 @@ class SearchHandler:
                     self.search_request.datetime[0] is not None
                     and self.search_request[1] is not None
                 ):
-                    return SearchClause(
+                    return FilterClause(
                         sql="NOT (datetime_end < ? OR datetime > ?)",
                         params=[
                             self.search_request.datetime[0],
@@ -265,7 +265,7 @@ class SearchHandler:
                     pass  # unbounded datetime means all results are valid
         return None
 
-    def _include_filter(self) -> Optional[SearchClause]:
+    def _include_filter(self) -> Optional[FilterClause]:
         search_request = cast(FilterExtensionPostRequest, self.search_request)
         if search_request.filter:
             ast = self._get_ast_from_filter(
@@ -275,7 +275,7 @@ class SearchHandler:
                 cast(DuckDBPyConnection, self.request.app.state.db_connection)
             )
             try:
-                return ast_to_search_clause(
+                return ast_to_filter_clause(
                     ast=ast,
                     geometry_fields=[
                         key

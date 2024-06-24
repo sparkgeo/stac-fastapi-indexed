@@ -3,6 +3,6 @@ from typing import Any, List
 
 
 @dataclass
-class SearchClause:
+class FilterClause:
     sql: str
     params: List[Any] = field(default_factory=list)

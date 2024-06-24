@@ -43,7 +43,7 @@ from stac_fastapi_indexed.search.filter.errors import (
     UnknownField,
     UnknownFunction,
 )
-from stac_fastapi_indexed.search.search_clause import SearchClause
+from stac_fastapi_indexed.search.filter_clause import FilterClause
 
 _COMPARISON_OP_MAP: Final[Dict[ast.ComparisonOp, str]] = {
     ast.ComparisonOp.EQ: "=",
@@ -112,39 +112,39 @@ class DubkDBSQLEvaluator(Evaluator):
         self.function_map = function_map
 
     @handle(ast.Not)
-    def not_(self, _, sub) -> SearchClause:
-        return SearchClause(
+    def not_(self, _, sub) -> FilterClause:
+        return FilterClause(
             sql=f"NOT {sub}",
         )
 
     @handle(ast.And, ast.Or)
     def combination(
-        self, node: ast.Combination, lhs: SearchClause, rhs: SearchClause
-    ) -> SearchClause:
-        return SearchClause(
+        self, node: ast.Combination, lhs: FilterClause, rhs: FilterClause
+    ) -> FilterClause:
+        return FilterClause(
             sql=f"({lhs.sql} {node.op.value} {rhs.sql})",
             params=lhs.params + rhs.params,
         )
 
     @handle(ast.Comparison, subclasses=True)
-    def comparison(self, node: ast.Comparison, lhs, rhs) -> SearchClause:
+    def comparison(self, node: ast.Comparison, lhs, rhs) -> FilterClause:
         lhs_identifier, lhs_params = self._parameterise_node_part(node.lhs, lhs)
         rhs_identifier, rhs_params = self._parameterise_node_part(node.rhs, rhs)
-        return SearchClause(
+        return FilterClause(
             sql=f"({lhs_identifier} {_COMPARISON_OP_MAP[node.op]} {rhs_identifier})",
             params=lhs_params + rhs_params,
         )
 
     @handle(ast.Between)
-    def between(self, node: ast.Between, lhs, low, high) -> SearchClause:
+    def between(self, node: ast.Between, lhs, low, high) -> FilterClause:
         lhs_identifier, lhs_params = self._parameterise_node_part(node.lhs, lhs)
-        return SearchClause(
+        return FilterClause(
             sql=f"({lhs_identifier} {'NOT ' if node.not_ else ''}BETWEEN ? AND ?)",
             params=lhs_params + [low, high],
         )
 
     @handle(ast.Like)
-    def like(self, node: ast.Like, lhs: str) -> SearchClause:
+    def like(self, node: ast.Like, lhs: str) -> FilterClause:
         pattern = node.pattern
         if node.wildcard != "%":
             # TODO: not preceded by escapechar
@@ -153,7 +153,7 @@ class DubkDBSQLEvaluator(Evaluator):
             # TODO: not preceded by escapechar
             pattern = pattern.replace(node.singlechar, "_")
         lhs_identifier, lhs_params = self._parameterise_node_part(node.lhs, lhs)
-        return SearchClause(
+        return FilterClause(
             # TODO: handle node.nocase
             sql=f"{lhs_identifier} {'NOT ' if node.not_ else ''}LIKE "
             f"? ESCAPE '{node.escapechar}'",
@@ -161,9 +161,9 @@ class DubkDBSQLEvaluator(Evaluator):
         )
 
     @handle(ast.In)
-    def in_(self, node: ast.In, lhs, *options: Tuple[Any]) -> SearchClause:
+    def in_(self, node: ast.In, lhs, *options: Tuple[Any]) -> FilterClause:
         lhs_identifier, lhs_params = self._parameterise_node_part(node.lhs, lhs)
-        return SearchClause(
+        return FilterClause(
             sql="{lhs_identifier} {not_logic}IN ({options})".format(
                 lhs_identifier=lhs_identifier,
                 not_logic="NOT " if node.not_ else "",
@@ -173,9 +173,9 @@ class DubkDBSQLEvaluator(Evaluator):
         )
 
     @handle(ast.IsNull)
-    def null(self, node: ast.IsNull, lhs) -> SearchClause:
+    def null(self, node: ast.IsNull, lhs) -> FilterClause:
         lhs_identifier, _ = self._parameterise_node_part(node.lhs, lhs)
-        return SearchClause(
+        return FilterClause(
             sql=f"{lhs_identifier} IS {'NOT ' if node.not_ else ''}NULL"
         )
 
@@ -205,7 +205,7 @@ class DubkDBSQLEvaluator(Evaluator):
             interval_start = interval_end = rhs_identifier
             if isinstance(node.rhs, values.Interval):
                 rhs_params = [rhs_params[0].start, rhs_params[0].end]
-        return SearchClause(
+        return FilterClause(
             sql=_TEMPORAL_POINT_COMPARISON_OP_MAP[node.op].format(
                 point_comparator=point_comparator,
                 interval_start=interval_start,
@@ -215,16 +215,16 @@ class DubkDBSQLEvaluator(Evaluator):
         )
 
     @handle(values.Interval, subclasses=True)
-    def interval(self, node: values.Interval, lhs, rhs) -> SearchClause:
+    def interval(self, node: values.Interval, lhs, rhs) -> FilterClause:
         return node
 
     @handle(ast.SpatialComparisonPredicate, subclasses=True)
     def spatial_operation(
         self, node: ast.SpatialComparisonPredicate, lhs, rhs
-    ) -> SearchClause:
+    ) -> FilterClause:
         func = _SPATIAL_COMPARISON_OP_MAP[node.op]
         if type(lhs) is _GeometrySql and type(rhs) == _GeometrySql:
-            return SearchClause(sql=f"{func}({lhs.sql_part},{rhs.sql_part})")
+            return FilterClause(sql=f"{func}({lhs.sql_part},{rhs.sql_part})")
         if type(lhs) is not _GeometrySql:
             raise NotAGeometryField(lhs)
         if type(rhs) is not _GeometrySql:
@@ -254,7 +254,7 @@ class DubkDBSQLEvaluator(Evaluator):
         op = _ARITHMETIC_OP_MAP[node.op]
         lhs_identifier, lhs_params = self._parameterise_node_part(node.lhs, lhs)
         rhs_identifier, rhs_params = self._parameterise_node_part(node.rhs, rhs)
-        return SearchClause(
+        return FilterClause(
             sql=f"({lhs_identifier} {op} {rhs_identifier})",
             params=lhs_params + rhs_params,
         )
@@ -283,11 +283,11 @@ class DubkDBSQLEvaluator(Evaluator):
         wkb_hex = geometry.box(node.x1, node.y1, node.x2, node.y2).wkb_hex
         return _GeometrySql(sql_part=f"ST_GeomFromHEXEWKB('{wkb_hex}')")
 
-    def adopt_result(self, result: SearchClause) -> SearchClause:
-        # flatten any nested SearchClauses as DuckDB will not evaluate parameterised expressions that are themselves parameters
-        def elevate_nested_clauses(parent_clause: SearchClause) -> SearchClause:
+    def adopt_result(self, result: FilterClause) -> FilterClause:
+        # flatten any nested FilterClauses as DuckDB will not evaluate parameterised expressions that are themselves parameters
+        def elevate_nested_clauses(parent_clause: FilterClause) -> FilterClause:
             for i, param in enumerate(parent_clause.params):
-                if type(param) is SearchClause:
+                if type(param) is FilterClause:
                     param = elevate_nested_clauses(param)
                     parts = parent_clause.sql.split(_param_placeholder)
                     parent_clause.sql = (
@@ -317,12 +317,12 @@ class DubkDBSQLEvaluator(Evaluator):
         return (part_identifier, part_params)
 
 
-def to_search_clause(
+def to_filter_clause(
     root: ast.Node,
     geometry_fields: List[str],
     temporal_fields: List[str],
     field_mapping: Dict[str, str],
-) -> SearchClause:
+) -> FilterClause:
     return DubkDBSQLEvaluator(
         geometry_fields,
         temporal_fields,
