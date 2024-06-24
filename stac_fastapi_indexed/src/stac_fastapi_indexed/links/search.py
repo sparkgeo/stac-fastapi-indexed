@@ -45,11 +45,4 @@ def get_token_link(
 
 
 def _add_token_to_get_url(request: Request, token: str) -> str:
-    return str(
-        request.url.replace_query_params(
-            **{
-                **dict(request.query_params),
-                "token": token,
-            }
-        )
-    )
+    return str(request.url.replace_query_params(token=token))
