@@ -2,7 +2,7 @@
 **/__pycache__
 
 data/index/**
-data/STAC/pc_partial_data/**
+data/STAC/pc_partial_data/data/**
 src/stac_indexer/index_data/**
 
 minio/mc/config/**
