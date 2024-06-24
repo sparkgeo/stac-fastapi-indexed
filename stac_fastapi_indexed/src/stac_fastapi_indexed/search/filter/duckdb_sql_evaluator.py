@@ -73,8 +73,21 @@ _SPATIAL_COMPARISON_OP_MAP: Final[Dict[ast.SpatialComparisonOp, str]] = {
     ast.SpatialComparisonOp.EQUALS: "ST_Equals",
 }
 
-_TEMPORAL_COMPARISON_OP_MAP: Final[Dict[ast.TemporalComparisonOp, str]] = {
-    ast.TemporalComparisonOp.TOVERLAPS: "{point_comparator} >= {interval_start} AND {point_comparator} <= {interval_end}"
+_TEMPORAL_POINT_COMPARISON_TYPES: Final[List[ast.TemporalPredicate]] = [
+    ast.TimeBefore,
+    ast.TimeAfter,
+    ast.TimeMeets,
+    ast.TimeMetBy,
+    ast.TimeOverlaps,
+    ast.TimeEquals,
+]
+_TEMPORAL_POINT_COMPARISON_OP_MAP: Final[Dict[ast.TemporalComparisonOp, str]] = {
+    ast.TemporalComparisonOp.BEFORE: "{interval_end} < {point_comparator}",
+    ast.TemporalComparisonOp.AFTER: "{interval_start} > {point_comparator}",
+    ast.TemporalComparisonOp.MEETS: "{interval_end} = {point_comparator}",
+    ast.TemporalComparisonOp.METBY: "{interval_start} = {point_comparator}",
+    ast.TemporalComparisonOp.TOVERLAPS: "{point_comparator} >= {interval_start} AND {point_comparator} <= {interval_end}",
+    ast.TemporalComparisonOp.TEQUALS: "{point_comparator} = {interval_start} AND {point_comparator} = {interval_end}",
 }
 
 _param_placeholder: Final[str] = "?"
@@ -168,33 +181,35 @@ class DubkDBSQLEvaluator(Evaluator):
 
     # This originally handled ast.TemporalPredicate, but has been restricted to only TimeOverlaps as this is all the STAC API filter extension requires.
     # Expected behaviour for other relationships theretically supported by pygeofilter is not well documented and it is unclear how the caller
-    # could compare against multiple fields in the data source, as would be required for some relationships.
-    @handle(ast.TimeOverlaps, subclasses=True)
-    def temporal(self, node: ast.TimeOverlaps, lhs, rhs):
+    # could compare against multiple fields in the data source, as would be required for some relationships.x
+    @handle(*_TEMPORAL_POINT_COMPARISON_TYPES)
+    def temporal_overlaps(self, node: ast.TemporalPredicate, lhs, rhs):
         lhs_identifier, lhs_params = self._parameterise_node_part(node.lhs, lhs)
         rhs_identifier, rhs_params = self._parameterise_node_part(node.rhs, rhs)
         if (
-            type(node.lhs) is ast.Attribute
+            isinstance(node.lhs, ast.Attribute)
             and node.lhs.name not in self.temporal_attributes
         ):
             raise NotATemporalField(node.lhs.name)
         if (
-            type(node.rhs) is ast.Attribute
+            isinstance(node.rhs, ast.Attribute)
             and node.rhs.name not in self.temporal_attributes
         ):
             raise NotATemporalField(node.rhs.name)
-        if type(node.lhs) is ast.Attribute:
+        if isinstance(node.lhs, ast.Attribute):
             point_comparator = lhs_identifier
-        elif type(node.lhs) is values.Interval:
+        else:
             interval_start = interval_end = lhs_identifier
-            lhs_params = [lhs_params[0].start, lhs_params[0].end]
-        if type(node.rhs) is ast.Attribute:
+            if isinstance(node.lhs, values.Interval):
+                lhs_params = [lhs_params[0].start, lhs_params[0].end]
+        if isinstance(node.rhs, ast.Attribute):
             point_comparator = rhs_identifier
-        elif type(node.rhs) is values.Interval:
+        else:
             interval_start = interval_end = rhs_identifier
-            rhs_params = [rhs_params[0].start, rhs_params[0].end]
+            if isinstance(node.rhs, values.Interval):
+                rhs_params = [rhs_params[0].start, rhs_params[0].end]
         return SearchClause(
-            sql=_TEMPORAL_COMPARISON_OP_MAP[node.op].format(
+            sql=_TEMPORAL_POINT_COMPARISON_OP_MAP[node.op].format(
                 point_comparator=point_comparator,
                 interval_start=interval_start,
                 interval_end=interval_end,
