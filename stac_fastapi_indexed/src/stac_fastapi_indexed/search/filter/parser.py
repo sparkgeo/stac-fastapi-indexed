@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from pygeofilter.ast import Node
 from stac_fastapi.types.errors import InvalidQueryParameter
@@ -8,23 +8,27 @@ from stac_fastapi_indexed.search.filter.duckdb_sql_evaluator import to_search_cl
 from stac_fastapi_indexed.search.search_clause import SearchClause
 
 
-class _TypeParsers(str, Enum):
+class FilterLanguages(str, Enum):
     JSON2 = "cql2-json"
     JSON = "cql-json"
-    CQL = "cql2-text"
+    TEXT = "cql2-text"
 
 
-def filter_to_ast(filter_lang_name: str, filter: str) -> Node:
+def parse_filter_language(filter_lang: str) -> FilterLanguages:
     try:
-        parser_type = _TypeParsers(filter_lang_name)
+        return FilterLanguages(filter_lang)
     except KeyError:
-        raise InvalidQueryParameter(f"Unsupported filter language {filter_lang_name}.")
-    if parser_type == _TypeParsers.JSON2:
+        raise InvalidQueryParameter(f"Unsupported filter language {filter_lang}.")
+
+
+def filter_to_ast(filter: Dict[str, Any] | str, filter_lang: str) -> Node:
+    parser_type = parse_filter_language(filter_lang)
+    if parser_type == FilterLanguages.JSON2:
         from pygeofilter.parsers.cql2_json import parse
-    if parser_type == _TypeParsers.JSON:
+    if parser_type == FilterLanguages.JSON:
         from pygeofilter.parsers.cql_json import parse
-    elif parser_type == _TypeParsers.CQL:
-        from pygeofilter.parsers.ecql import parse
+    elif parser_type == FilterLanguages.TEXT:
+        from pygeofilter.parsers.cql2_text import parse
     try:
         return parse(filter)
     except Exception as e:

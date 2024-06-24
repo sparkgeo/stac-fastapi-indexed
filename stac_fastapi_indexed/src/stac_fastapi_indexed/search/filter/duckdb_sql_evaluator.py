@@ -179,9 +179,6 @@ class DubkDBSQLEvaluator(Evaluator):
             sql=f"{lhs_identifier} IS {'NOT ' if node.not_ else ''}NULL"
         )
 
-    # This originally handled ast.TemporalPredicate, but has been restricted to only TimeOverlaps as this is all the STAC API filter extension requires.
-    # Expected behaviour for other relationships theretically supported by pygeofilter is not well documented and it is unclear how the caller
-    # could compare against multiple fields in the data source, as would be required for some relationships.x
     @handle(*_TEMPORAL_POINT_COMPARISON_TYPES)
     def temporal_overlaps(self, node: ast.TemporalPredicate, lhs, rhs):
         lhs_identifier, lhs_params = self._parameterise_node_part(node.lhs, lhs)
@@ -235,8 +232,7 @@ class DubkDBSQLEvaluator(Evaluator):
         raise Exception(f"unknown error condition in '{func}'")
 
     @handle(ast.BBox)
-    def bbox(self, node, lhs):
-        # seemingly unsupported in cql2-json format, currently untested as execution never gets this far
+    def bbox(self, node: ast.BBox, lhs):
         if type(lhs) is not _GeometrySql:
             raise NotAGeometryField(lhs)
         func = _SPATIAL_COMPARISON_OP_MAP[ast.SpatialComparisonOp.INTERSECTS]
@@ -284,7 +280,6 @@ class DubkDBSQLEvaluator(Evaluator):
     # inspired by https://github.com/geopython/pygeofilter/issues/90#issuecomment-2011712041
     @handle(values.Envelope)
     def envelope(self, node: values.Envelope) -> _GeometrySql:
-        # seemingly unsupported in cql2-json format, currently untested as execution never gets this far
         wkb_hex = geometry.box(node.x1, node.y1, node.x2, node.y2).wkb_hex
         return _GeometrySql(sql_part=f"ST_GeomFromHEXEWKB('{wkb_hex}')")
 

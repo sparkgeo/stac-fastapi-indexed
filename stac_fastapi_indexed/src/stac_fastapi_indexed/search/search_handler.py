@@ -4,10 +4,11 @@ from datetime import datetime
 from json import loads
 from logging import Logger, getLogger
 from re import sub
-from typing import Any, Final, List, Optional, Union, cast
+from typing import Any, Dict, Final, List, Optional, Union, cast
 
 from duckdb import DuckDBPyConnection
 from fastapi import Request
+from pygeofilter.ast import Node
 from stac_fastapi.extensions.core.filter.filter import FilterExtensionPostRequest
 from stac_fastapi.extensions.core.pagination.token_pagination import POSTTokenPagination
 from stac_fastapi.extensions.core.sort.sort import SortExtensionPostRequest
@@ -28,6 +29,7 @@ from stac_fastapi_indexed.search.filter.errors import (
     UnknownFunction,
 )
 from stac_fastapi_indexed.search.filter.parser import (
+    FilterLanguages,
     ast_to_search_clause,
     filter_to_ast,
 )
@@ -43,12 +45,19 @@ from stac_fastapi_indexed.search.token import (
 from stac_fastapi_indexed.search.types import SearchDirection, SearchMethod
 
 _logger: Final[Logger] = getLogger(__file__)
+_text_filter_wrap_key: Final[str] = "__text_filter"
 
 
 @dataclass
 class SearchHandler:
     search_request: BaseSearchPostRequest
     request: Request
+
+    @staticmethod
+    def wrap_text_filter(filter: str) -> Dict[str, Any]:
+        # BaseSearchPostRequest only supports dictionary filters.
+        # Wrap and unwrap as required, rather than following multiple parsing steps to hack around this.
+        return {_text_filter_wrap_key: filter}
 
     async def search(self) -> ItemCollection:
         if cast(POSTTokenPagination, self.search_request).token is None:
@@ -259,7 +268,9 @@ class SearchHandler:
     def _include_filter(self) -> Optional[SearchClause]:
         search_request = cast(FilterExtensionPostRequest, self.search_request)
         if search_request.filter:
-            ast = filter_to_ast(search_request.filter_lang, search_request.filter)
+            ast = self._get_ast_from_filter(
+                search_request.filter, search_request.filter_lang
+            )
             queryable_config = get_queryable_config_by_name(
                 cast(DuckDBPyConnection, self.request.app.state.db_connection)
             )
@@ -288,6 +299,16 @@ class SearchHandler:
             except UnknownFunction as e:
                 raise InvalidQueryParameter(e.function_name)
         return None
+
+    def _get_ast_from_filter(
+        self, filter_dict: Dict[str, Any], filter_lang: str
+    ) -> Node:
+        if _text_filter_wrap_key in filter_dict:
+            return filter_to_ast(
+                filter_dict[_text_filter_wrap_key], FilterLanguages.TEXT.value
+            )
+        else:
+            return filter_to_ast(filter_dict, filter_lang)
 
     def _get_bbox_2d(
         self, bbox: List[Union[float, int]]
