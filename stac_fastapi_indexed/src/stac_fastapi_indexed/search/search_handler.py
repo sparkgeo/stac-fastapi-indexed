@@ -29,9 +29,10 @@ from stac_fastapi_indexed.search.filter.errors import (
     UnknownFunction,
 )
 from stac_fastapi_indexed.search.filter.parser import (
-    FilterLanguages,
+    FilterLanguage,
     ast_to_filter_clause,
     filter_to_ast,
+    parse_filter_language,
 )
 from stac_fastapi_indexed.search.filter.queryable_field_map import (
     get_queryable_config_by_name,
@@ -54,10 +55,15 @@ class SearchHandler:
     request: Request
 
     @staticmethod
-    def wrap_text_filter(filter: str) -> Dict[str, Any]:
+    def wrap_text_filter(
+        filter: str | Dict[str, Any], filter_lang: str
+    ) -> Dict[str, Any]:
         # BaseSearchPostRequest only supports dictionary filters.
         # Wrap and unwrap as required, rather than following multiple parsing steps to hack around this.
-        return {_text_filter_wrap_key: filter}
+        filter_type = parse_filter_language(filter_lang)
+        if filter_type == FilterLanguage.TEXT:
+            return {_text_filter_wrap_key: filter}
+        return cast(Dict[str, Any], filter)
 
     async def search(self) -> ItemCollection:
         if cast(POSTTokenPagination, self.search_request).token is None:
@@ -305,7 +311,7 @@ class SearchHandler:
     ) -> Node:
         if _text_filter_wrap_key in filter_dict:
             return filter_to_ast(
-                filter_dict[_text_filter_wrap_key], FilterLanguages.TEXT.value
+                filter_dict[_text_filter_wrap_key], FilterLanguage.TEXT.value
             )
         else:
             return filter_to_ast(filter_dict, filter_lang)

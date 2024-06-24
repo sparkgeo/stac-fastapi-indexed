@@ -24,7 +24,7 @@ from stac_fastapi_indexed.links.collection import (
     get_collections_link,
 )
 from stac_fastapi_indexed.links.item import fix_item_links
-from stac_fastapi_indexed.search.filter.parser import FilterLanguages
+from stac_fastapi_indexed.search.filter.parser import FilterLanguage
 from stac_fastapi_indexed.search.search_handler import SearchHandler
 
 _logger: Final[Logger] = getLogger(__file__)
@@ -177,7 +177,6 @@ class CoreCrudClient(AsyncBaseCoreClient):
         if intersects:
             base_args["intersects"] = unquote_plus(intersects)
         if filter:
-            base_args["filter"] = SearchHandler.wrap_text_filter(filter)
             # following block based on https://github.com/stac-utils/stac-fastapi-pgstac/blob/659ddc374b7001dc7c7ad2cc2fd29e3f420b0573/stac_fastapi/pgstac/core.py#L373
             # Kludgy fix because using factory does not allow alias for filter-lang
             if filter_lang is None:
@@ -186,8 +185,10 @@ class CoreCrudClient(AsyncBaseCoreClient):
                 )
                 if lang_match:
                     filter_lang = lang_match.group(1)
-            base_args["filter-lang"] = filter_lang or FilterLanguages.TEXT.value
-            # prefer to wrap / unwrap filter content here than parse and convert and re-parse
+            filter_lang = filter_lang or FilterLanguage.TEXT.value
+            # prefer to wrap / unwrap filter content here than parse, convert, and re-parse
+            base_args["filter"] = SearchHandler.wrap_text_filter(filter, filter_lang)
+            base_args["filter-lang"] = filter_lang
         try:
             search_request = self.post_request_model(
                 **{

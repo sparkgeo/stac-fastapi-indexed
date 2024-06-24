@@ -8,26 +8,26 @@ from stac_fastapi_indexed.search.filter.duckdb_sql_evaluator import to_filter_cl
 from stac_fastapi_indexed.search.filter_clause import FilterClause
 
 
-class FilterLanguages(str, Enum):
+class FilterLanguage(str, Enum):
     JSON2 = "cql2-json"
     JSON = "cql-json"
     TEXT = "cql2-text"
 
 
-def parse_filter_language(filter_lang: str) -> FilterLanguages:
+def parse_filter_language(filter_lang: str) -> FilterLanguage:
     try:
-        return FilterLanguages(filter_lang)
+        return FilterLanguage(filter_lang)
     except KeyError:
         raise InvalidQueryParameter(f"Unsupported filter language {filter_lang}.")
 
 
 def filter_to_ast(filter: Dict[str, Any] | str, filter_lang: str) -> Node:
     parser_type = parse_filter_language(filter_lang)
-    if parser_type == FilterLanguages.JSON2:
+    if parser_type == FilterLanguage.JSON2:
         from pygeofilter.parsers.cql2_json import parse
-    if parser_type == FilterLanguages.JSON:
+    if parser_type == FilterLanguage.JSON:
         from pygeofilter.parsers.cql_json import parse
-    elif parser_type == FilterLanguages.TEXT:
+    elif parser_type == FilterLanguage.TEXT:
         from pygeofilter.parsers.cql2_text import parse
     try:
         return parse(filter)
