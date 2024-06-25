@@ -20,6 +20,8 @@ class Queryable(BaseModel):
     description: str
     json_path: str
     json_schema: Dict[str, Any]
+    is_geometry: Optional[bool] = False
+    is_temporal: Optional[bool] = False
 
 
 QueryablesByFieldName = Dict[str, Queryable]

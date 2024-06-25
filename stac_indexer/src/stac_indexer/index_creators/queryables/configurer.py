@@ -13,8 +13,8 @@ def configure(config: IndexConfig, connection: DuckDBPyConnection) -> None:
         for field_name, queryable in queryables_by_field_name.items():
             connection.execute(
                 """
-                INSERT INTO queryables (collection_id, name, description, json_path, json_schema, items_column)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO queryables (collection_id, name, description, json_path, json_schema, items_column, is_geometry, is_temporal)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
                 [
                     collection_id,
@@ -23,6 +23,8 @@ def configure(config: IndexConfig, connection: DuckDBPyConnection) -> None:
                     queryable.json_path,
                     dumps(queryable.json_schema),
                     queryable_field_name_to_column_name(field_name),
+                    queryable.is_geometry,
+                    queryable.is_temporal,
                 ],
             )
             connection.execute(
