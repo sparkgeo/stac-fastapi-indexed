@@ -9,6 +9,7 @@ from stac_fastapi.extensions.core import (
     FilterExtension,
     SortExtension,
     TokenPaginationExtension,
+    FieldsExtension,
 )
 
 from stac_fastapi_indexed.core import CoreCrudClient
@@ -17,9 +18,10 @@ from stac_fastapi_indexed.search.filter.filter_client import FiltersClient
 from stac_fastapi_indexed.settings import get_settings
 
 extensions_map = {
-    "sort": SortExtension(),
-    "pagination": TokenPaginationExtension(),
+    "fields": FieldsExtension(),
     "filter": FilterExtension(client=FiltersClient()),
+    "pagination": TokenPaginationExtension(),
+    "sort": SortExtension(),
 }
 
 extensions = list(extensions_map.values())

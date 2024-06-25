@@ -144,7 +144,6 @@ class CoreCrudClient(AsyncBaseCoreClient):
         bbox: Optional[BBox] = None,
         datetime: Optional[DateTimeType] = None,
         limit: Optional[int] = None,
-        query: Optional[str] = None,
         token: Optional[str] = None,
         fields: Optional[List[str]] = None,
         sortby: Optional[str] = None,
@@ -189,6 +188,18 @@ class CoreCrudClient(AsyncBaseCoreClient):
             # prefer to wrap / unwrap filter content here than parse, convert, and re-parse
             base_args["filter"] = SearchHandler.wrap_text_filter(filter, filter_lang)
             base_args["filter-lang"] = filter_lang
+        # following block based on https://github.com/stac-utils/stac-fastapi-pgstac/blob/659ddc374b7001dc7c7ad2cc2fd29e3f420b0573/stac_fastapi/pgstac/core.py#L415
+        if fields:
+            includes = set()
+            excludes = set()
+            for field in fields:
+                if field[0] == "-":
+                    excludes.add(field[1:])
+                elif field[0] == "+":
+                    includes.add(field[1:])
+                else:
+                    includes.add(field)
+            base_args["fields"] = {"include": includes, "exclude": excludes}
         try:
             search_request = self.post_request_model(
                 **{
