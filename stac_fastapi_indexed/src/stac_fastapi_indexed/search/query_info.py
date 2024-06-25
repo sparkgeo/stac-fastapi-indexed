@@ -1,5 +1,12 @@
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, cast
+from datetime import datetime
+from json import JSONEncoder
+from re import escape, match
+from typing import Any, Dict, Final, List, Optional, Type, cast
+
+from dateutil import parser as datetime_parser
+
+_datetime_field_prefix: Final[str] = "datetime::"
 
 
 @dataclass(kw_only=True)
@@ -34,3 +41,33 @@ class QueryInfo:
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
+
+    @staticmethod
+    def json_encoder() -> Type:
+        return _CustomJSONEncoder
+
+    def json_post_decoder(self) -> "QueryInfo":
+        new_params = []
+        for param in self.params:
+            if isinstance(param, str):
+                datetime_match = match(rf"^{escape(_datetime_field_prefix)}(.+)", param)
+                if datetime_match:
+                    new_params.append(datetime_parser.parse(datetime_match.group(1)))
+                    continue
+            new_params.append(param)
+        return QueryInfo(
+            query=self.query,
+            params=new_params,
+            limit=self.limit,
+            offset=self.offset,
+        )
+
+
+class _CustomJSONEncoder(JSONEncoder):
+    def default(self, obj: Any) -> Any:
+        if isinstance(obj, datetime):
+            return "{}{}".format(
+                _datetime_field_prefix,
+                obj.isoformat(),
+            )
+        return JSONEncoder.default(self, obj)

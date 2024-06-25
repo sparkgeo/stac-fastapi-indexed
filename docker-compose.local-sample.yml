@@ -26,7 +26,7 @@ services:
       <<: *minio-environment
     volumes:
       - "./minio/mc/entrypoint.sh:/entrypoint.sh:ro"
-      - "./data/STAC/sample/:/stac/sample:ro"
+      - "./data/STAC/sample/data/:/stac/sample:ro"
     depends_on:
       minio:
         condition: service_healthy
@@ -47,8 +47,9 @@ services:
       - "indexer-output:/output:rw"
       - "./stac_index_common:/app/stac_index_common:rw"
       - "./stac_indexer:/app/stac_indexer:rw"
+      - "./data/STAC/sample/index-config.json:/index-config.json:ro"
     working_dir: /app/stac_indexer/src
-    command: "python -m stac_indexer.index s3://stac/sample/catalog.json"
+    command: "python -m stac_indexer.index /index-config.json"
     depends_on:
       minio-sample-loader:
         condition: service_completed_successfully

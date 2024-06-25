@@ -1,15 +1,18 @@
 from asyncio import gather
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from json import loads
 from logging import Logger, getLogger
 from re import sub
-from typing import Any, Final, List, Optional, Union, cast
+from typing import Any, Dict, Final, List, Optional, Union, cast
 
 from duckdb import DuckDBPyConnection
 from fastapi import Request
+from pygeofilter.ast import Node
+from stac_fastapi.extensions.core.filter.filter import FilterExtensionPostRequest
 from stac_fastapi.extensions.core.pagination.token_pagination import POSTTokenPagination
 from stac_fastapi.extensions.core.sort.sort import SortExtensionPostRequest
+from stac_fastapi.types.errors import InvalidQueryParameter
 from stac_fastapi.types.search import BaseSearchPostRequest
 from stac_fastapi.types.stac import Item, ItemCollection
 from stac_pydantic.api.extensions.sort import SortDirections
@@ -19,6 +22,22 @@ from stac_fastapi_indexed.fetchers import fetch
 from stac_fastapi_indexed.links.catalog import get_catalog_link
 from stac_fastapi_indexed.links.item import fix_item_links
 from stac_fastapi_indexed.links.search import get_search_link, get_token_link
+from stac_fastapi_indexed.search.filter.errors import (
+    NotAGeometryField,
+    NotATemporalField,
+    UnknownField,
+    UnknownFunction,
+)
+from stac_fastapi_indexed.search.filter.parser import (
+    FilterLanguage,
+    ast_to_filter_clause,
+    filter_to_ast,
+    parse_filter_language,
+)
+from stac_fastapi_indexed.search.filter.queryable_field_map import (
+    get_queryable_config_by_name,
+)
+from stac_fastapi_indexed.search.filter_clause import FilterClause
 from stac_fastapi_indexed.search.query_info import QueryInfo
 from stac_fastapi_indexed.search.token import (
     create_token_from_query,
@@ -27,18 +46,24 @@ from stac_fastapi_indexed.search.token import (
 from stac_fastapi_indexed.search.types import SearchDirection, SearchMethod
 
 _logger: Final[Logger] = getLogger(__file__)
-
-
-@dataclass
-class _SearchAddition:
-    clauses: List[str] = field(default_factory=list)
-    params: List[Any] = field(default_factory=list)
+_text_filter_wrap_key: Final[str] = "__text_filter"
 
 
 @dataclass
 class SearchHandler:
     search_request: BaseSearchPostRequest
     request: Request
+
+    @staticmethod
+    def wrap_text_filter(
+        filter: str | Dict[str, Any], filter_lang: str
+    ) -> Dict[str, Any]:
+        # BaseSearchPostRequest only supports dictionary filters.
+        # Wrap and unwrap as required, rather than following multiple parsing steps to hack around this.
+        filter_type = parse_filter_language(filter_lang)
+        if filter_type == FilterLanguage.TEXT:
+            return {_text_filter_wrap_key: filter}
+        return cast(Dict[str, Any], filter)
 
     async def search(self) -> ItemCollection:
         if cast(POSTTokenPagination, self.search_request).token is None:
@@ -119,10 +144,11 @@ class SearchHandler:
                 self._include_bbox(),
                 self._include_intersects(),
                 self._include_datetime(),
+                self._include_filter(),
             ]
             if addition is not None
         ]:
-            clauses.extend(addition.clauses)
+            clauses.append(addition.sql)
             params.extend(addition.params)
         query = """
             SELECT stac_location
@@ -159,73 +185,58 @@ class SearchHandler:
             sort_fields.append("collection_id ASC, id ASC")
         return sort_fields
 
-    def _include_ids(self) -> Optional[_SearchAddition]:
+    def _include_ids(self) -> Optional[FilterClause]:
         if self.search_request.ids is not None:
-            return _SearchAddition(
-                clauses=[
-                    "id IN ({})".format(
-                        ", ".join(["?" for _ in range(len(self.search_request.ids))])
-                    )
-                ],
+            return FilterClause(
+                sql="id IN ({})".format(
+                    ", ".join(["?" for _ in range(len(self.search_request.ids))])
+                ),
                 params=self.search_request.ids,
             )
         return None
 
-    def _include_collections(self) -> Optional[_SearchAddition]:
+    def _include_collections(self) -> Optional[FilterClause]:
         if self.search_request.collections is not None:
-            return _SearchAddition(
-                clauses=[
-                    "collection_id IN ({})".format(
-                        ", ".join(
-                            ["?" for _ in range(len(self.search_request.collections))]
-                        )
+            return FilterClause(
+                sql="collection_id IN ({})".format(
+                    ", ".join(
+                        ["?" for _ in range(len(self.search_request.collections))]
                     )
-                ],
+                ),
                 params=self.search_request.collections,
             )
         return None
 
-    def _include_bbox(self) -> Optional[_SearchAddition]:
+    def _include_bbox(self) -> Optional[FilterClause]:
         if self.search_request.bbox is not None:
             bbox_2d = self._get_bbox_2d(self.search_request.bbox)
             if bbox_2d is not None:
-                return _SearchAddition(
-                    clauses=[
-                        "ST_Intersects(ST_GeomFromText('{}'), ST_GeomFromWKB(geometry))".format(
-                            "POLYGON (({xmin} {ymin}, {xmax} {ymin}, {xmax} {ymax}, {xmin} {ymax}, {xmin} {ymin}))".format(
-                                xmin=bbox_2d[0],
-                                ymin=bbox_2d[1],
-                                xmax=bbox_2d[2],
-                                ymax=bbox_2d[3],
-                            )
+                return FilterClause(
+                    sql="ST_Intersects(ST_GeomFromText('{}'), ST_GeomFromWKB(geometry))".format(
+                        "POLYGON (({xmin} {ymin}, {xmax} {ymin}, {xmax} {ymax}, {xmin} {ymax}, {xmin} {ymin}))".format(
+                            xmin=bbox_2d[0],
+                            ymin=bbox_2d[1],
+                            xmax=bbox_2d[2],
+                            ymax=bbox_2d[3],
                         )
-                    ]
+                    )
                 )
         return None
 
-    def _include_intersects(self) -> Optional[_SearchAddition]:
+    def _include_intersects(self) -> Optional[FilterClause]:
         if self.search_request.intersects is not None:
-            return _SearchAddition(
-                clauses=[
-                    "ST_Intersects(ST_GeomFromGeoJSON('{}', ST_GeomFromWKB(geometry)))".format(
-                        self.search_request.intersects
-                    )
-                ]
+            return FilterClause(
+                sql="ST_Intersects(ST_GeomFromGeoJSON('{}', ST_GeomFromWKB(geometry)))".format(
+                    self.search_request.intersects
+                )
             )
         return None
 
-    def _include_datetime(self) -> Optional[_SearchAddition]:
+    def _include_datetime(self) -> Optional[FilterClause]:
         if self.search_request.datetime:
             if isinstance(self.search_request.datetime, datetime):
-                return _SearchAddition(
-                    clauses=[
-                        """
-                        CASE
-                            WHEN datetime_end IS NULL THEN datetime = ?
-                            ELSE datetime <= ? AND datetime_end >= ?
-                        END
-                        """
-                    ],
+                return FilterClause(
+                    sql="datetime <= ? AND datetime_end >= ?",
                     params=[self.search_request.datetime for _ in range(3)],
                 )
             elif isinstance(self.search_request.datetime, tuple):
@@ -233,34 +244,25 @@ class SearchHandler:
                     self.search_request.datetime[0] is None
                     and self.search_request.datetime[1] is not None
                 ):
-                    return _SearchAddition(
-                        clauses=["datetime <= ?"],
+                    return FilterClause(
+                        sql="datetime <= ?",
                         params=[self.search_request.datetime[1]],
                     )
                 elif (
                     self.search_request.datetime[0] is not None
                     and self.search_request.datetime[1] is None
                 ):
-                    return _SearchAddition(
-                        clauses=["datetime >= ?"],
+                    return FilterClause(
+                        sql="datetime >= ?",
                         params=[self.search_request.datetime[0]],
                     )
                 elif (
                     self.search_request.datetime[0] is not None
                     and self.search_request[1] is not None
                 ):
-                    return _SearchAddition(
-                        clauses=[
-                            """
-                            CASE
-                                WHEN datetime_end IS NULL THEN datetime >= ? and datetime <= ?
-                                ELSE datetime_end >= ? AND datetime <= ?
-                            END
-                        """
-                        ],
+                    return FilterClause(
+                        sql="NOT (datetime_end < ? OR datetime > ?)",
                         params=[
-                            self.search_request.datetime[0],
-                            self.search_request.datetime[1],
                             self.search_request.datetime[0],
                             self.search_request.datetime[1],
                         ],
@@ -268,6 +270,51 @@ class SearchHandler:
                 else:
                     pass  # unbounded datetime means all results are valid
         return None
+
+    def _include_filter(self) -> Optional[FilterClause]:
+        search_request = cast(FilterExtensionPostRequest, self.search_request)
+        if search_request.filter:
+            ast = self._get_ast_from_filter(
+                search_request.filter, search_request.filter_lang
+            )
+            queryable_config = get_queryable_config_by_name(
+                cast(DuckDBPyConnection, self.request.app.state.db_connection)
+            )
+            try:
+                return ast_to_filter_clause(
+                    ast=ast,
+                    geometry_fields=[
+                        key
+                        for key, value in queryable_config.items()
+                        if value.is_geometry
+                    ],
+                    temporal_fields=[
+                        key
+                        for key, value in queryable_config.items()
+                        if value.is_temporal
+                    ],
+                    field_mapping={
+                        key: value.items_column
+                        for key, value in queryable_config.items()
+                    },
+                )
+            except UnknownField as e:
+                raise InvalidQueryParameter(e.field_name)
+            except (NotAGeometryField, NotATemporalField) as e:
+                raise InvalidQueryParameter(e.argument)
+            except UnknownFunction as e:
+                raise InvalidQueryParameter(e.function_name)
+        return None
+
+    def _get_ast_from_filter(
+        self, filter_dict: Dict[str, Any], filter_lang: str
+    ) -> Node:
+        if _text_filter_wrap_key in filter_dict:
+            return filter_to_ast(
+                filter_dict[_text_filter_wrap_key], FilterLanguage.TEXT.value
+            )
+        else:
+            return filter_to_ast(filter_dict, filter_lang)
 
     def _get_bbox_2d(
         self, bbox: List[Union[float, int]]
