@@ -6,10 +6,10 @@ from stac_fastapi.api.app import StacApi
 from stac_fastapi.api.middleware import CORSMiddleware, ProxyHeaderMiddleware
 from stac_fastapi.api.models import create_get_request_model, create_post_request_model
 from stac_fastapi.extensions.core import (
+    FieldsExtension,
     FilterExtension,
     SortExtension,
     TokenPaginationExtension,
-    FieldsExtension,
 )
 
 from stac_fastapi_indexed.core import CoreCrudClient
