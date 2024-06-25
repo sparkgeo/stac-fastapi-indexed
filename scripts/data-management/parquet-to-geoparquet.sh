@@ -5,7 +5,7 @@ set -e
 pushd $(dirname $0)/../..
 
 . scripts/data-management/gpq/build.sh
-input_dir=${index_output_dir:-$(pwd)/src/stac_indexer/index_data/s3}/parquet
+input_dir=${index_output_dir:-$(pwd)/stac_index/indexer/stac_index/indexer/index_data/s3}/parquet
 output_dir=$input_dir/../geoparquet
 mkdir -p $output_dir
 
