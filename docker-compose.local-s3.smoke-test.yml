@@ -1,0 +1,11 @@
+services:
+  tester:
+    image: sparkgeo/stac_fastapi_indexed_smoke_tester
+    build:
+      context: .
+      dockerfile: ./docker/tests/smoke_tests/Dockerfile
+    environment:
+      API_ROOT_PATH: http://api/
+    depends_on:
+      api:
+        condition: service_healthy
