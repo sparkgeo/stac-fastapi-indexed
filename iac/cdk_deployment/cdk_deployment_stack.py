@@ -4,7 +4,6 @@ from aws_cdk import (
     Duration,
     Stack,
     RemovalPolicy,
-    # aws_sqs as sqs,
 )
 from aws_cdk.aws_logs import LogGroup, RetentionDays
 from aws_cdk.aws_s3 import Bucket, BucketEncryption
@@ -40,9 +39,9 @@ class CdkDeploymentStack(Stack):
             self,
             "StacServerlessLambda",
             code=lamda_code,
-            timeout=Duration.seconds(60 * 5),
+            timeout=Duration.seconds(300),
             environment=build_arguments,
-            memory_size=10240,  # set max memory
+            memory_size=10240,
         )
         cors = apigw.CorsOptions(allow_origins=["*"])
         apigw.LambdaRestApi(
