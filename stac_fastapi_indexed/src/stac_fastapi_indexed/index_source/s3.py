@@ -54,9 +54,7 @@ class S3IndexSource(IndexSource):
         return urls
 
     def configure_duckdb(self, connection: DuckDBPyConnection) -> None:
-        region = os.getenv("AWS_REGION")
         config_parts = {"TYPE": "S3", "PROVIDER": "CREDENTIAL_CHAIN"}
-        _logger.debug(f"s3 config parts:\n{config_parts}")
         if self._s3_endpoint is not None:
             config_parts["ENDPOINT"] = f"'{self._s3_endpoint}'"
         if self._s3_insecure:
@@ -64,6 +62,4 @@ class S3IndexSource(IndexSource):
         command = "CREATE SECRET ({})".format(
             ", ".join([f"{key} {value}" for key, value in config_parts.items()])
         )
-        _logger.debug(f"Command:\n{command}")
         connection.execute(command)
-        _logger.debug("Create Secret Success")
