@@ -17,7 +17,6 @@ from stac_index_common.data_stores.s3 import (
 import os
 
 _logger: Final[Logger] = getLogger(__file__)
-boto3.set_stream_logger("", logging.DEBUG)
 
 
 class S3IndexSource(IndexSource):
