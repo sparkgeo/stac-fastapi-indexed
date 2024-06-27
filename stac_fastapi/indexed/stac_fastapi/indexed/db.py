@@ -1,6 +1,9 @@
+import logging
+import os
 from logging import Logger, getLogger
 from typing import Final, cast
 
+import boto3
 from duckdb import DuckDBPyConnection
 from duckdb import connect as duckdb_connect
 from fastapi import FastAPI
@@ -25,13 +28,19 @@ async def connect_to_db(app: FastAPI) -> None:
     times = {}
     start = utc_now()
     duckdb_connection = duckdb_connect()
+    _logger.debug("Connect duckdb success")
     index_source.configure_duckdb(duckdb_connection)
+    _logger.debug("Configure duckdb success")
     times["create db connection"] = utc_now()
     duckdb_connection.execute("INSTALL spatial")
+    _logger.debug("Install Spatial Success")
     duckdb_connection.execute("LOAD spatial")
+    _logger.debug("Load Spatial Success")
     times["load spatial extension"] = utc_now()
     duckdb_connection.execute("INSTALL httpfs")
+    _logger.debug("Install httpfs Success")
     duckdb_connection.execute("LOAD httpfs")
+    _logger.debug("Load httpfs Success")
     times["load httpfs extension"] = utc_now()
     parquet_urls = await index_source.get_parquet_uris()
     if len(parquet_urls.keys()) == 0:

@@ -1,0 +1,15 @@
+**/*.egg-info
+**/__pycache__
+
+data/index/**
+data/STAC/pc_partial_data/**
+src/stac_indexer/index_data/**
+
+minio/mc/config/**
+
+!**/.gitkeep
+
+.autoenv*.zsh
+.vscode
+**/.DS_Store
+todo.md

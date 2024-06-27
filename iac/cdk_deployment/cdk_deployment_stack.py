@@ -1,0 +1,60 @@
+from pathlib import Path
+
+from aws_cdk import (
+    Duration,
+    Stack,
+    RemovalPolicy,
+    # aws_sqs as sqs,
+)
+from aws_cdk.aws_logs import LogGroup, RetentionDays
+from aws_cdk.aws_s3 import Bucket, BucketEncryption
+from constructs import Construct
+from aws_cdk import aws_lambda as _lambda
+from aws_cdk import aws_apigateway as apigw
+import os
+
+
+class CdkDeploymentStack(Stack):
+    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+        super().__init__(scope, construct_id, **kwargs)
+        build_arguments = {
+            "stac_api_indexed_parquet_index_source_url": os.environ[
+                "stac_api_indexed_parquet_index_source_url"
+            ],
+            "stac_api_indexed_s3_endpoint": os.environ["stac_api_indexed_s3_endpoint"],
+            "stac_api_indexed_token_jwt_secret": os.environ[
+                "stac_api_indexed_token_jwt_secret"
+            ],
+            "stac_api_indexed_log_level": os.environ["stac_api_indexed_log_level"],
+            "permit_boto_debug": os.environ["permit_boto_debug"],
+        }
+        build_path = Path("../")
+        os.chdir(build_path.resolve())
+        bucket = Bucket(
+            self, id="ServerlessStacBucket", encryption=BucketEncryption.S3_MANAGED
+        )
+        cors = apigw.CorsOptions(allow_origins=["*"])
+        lamda_code = _lambda.DockerImageCode.from_image_asset("")
+        stac_serverless_lambda = _lambda.DockerImageFunction(
+            self,
+            "StacServerlessLambda",
+            code=lamda_code,
+            timeout=Duration.seconds(60 * 5),
+            environment=build_arguments,
+            memory_size=10240,  # set max memory
+        )
+        cors = apigw.CorsOptions(allow_origins=["*"])
+        apigw.LambdaRestApi(
+            self,
+            "ServerlessStacAPI",
+            handler=stac_serverless_lambda,
+            default_cors_preflight_options=cors,
+            proxy=True,
+        )
+        log_group = LogGroup(
+            self,
+            id="ServerlessStacLogs",
+            retention=RetentionDays.ONE_DAY,
+            log_group_name="ServerlessStacLogGroup",
+            removal_policy=RemovalPolicy.RETAIN,
+        )
