@@ -2,7 +2,6 @@ from logging import Logger, getLogger
 from time import time
 from typing import Any, Final, List, Optional
 
-import boto3
 from duckdb import DuckDBPyConnection
 from duckdb import connect as duckdb_connect
 

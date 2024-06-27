@@ -13,7 +13,7 @@ class CdkDeploymentStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
         build_arguments = {
-            "stac_api_indexed_parquet_index_source_url": os.environ[
+            "stac_api_indexed_parquet_index_source_uri": os.environ[
                 "stac_api_indexed_parquet_index_source_url"
             ],
             "stac_api_indexed_token_jwt_secret": os.environ[
