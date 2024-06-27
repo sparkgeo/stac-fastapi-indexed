@@ -1,7 +1,7 @@
 [project]
 name = "StacAPIServerless"
 version = "0.1.0"
-requires-python = ">=3.12"
+requires-python = "=3.8.0"
 
 [tool.isort]
 profile = "black"

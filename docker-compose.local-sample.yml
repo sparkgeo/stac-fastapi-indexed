@@ -7,14 +7,13 @@ x-minio-environment: &minio-environment
 services:
   minio:
     image: minio/minio:RELEASE.2024-06-11T03-13-30Z
-    command: server /data --console-address ":9001" --quiet
+    command: server /data --console-address ":9001"
     environment:
       <<: *minio-environment
     ports:
       - "9000:9000"
       - "9001:9001"
     healthcheck:
-      test: curl --fail http://localhost:9001
       interval: 1s
       timeout: 1s
       retries: 3
@@ -71,6 +70,7 @@ services:
       <<: *minio-environment
       stac_api_indexed_parquet_index_source_url: s3://index/index/parquet
       stac_api_indexed_s3_endpoint: http://minio:9000
+      AWS_PROFILE: ${AWS_PROFILE:-not-set}
     depends_on:
       minio-index-loader:
         condition: service_completed_successfully
