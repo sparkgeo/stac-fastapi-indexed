@@ -3,7 +3,7 @@
 cdk.out
 
 .idea
-
+iac/cdk.out
 
 
 data/index/**
