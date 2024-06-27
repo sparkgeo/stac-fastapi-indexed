@@ -58,7 +58,7 @@ class S3IndexSource(IndexSource):
         config_parts = {"TYPE": "S3", "PROVIDER": "CREDENTIAL_CHAIN"}
         _logger.debug(f"s3 config parts:\n{config_parts}")
         if self._s3_endpoint is not None:
-            config_parts["ENDPOINT"] = "'{}'".format(self._s3_endpoint)
+            config_parts["ENDPOINT"] = f"'{self._s3_endpoint}'"
         if self._s3_insecure:
             config_parts["USE_SSL"] = "false"
         command = "CREATE SECRET ({})".format(
