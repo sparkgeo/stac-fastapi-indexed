@@ -1,23 +1,19 @@
+import os
 from pathlib import Path
 
-from aws_cdk import (
-    Duration,
-    Stack,
-    RemovalPolicy,
-)
+from aws_cdk import Duration, RemovalPolicy, Stack
+from aws_cdk import aws_apigateway as apigw
+from aws_cdk import aws_lambda as _lambda
 from aws_cdk.aws_logs import LogGroup, RetentionDays
 from aws_cdk.aws_s3 import Bucket, BucketEncryption
 from constructs import Construct
-from aws_cdk import aws_lambda as _lambda
-from aws_cdk import aws_apigateway as apigw
-import os
 
 
 class CdkDeploymentStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
         build_arguments = {
-            "stac_api_indexed_parquet_index_source_url": os.environ[
+            "stac_api_indexed_parquet_index_source_uri": os.environ[
                 "stac_api_indexed_parquet_index_source_url"
             ],
             "stac_api_indexed_token_jwt_secret": os.environ[
@@ -28,9 +24,7 @@ class CdkDeploymentStack(Stack):
         }
         build_path = Path("../")
 
-        bucket = Bucket(
-            self, id="ServerlessStacBucket", encryption=BucketEncryption.S3_MANAGED
-        )
+        Bucket(self, id="ServerlessStacBucket", encryption=BucketEncryption.S3_MANAGED)
         cors = apigw.CorsOptions(allow_origins=["*"])
         lamda_code = _lambda.DockerImageCode.from_image_asset(
             str(build_path.resolve()), file="iac/Dockerfile"
@@ -51,7 +45,7 @@ class CdkDeploymentStack(Stack):
             default_cors_preflight_options=cors,
             proxy=True,
         )
-        log_group = LogGroup(
+        LogGroup(
             self,
             id="ServerlessStacLogs",
             retention=RetentionDays.ONE_DAY,

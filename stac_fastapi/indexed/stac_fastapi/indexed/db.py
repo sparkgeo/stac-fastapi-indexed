@@ -1,7 +1,6 @@
 from logging import Logger, getLogger
 from typing import Final, cast
 
-import boto3
 from duckdb import DuckDBPyConnection
 from duckdb import connect as duckdb_connect
 from fastapi import FastAPI
