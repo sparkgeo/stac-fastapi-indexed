@@ -1,0 +1,20 @@
+services:
+  api:
+    build:
+      dockerfile: docker/api/Dockerfile
+      context: .
+    image: sparkgeo/stac_fastapi_indexed
+    environment:
+      stac_api_indexed_token_jwt_secret: $(openssl rand -base64 32)
+      stac_api_indexed_log_level: debug
+    volumes:
+      - "./stac_index/common/stac_index/common:/app/stac_index/common/stac_index/common:rw"
+      - "./stac_index/reader/s3/stac_index/reader/s3:/app/stac_index/reader/s3/stac_index/reader/s3:rw"
+      - "./stac_fastapi/indexed/stac_fastapi/indexed:/app/stac_fastapi/indexed/stac_fastapi/indexed:rw"
+    healthcheck:
+      test: curl --fail http://localhost/_mgmt/ping
+      interval: 5s
+      timeout: 1s
+      retries: 50
+    ports:
+      - "8123:80"

@@ -1,4 +1,5 @@
 import importlib
+import importlib.metadata
 import inspect
 from logging import Logger, getLogger
 from typing import Final, List, Type
