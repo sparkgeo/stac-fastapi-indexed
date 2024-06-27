@@ -1,5 +1,8 @@
 **/*.egg-info
 **/__pycache__
+cdk.out
+
+
 
 data/index/**
 data/STAC/pc_partial_data/data/**

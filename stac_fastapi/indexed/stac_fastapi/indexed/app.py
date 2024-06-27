@@ -63,6 +63,7 @@ def run():
         import uvicorn
 
         settings = get_settings()
+
         uvicorn.run(
             "stac_fastapi.indexed.app:app",
             host=settings.app_host,
