@@ -1,10 +1,5 @@
 FROM public.ecr.aws/lambda/python:3.12
 
-
-
-
-
-
 ENV HOME=/tmp
 COPY stac_index_common ./stac_index_common
 COPY stac_fastapi_indexed ./stac_fastapi_indexed
