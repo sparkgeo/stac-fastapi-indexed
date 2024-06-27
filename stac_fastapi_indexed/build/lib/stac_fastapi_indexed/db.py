@@ -20,8 +20,6 @@ _index_sources: Final[List[Type[IndexSource]]] = [
     FileIndexSource,
 ]
 
-boto3.set_stream_logger("", logging.DEBUG)
-
 
 def connect_to_db(app: FastAPI) -> None:
     index_source_url = get_settings().parquet_index_source_url
