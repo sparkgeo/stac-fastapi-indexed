@@ -1,5 +1,5 @@
 {
-    "root_catalog_url": "s3://stac/sample/catalog.json",
+    "root_catalog_uri": "s3://stac/sample/catalog.json",
     "queryables": {
         "collection": {
             "joplin": {

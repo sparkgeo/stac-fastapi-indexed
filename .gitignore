@@ -3,7 +3,7 @@
 
 data/index/**
 data/STAC/pc_partial_data/data/**
-src/stac_indexer/index_data/**
+stac_index/indexer/stac_index/indexer/index_data/**
 
 minio/mc/config/**
 
