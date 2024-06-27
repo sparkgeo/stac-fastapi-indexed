@@ -2,6 +2,8 @@
 **/__pycache__
 cdk.out
 
+.idea
+
 
 
 data/index/**
