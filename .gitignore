@@ -4,6 +4,7 @@ cdk.out
 
 .idea
 iac/cdk.out
+iac/.venv
 
 
 data/index/**
