@@ -4,3 +4,4 @@ data/STAC/pc_partial_data
 cdk
 cdk.out
 .venv
+iac/cdk.out

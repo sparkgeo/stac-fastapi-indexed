@@ -21,7 +21,6 @@ class CdkDeploymentStack(Stack):
             "stac_api_indexed_parquet_index_source_url": os.environ[
                 "stac_api_indexed_parquet_index_source_url"
             ],
-            "stac_api_indexed_s3_endpoint": os.environ["stac_api_indexed_s3_endpoint"],
             "stac_api_indexed_token_jwt_secret": os.environ[
                 "stac_api_indexed_token_jwt_secret"
             ],
@@ -29,12 +28,14 @@ class CdkDeploymentStack(Stack):
             "permit_boto_debug": os.environ["permit_boto_debug"],
         }
         build_path = Path("../")
-        os.chdir(build_path.resolve())
+
         bucket = Bucket(
             self, id="ServerlessStacBucket", encryption=BucketEncryption.S3_MANAGED
         )
         cors = apigw.CorsOptions(allow_origins=["*"])
-        lamda_code = _lambda.DockerImageCode.from_image_asset("")
+        lamda_code = _lambda.DockerImageCode.from_image_asset(
+            str(build_path.resolve()), file="iac/Dockerfile"
+        )
         stac_serverless_lambda = _lambda.DockerImageFunction(
             self,
             "StacServerlessLambda",
