@@ -2,11 +2,8 @@ import logging
 from logging import Logger, getLogger
 from re import escape, match, sub
 from typing import Dict, Final, Optional
-
-import boto3
 from boto3 import client
 from duckdb import DuckDBPyConnection
-
 from stac_fastapi_indexed.index_source.index_source import IndexSource
 from stac_fastapi_indexed.settings import get_settings
 from stac_index_common.data_stores.s3 import (
@@ -14,7 +11,7 @@ from stac_index_common.data_stores.s3 import (
     list_objects_from_url,
     url_prefix_regex,
 )
-import os
+
 
 _logger: Final[Logger] = getLogger(__file__)
 
