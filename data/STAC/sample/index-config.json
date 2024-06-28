@@ -1,5 +1,10 @@
 {
     "root_catalog_uri": "s3://stac/sample/catalog.json",
+    "partitions": {
+        "items": {
+            "partition_fields": ["collection_id"]
+        }
+    },
     "queryables": {
         "collection": {
             "joplin": {

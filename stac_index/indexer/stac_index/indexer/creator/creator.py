@@ -69,10 +69,22 @@ class IndexCreator:
                 export_select = "* EXCLUDE ({col}), ST_AsWKB({col}) as {col}".format(
                     col=geometry_column_name
                 )
+            partition_config = ""
+            if (
+                self._index_config.partitions is not None
+                and table_name in self._index_config.partitions
+            ):
+                partition_config = (
+                    ", PARTITION_BY ({fields}), OVERWRITE_OR_IGNORE".format(
+                        fields=", ".join(
+                            self._index_config.partitions[table_name].partition_fields
+                        )
+                    )
+                )
             self._conn.execute(f"""
                 COPY (SELECT {export_select} FROM {table_name}) 
                   TO '{output_dir}/{table_name}.parquet'
-                  (FORMAT PARQUET)
+                  (FORMAT PARQUET{partition_config})
                 ;
             """)
         with open(path.join(output_dir, "manifest.json"), "w") as f:

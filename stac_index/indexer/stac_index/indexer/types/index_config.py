@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Dict, Final, Optional
+from typing import Any, Dict, Final, List, Optional
 
 from pydantic import BaseModel
 
@@ -32,6 +32,14 @@ class Queryables(BaseModel):
     collection: QueryablesByCollection
 
 
+class PartitionConfig(BaseModel):
+    partition_fields: List[str]
+
+
+PartitionsByTableName = Optional[Dict[str, PartitionConfig]]
+
+
 class IndexConfig(BaseModel):
     root_catalog_uri: str
+    partitions: PartitionsByTableName = None
     queryables: Queryables
