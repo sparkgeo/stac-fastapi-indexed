@@ -9,6 +9,11 @@ from duckdb import connect
 from shapely.wkt import loads as wkt_loads
 from stac_fastapi.types.stac import Collection
 
+from stac_index.common.index_manifest import (
+    IndexManifest,
+    TableMetadata,
+    TablePartitioning,
+)
 from stac_index.indexer.creator.queryables.configurer import (
     configure,
     queryable_field_name_to_column_name,
@@ -44,6 +49,9 @@ class IndexCreator:
         items_errors = await self._request_items(reader, collections)
         self._insert_metadata()
         output_dir = path.join(get_settings().output_dir, "parquet")
+        manifest: IndexManifest = IndexManifest(
+            created=self._creation_time,
+        )
         try:
             makedirs(output_dir, exist_ok=True)
         except Exception as e:
@@ -69,11 +77,19 @@ class IndexCreator:
                 export_select = "* EXCLUDE ({col}), ST_AsWKB({col}) as {col}".format(
                     col=geometry_column_name
                 )
+            table_partitioning: TablePartitioning = None
+            output_target = f"{table_name}.parquet"
             partition_config = ""
             if (
                 self._index_config.partitions is not None
                 and table_name in self._index_config.partitions
             ):
+                table_partitioning = TablePartitioning(
+                    partition_fields=self._index_config.partitions[
+                        table_name
+                    ].partition_fields
+                )
+                output_target = table_name
                 partition_config = (
                     ", PARTITION_BY ({fields}), OVERWRITE_OR_IGNORE".format(
                         fields=", ".join(
@@ -81,17 +97,20 @@ class IndexCreator:
                         )
                     )
                 )
+            output_path = path.join(output_dir, output_target)
             self._conn.execute(f"""
                 COPY (SELECT {export_select} FROM {table_name}) 
-                  TO '{output_dir}/{table_name}.parquet'
+                  TO '{output_path}'
                   (FORMAT PARQUET{partition_config})
                 ;
             """)
+            manifest.tables[table_name] = TableMetadata(
+                relative_path=output_target,
+                partitioning=table_partitioning,
+            )
         with open(path.join(output_dir, "manifest.json"), "w") as f:
             dump(
-                {
-                    "created": self._creation_time.isoformat(),
-                },
+                manifest.model_dump(),
                 f,
                 indent=2,
             )
