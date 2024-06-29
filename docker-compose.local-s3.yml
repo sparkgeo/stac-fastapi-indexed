@@ -43,6 +43,9 @@ services:
       stac_index_reader_s3_endpoint: http://minio:9000
     volumes:
       - "indexer-output:/output:rw"
+      - "./stac_index/common/stac_index/common:/app/stac_index/common/stac_index/common:rw"
+      - "./stac_index/reader/s3/stac_index/reader/s3:/app/stac_index/reader/s3/stac_index/reader/s3:rw"
+      - "./stac_index/indexer/stac_index/indexer:/app/stac_index/indexer/stac_index/indexer:rw"
       - "./data/STAC/sample/index-config.json:/index-config.json:ro"
     command: "python -m stac_index.indexer.index /index-config.json"
     depends_on:
