@@ -33,6 +33,7 @@ class S3SourceReader(SourceReader):
         return cast(Match, match(rf"{_uri_prefix_regex}([^/]+)/(.+)", key)).groups()
 
     async def get_uri_as_string(self, uri: str) -> str:
+        _logger.debug(f"get_uri_as_string: '{uri}'")
         try:
             bucket, key = self._get_s3_key_parts(uri)
         except Exception as e:

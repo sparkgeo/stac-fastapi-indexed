@@ -1,3 +1,4 @@
+from json import loads
 from logging import Logger, getLogger
 from typing import Final, cast
 
@@ -7,21 +8,29 @@ from fastapi import FastAPI
 
 from stac_fastapi.indexed.settings import get_settings
 from stac_fastapi.indexed.util import utc_now
-from stac_index.common import index_reader_classes
+from stac_index.common import SourceReader, index_reader_classes
+from stac_index.common.index_manifest import IndexManifest
 
 _logger: Final[Logger] = getLogger(__file__)
 
 
 async def connect_to_db(app: FastAPI) -> None:
-    index_source_uri = get_settings().parquet_index_source_uri
+    manifest_source_uri = get_settings().parquet_manifest_uri
     compatible_index_readers = [
         index_reader
         for index_reader in index_reader_classes
-        if index_reader.can_handle_source_uri(index_source_uri)
+        if index_reader.can_handle_source_uri(manifest_source_uri)
     ]
     if len(compatible_index_readers) == 0:
-        raise Exception(f"no index readers support source URI '{index_source_uri}'")
-    index_source = compatible_index_readers[0](index_source_uri)
+        raise Exception(f"no index readers support source URI '{manifest_source_uri}'")
+    index_source = compatible_index_readers[0](manifest_source_uri)
+    manifest = IndexManifest(
+        **loads(
+            await cast(SourceReader, index_source.source_reader).get_uri_as_string(
+                manifest_source_uri
+            )
+        )
+    )
     times = {}
     start = utc_now()
     duckdb_connection = duckdb_connect()
@@ -33,11 +42,21 @@ async def connect_to_db(app: FastAPI) -> None:
     duckdb_connection.execute("INSTALL httpfs")
     duckdb_connection.execute("LOAD httpfs")
     times["load httpfs extension"] = utc_now()
-    parquet_urls = await index_source.get_parquet_uris()
-    if len(parquet_urls.keys()) == 0:
-        raise Exception(f"no URLs found at '{index_source_uri}'")
-    for view_name, source_uri in parquet_urls.items():
-        command = f"CREATE VIEW {view_name} AS SELECT * FROM '{source_uri}'"
+    for table_name, table_config in manifest.tables.items():
+        if table_config.partitioning is None:
+            table_uri = "/".join(
+                manifest_source_uri.split("/")[:-1] + [table_config.relative_path]
+            )
+            partitioning_suffix = ""
+        else:
+            table_uri = "/".join(
+                manifest_source_uri.split("/")[:-1]
+                + [table_config.relative_path]
+                + ["*" for _ in table_config.partitioning.partition_fields]
+                + ["*.parquet"]
+            )
+            partitioning_suffix = ", hive_partitioning = true"
+        command = f"CREATE VIEW {table_name} AS SELECT * FROM read_parquet('{table_uri}'{partitioning_suffix})"
         _logger.debug(command)
         duckdb_connection.execute(command)
     times["create views from parquet"] = utc_now()
