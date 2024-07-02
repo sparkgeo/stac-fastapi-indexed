@@ -10,6 +10,8 @@ def get_s3_key_parts(url: str) -> Tuple[str, str]:
 
 
 def get_str_object_from_url(s3_client, url: str) -> str:
+    log = logging.getLogger(__name__)
+    log.setLevel(logging.DEBUG)
     try:
         bucket, key = get_s3_key_parts(url)
     except Exception as e:

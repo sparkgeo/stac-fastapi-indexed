@@ -15,7 +15,9 @@ def s3_join(parts: List[str]) -> str:
 base_source_url: Final[str] = "https://planetarycomputer.microsoft.com/api/stac/v1/"
 json_type: Final[str] = "application/json"
 geojson_type: Final[str] = "application/geo+json"
-s3_base_url: Final[str] = "s3://tchristian-stac-serverless-data/pc_partial_data"
+s3_base_url: Final[
+    str
+] = "s3://cdkdeploymentstack-stacserverlessapibucket5ea5fcc7-lcahteyxhlvs/pc_partial_data"
 
 base_source_path: Final[str] = path.abspath(
     path.join(path.dirname(__file__), "pc_partial_data", "s3")

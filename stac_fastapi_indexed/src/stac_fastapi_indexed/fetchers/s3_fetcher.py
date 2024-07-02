@@ -24,6 +24,7 @@ class S3Fetcher(Fetcher):
 
     async def fetch(self, url: str) -> str:
         def caller():
+            # logger.debg()
             return get_str_object_from_url(self._s3, url)
 
         return await get_running_loop().run_in_executor(None, caller)
