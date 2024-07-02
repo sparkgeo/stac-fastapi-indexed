@@ -1,0 +1,15 @@
+name: Pull Request, Any Branch
+
+on:
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  smoke-test:
+    name: Execute Smoke Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Test
+        run: scripts/tests/smoke-test.sh

@@ -1,0 +1,87 @@
+from functools import partial
+from logging import Logger, getLogger
+from re import Match, match
+from typing import Final, List, Optional, Tuple, cast
+
+from boto3 import client
+
+from stac_index.common.async_util import get_callable_event_loop
+from stac_index.common.source_reader import SourceReader
+from stac_index.reader.s3.settings import get_settings
+
+_uri_prefix_regex: Final[str] = r"^s3://"
+_logger: Final[Logger] = getLogger(__file__)
+
+
+class S3SourceReader(SourceReader):
+    @staticmethod
+    def can_handle_uri(uri: str) -> bool:
+        return not not match(_uri_prefix_regex, uri)
+
+    def __init__(self):
+        super().__init__()
+        _logger.info("creating S3 Reader")
+        client_args = {}
+        s3_endpoint = get_settings().endpoint
+        if s3_endpoint is not None:
+            client_args["endpoint_url"] = s3_endpoint
+            if s3_endpoint.startswith("http://"):
+                client_args["use_ssl"] = False
+        self._s3 = client("s3", **client_args)
+
+    def _get_s3_key_parts(self, key: str) -> Tuple[str, str]:
+        return cast(Match, match(rf"{_uri_prefix_regex}([^/]+)/(.+)", key)).groups()
+
+    async def get_uri_as_string(self, uri: str) -> str:
+        try:
+            bucket, key = self._get_s3_key_parts(uri)
+        except Exception as e:
+            raise ValueError(f"'{uri}' is not in the expected format", e)
+        get_object_partial = partial(
+            self._s3.get_object,
+            Bucket=bucket,
+            Key=key,
+        )
+        return (
+            (await get_callable_event_loop().run_in_executor(None, get_object_partial))[
+                "Body"
+            ]
+            .read()
+            .decode("UTF-8")
+        )
+
+    async def list_uris_by_prefix(
+        self,
+        uri_prefix: str,
+        list_limit: Optional[int] = None,
+        uri_suffix: Optional[str] = None,
+    ) -> List[str]:
+        bucket, prefix = self._get_s3_key_parts(uri_prefix)
+        next_token = None
+        all_keys: List[str] = []
+        while True:
+            list_kwargs = {
+                "Bucket": bucket,
+                "Prefix": prefix,
+            }
+            if next_token:
+                list_kwargs["ContinuationToken"] = next_token
+            list_objects_partial = partial(
+                self._s3.list_objects_v2,
+                **list_kwargs,
+            )
+            response = await get_callable_event_loop().run_in_executor(
+                None, list_objects_partial
+            )
+            if "Contents" in response:
+                for object in response["Contents"]:
+                    key: str = object["Key"]
+                    if uri_suffix is None or key.endswith(uri_suffix):
+                        all_keys.append(f"s3://{bucket}/{key}")
+                        if list_limit is not None and len(all_keys) == list_limit:
+                            return all_keys
+            if response.get("IsTruncated"):
+                next_token = response.get("NextContinuationToken")
+            else:
+                break
+        return all_keys

@@ -7,8 +7,8 @@ iac/cdk.out
 iac/.venv
 
 data/index/**
-data/STAC/pc_partial_data/**
-src/stac_indexer/index_data/**
+data/STAC/pc_partial_data/data/**
+stac_index/indexer/stac_index/indexer/index_data/**
 
 minio/mc/config/**
 

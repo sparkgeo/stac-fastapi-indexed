@@ -1,0 +1,6 @@
+{
+    "root_catalog_uri": "s3://tchristian-stac-serverless-data/pc_partial_data/catalog.json",
+    "queryables": {
+        "collection": {}
+    }
+}

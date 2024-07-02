@@ -1,10 +1,12 @@
 FROM python:3.12-slim
 
 WORKDIR /app
-COPY stac_index_common ./stac_index_common
-COPY stac_indexer ./stac_indexer
+COPY stac_index/common ./stac_index/common
+COPY stac_index/reader/s3 ./stac_index/reader/s3
+COPY stac_index/indexer ./stac_index/indexer
 
-RUN pip install -e stac_index_common
-RUN pip install -e stac_indexer[s3_source]
+RUN pip install -e stac_index/common
+RUN pip install -e stac_index/reader/s3
+RUN pip install -e stac_index/indexer
 
-CMD ["python", "-m", "stac_indexer.index", "--help"]
+CMD ["python", "-m", "stac_index.indexer.index", "--help"]
