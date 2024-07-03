@@ -18,6 +18,10 @@ minio/mc/config/**
 .vscode
 **/.DS_Store
 todo.md
-
+.idea
+cdk
+cdk.out
+.venv
+iac/cdk.out
 
 .env

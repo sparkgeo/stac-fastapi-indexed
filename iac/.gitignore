@@ -13,3 +13,12 @@ minio/mc/config/**
 .vscode
 **/.DS_Store
 todo.md
+.idea
+data
+**/*.egg-info
+cdk
+cdk.out
+.venv
+iac/cdk.out
+.env
+.idea
