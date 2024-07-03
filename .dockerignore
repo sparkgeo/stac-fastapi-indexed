@@ -5,3 +5,5 @@ cdk
 cdk.out
 .venv
 iac/cdk.out
+.env
+.idea
