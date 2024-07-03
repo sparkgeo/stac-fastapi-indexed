@@ -17,6 +17,7 @@ services:
       interval: 1s
       timeout: 1s
       retries: 3
+      test: curl --fail http://localhost:9001
 
   minio-sample-loader:
     image: minio/mc:RELEASE.2024-06-12T14-34-03Z

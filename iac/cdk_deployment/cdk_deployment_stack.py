@@ -13,8 +13,8 @@ class CdkDeploymentStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
         build_arguments = {
-            "stac_api_indexed_parquet_index_source_url": os.environ[
-                "stac_api_indexed_parquet_index_source_url"
+            "stac_api_indexed_parquet_index_source_uri": os.environ[
+                "stac_api_indexed_parquet_index_source_uri"
             ],
             "stac_api_indexed_token_jwt_secret": os.environ[
                 "stac_api_indexed_token_jwt_secret"
@@ -44,6 +44,8 @@ class CdkDeploymentStack(Stack):
             handler=stac_serverless_lambda,
             default_cors_preflight_options=cors,
             proxy=True,
+            binary_media_types=["application/json"],
+            rest_api_name="STAC-API-Serverless",
         )
         LogGroup(
             self,

@@ -1,12 +1,16 @@
 FROM public.ecr.aws/lambda/python:3.12
 
 ENV HOME=/tmp
-COPY stac_index_common ./stac_index_common
-COPY stac_fastapi_indexed ./stac_fastapi_indexed
 
-RUN pip install uvicorn mangum
-RUN pip install -e stac_index_common
-RUN pip install -e stac_fastapi_indexed[server,s3_source]
+WORKDIR /app
+
+COPY stac_index/common ./stac_index/common
+COPY stac_index/reader ./stac_index/reader
+COPY stac_fastapi/indexed ./stac_fastapi/indexed
+
+RUN pip install -e stac_index/common
+RUN pip install -e stac_index/reader/s3
+RUN pip install -e stac_fastapi/indexed[server]
 
 CMD ["stac_fastapi_indexed.app.handler"]
 
