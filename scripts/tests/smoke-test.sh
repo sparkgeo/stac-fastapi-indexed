@@ -7,6 +7,8 @@ dco="docker compose -f docker-compose.base.yml -f docker-compose.local-s3.yml -f
 $dco build
 $dco run tester
 exit_code=$?
-$dco logs
+if [ $exit_code -ne 0 ] || [ ${TESTS_DEBUG:-0} -ne 0 ]; then
+    $dco logs
+fi
 $dco down
 exit $exit_code

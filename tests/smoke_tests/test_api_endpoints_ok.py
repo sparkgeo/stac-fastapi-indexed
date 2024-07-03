@@ -1,9 +1,33 @@
+from datetime import datetime, timezone
 from os import environ
+from time import sleep
 from typing import Any, Dict, Final
 
 import requests
 
 _api_base_url: Final[str] = environ["API_ROOT_PATH"]
+_healthcheck_url: Final[str] = f"{_api_base_url}_mgmt/ping"
+_healthcheck_timeout_seconds: Final[int] = int(
+    environ.get("API_HEALTHCHECK_TIMEOUT_SECONDS", 120)
+)
+_healthcheck_check_interval_seconds: Final[int] = 1
+
+
+def setup_module():
+    timer = datetime.now(tz=timezone.utc)
+    while (
+        datetime.now(tz=timezone.utc) - timer
+    ).seconds < _healthcheck_timeout_seconds:
+        try:
+            requests.get(_healthcheck_url)
+            print("API available, executing tests")
+            return
+        except Exception:
+            print("waiting for API to become available")
+            sleep(_healthcheck_check_interval_seconds)
+    raise Exception(
+        f"API unavailable after {_healthcheck_timeout_seconds} seconds, failing tests"
+    )
 
 
 def test_get_catalog_endpoint():
