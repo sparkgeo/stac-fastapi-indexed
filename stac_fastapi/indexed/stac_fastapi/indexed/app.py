@@ -41,12 +41,12 @@ app = api.app
     "startup"
 )  # deprecated event handlers because of stac-fastapi, not yet able to use lifespan approach
 async def startup_event():
-    await connect_to_db(app)
+    await connect_to_db()
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    await disconnect_from_db(app)
+    await disconnect_from_db()
 
 
 def run():

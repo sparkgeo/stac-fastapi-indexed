@@ -1,11 +1,10 @@
 from asyncio import gather
 from logging import Logger, getLogger
 from re import IGNORECASE, match, search
-from typing import Final, List, Optional, cast
+from typing import Final, List, Optional
 from urllib.parse import unquote_plus
 
 import attr
-from duckdb import DuckDBPyConnection
 from fastapi import HTTPException, Request
 from pydantic import ValidationError
 from stac_fastapi.types.core import AsyncBaseCoreClient
@@ -16,6 +15,7 @@ from stac_fastapi.types.stac import Collection, Collections, Item, ItemCollectio
 from stac_pydantic.shared import BBox
 
 from stac_fastapi.indexed.constants import rel_parent, rel_root, rel_self
+from stac_fastapi.indexed.db import fetchall, fetchone
 from stac_fastapi.indexed.links.catalog import get_catalog_link
 from stac_fastapi.indexed.links.collection import (
     fix_collection_links,
@@ -35,10 +35,7 @@ class CoreCrudClient(AsyncBaseCoreClient):
         fetch_tasks = [
             fetch_dict(url)
             for url in [
-                row[0]
-                for row in cast(DuckDBPyConnection, request.app.state.db_connection)
-                .execute("SELECT stac_location FROM collections")
-                .fetchall()
+                row[0] for row in fetchall("SELECT stac_location FROM collections")
             ]
         ]
         collections = [
@@ -60,13 +57,9 @@ class CoreCrudClient(AsyncBaseCoreClient):
     async def get_collection(
         self, collection_id: str, request: Request, **kwargs
     ) -> Collection:
-        row = (
-            cast(DuckDBPyConnection, request.app.state.db_connection)
-            .execute(
-                "SELECT stac_location FROM collections WHERE id = ?",
-                [collection_id],
-            )
-            .fetchone()
+        row = fetchone(
+            "SELECT stac_location FROM collections WHERE id = ?",
+            [collection_id],
         )
         if row is not None:
             return fix_collection_links(
@@ -113,13 +106,9 @@ class CoreCrudClient(AsyncBaseCoreClient):
         await self.get_collection(
             collection_id, request=request
         )  # will error if collection does not exist
-        row = (
-            cast(DuckDBPyConnection, request.app.state.db_connection)
-            .execute(
-                "SELECT stac_location FROM items WHERE collection_id = ? and id = ?",
-                [collection_id, item_id],
-            )
-            .fetchone()
+        row = fetchone(
+            "SELECT stac_location FROM items WHERE collection_id = ? and id = ?",
+            [collection_id, item_id],
         )
         if row is not None:
             return fix_item_links(
