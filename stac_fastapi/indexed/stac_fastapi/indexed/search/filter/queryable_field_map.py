@@ -3,7 +3,7 @@ from functools import lru_cache
 from logging import Logger, getLogger
 from typing import Dict, Final
 
-from duckdb import DuckDBPyConnection
+from stac_fastapi.indexed.db import fetchall
 
 _logger: Final[Logger] = getLogger(__file__)
 
@@ -20,12 +20,11 @@ class QueryableConfig:
 
 
 @lru_cache(maxsize=1)
-def get_queryable_config_by_name(
-    connection: DuckDBPyConnection,
-) -> Dict[str, QueryableConfig]:
+def get_queryable_config_by_name() -> Dict[str, QueryableConfig]:
     _logger.debug("fetching queryable field config")
     field_config = {}
-    for row in connection.execute("""
+    for row in fetchall(
+        """
         SELECT name
              , collection_id
              , description
@@ -34,7 +33,8 @@ def get_queryable_config_by_name(
              , is_geometry
              , is_temporal
           FROM queryables_by_collection
-    """).fetchall():
+    """,
+    ):
         field_config[row[0]] = QueryableConfig(
             name=row[0],
             collection_id=row[1],

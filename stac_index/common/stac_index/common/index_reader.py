@@ -1,8 +1,6 @@
 from logging import Logger, getLogger
 from re import escape, match
-from typing import Dict, Final
-
-from duckdb import DuckDBPyConnection
+from typing import Any, Dict, Final, List, Optional, Tuple
 
 _logger: Final[Logger] = getLogger(__file__)
 
@@ -37,6 +35,8 @@ class IndexReader:
                 uri_dict[match_result.group(1)] = uri
         return uri_dict
 
-    def configure_duckdb(self, _: DuckDBPyConnection) -> None:
+    def get_duckdb_configuration_statements(
+        self,
+    ) -> List[Tuple[str, Optional[List[Any]]]]:
         _logger.info("not performing any special DuckDB configuration")
-        pass
+        return []
