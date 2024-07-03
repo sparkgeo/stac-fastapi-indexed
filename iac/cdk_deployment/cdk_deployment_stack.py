@@ -44,6 +44,8 @@ class CdkDeploymentStack(Stack):
             handler=stac_serverless_lambda,
             default_cors_preflight_options=cors,
             proxy=True,
+            binary_media_types=["*/*"],
+            rest_api_name="STAC-API-Serverless",
         )
         LogGroup(
             self,
