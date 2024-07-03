@@ -1,4 +1,3 @@
-from functools import lru_cache
 from logging import Logger, getLogger
 from time import time
 from typing import Any, Final, List, Optional
@@ -64,9 +63,8 @@ async def disconnect_from_db() -> None:
             _logger.error(e)
 
 
-@lru_cache(maxsize=1)
 def get_db_connection():
-    return _root_db_connection
+    return _root_db_connection.cursor()
 
 
 def execute(statement: str, params: Optional[List[Any]] = None) -> None:
