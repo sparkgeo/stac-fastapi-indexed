@@ -7,17 +7,17 @@ x-minio-environment: &minio-environment
 services:
   minio:
     image: minio/minio:RELEASE.2024-06-11T03-13-30Z
-    command: server /data --console-address ":9001"
+    command: server /data --console-address ":9001" --quiet
     environment:
       <<: *minio-environment
     ports:
       - "9000:9000"
       - "9001:9001"
     healthcheck:
+      test: curl --fail http://localhost:9001
       interval: 1s
       timeout: 1s
       retries: 3
-      test: curl --fail http://localhost:9001
 
   minio-sample-loader:
     image: minio/mc:RELEASE.2024-06-12T14-34-03Z
@@ -26,7 +26,7 @@ services:
       <<: *minio-environment
     volumes:
       - "./minio/mc/entrypoint.sh:/entrypoint.sh:ro"
-      - "./data/STAC/sample/:/stac/sample:ro"
+      - "./data/STAC/sample/data/:/stac/sample:ro"
     depends_on:
       minio:
         condition: service_healthy
@@ -39,16 +39,12 @@ services:
     image: sparkgeo/stac_indexer
     environment:
       <<: *minio-environment
-      stac_index_index_output_dir: /output
-      stac_index_s3_endpoint: http://minio:9000
-      AWS_PROFILE: ${AWS_PROFILE:-not-set}
+      stac_index_indexer_output_dir: /output
+      stac_index_reader_s3_endpoint: http://minio:9000
     volumes:
-      - "~/.aws:/root/.aws:ro"
       - "indexer-output:/output:rw"
-      - "./stac_index_common:/app/stac_index_common:rw"
-      - "./stac_indexer:/app/stac_indexer:rw"
-    working_dir: /app/stac_indexer/src
-    command: "python -m stac_indexer.index s3://stac/sample/catalog.json"
+      - "./data/STAC/sample/index-config.json:/index-config.json:ro"
+    command: "python -m stac_index.indexer.index /index-config.json"
     depends_on:
       minio-sample-loader:
         condition: service_completed_successfully
@@ -69,9 +65,8 @@ services:
   api:
     environment:
       <<: *minio-environment
-      stac_api_indexed_parquet_index_source_url: s3://index/index/parquet
-      stac_api_indexed_s3_endpoint: http://minio:9000
-      AWS_PROFILE: ${AWS_PROFILE:-not-set}
+      stac_api_indexed_parquet_index_source_uri: s3://index/index/parquet
+      stac_index_reader_s3_endpoint: http://minio:9000
     depends_on:
       minio-index-loader:
         condition: service_completed_successfully

@@ -2,7 +2,13 @@
 
 set -e
 
-pushd $(dirname $0)/..
+# ensure Docker is running before embarking on a potentially long journey
+docker ps -q
+
+pushd $(dirname $0)/../..
 index_dir=$(pwd)/data/index/s3
-stac_index_index_output_dir=$index_dir python -m stac_indexer.index s3://cdkdeploymentstack-stacserverlessapibucket5ea5fcc7-lcahteyxhlvs/pc_partial_data/catalog.json
-index_output_dir=$index_dir scripts/parquet-to-geoparquet.sh
+
+stac_index_indexer_output_dir=$index_dir \
+stac_index_indexer_log_level=debug \
+    python -m stac_index.indexer.index ./data/STAC/pc_partial_data/index-config.json
+index_output_dir=$index_dir scripts/data-management/parquet-to-geoparquet.sh
