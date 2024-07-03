@@ -5,7 +5,6 @@ from logging import Logger, getLogger
 from re import sub
 from typing import Any, Dict, Final, List, Optional, Union, cast
 
-from duckdb import DuckDBPyConnection
 from fastapi import Request
 from pygeofilter.ast import Node
 from stac_fastapi.extensions.core.filter.filter import FilterExtensionPostRequest
@@ -17,6 +16,7 @@ from stac_fastapi.types.stac import Item, ItemCollection
 from stac_pydantic.api.extensions.sort import SortDirections
 
 from stac_fastapi.indexed.constants import rel_root, rel_self
+from stac_fastapi.indexed.db import fetchall
 from stac_fastapi.indexed.links.catalog import get_catalog_link
 from stac_fastapi.indexed.links.item import fix_item_links
 from stac_fastapi.indexed.links.search import get_search_link, get_token_link
@@ -81,14 +81,9 @@ class SearchHandler:
             limit=limit_text,
             offset=offset_text,
         )
-        _logger.debug(f"{current_query}: {query_info.params}")
-        rows = (
-            cast(DuckDBPyConnection, self.request.app.state.db_connection)
-            .execute(
-                current_query,
-                query_info.params,
-            )
-            .fetchall()
+        rows = fetchall(
+            current_query,
+            query_info.params,
         )
         has_next_page = len(rows) > query_info.limit
         has_previous_page = query_info.offset is not None
@@ -276,9 +271,7 @@ class SearchHandler:
             ast = self._get_ast_from_filter(
                 search_request.filter, search_request.filter_lang
             )
-            queryable_config = get_queryable_config_by_name(
-                cast(DuckDBPyConnection, self.request.app.state.db_connection)
-            )
+            queryable_config = get_queryable_config_by_name()
             try:
                 return ast_to_filter_clause(
                     ast=ast,

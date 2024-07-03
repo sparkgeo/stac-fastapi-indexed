@@ -1,7 +1,6 @@
 from json import loads
-from typing import Any, Dict, Final, Optional, cast
+from typing import Any, Dict, Final, Optional
 
-from duckdb import DuckDBPyConnection
 from fastapi import Request
 from stac_fastapi.types.core import AsyncBaseFiltersClient
 
@@ -20,9 +19,7 @@ class FiltersClient(AsyncBaseFiltersClient):
         **kwargs: Any,
     ) -> Dict[str, Any]:
         queryables = {}
-        for field_config in get_queryable_config_by_name(
-            cast(DuckDBPyConnection, request.app.state.db_connection)
-        ).values():
+        for field_config in get_queryable_config_by_name().values():
             if (
                 collection_id is None
                 and field_config.collection_id == _collection_wildcard

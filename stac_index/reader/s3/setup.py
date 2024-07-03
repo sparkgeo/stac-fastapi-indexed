@@ -7,7 +7,6 @@ setup(
     packages=find_namespace_packages(),
     install_requires=[
         "boto3~=1.34.125",
-        "duckdb~=1.0.0",
         "pydantic-settings~=2.0",
     ],
     extras_require={
