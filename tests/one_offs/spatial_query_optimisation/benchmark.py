@@ -1,14 +1,17 @@
+from json import dumps
 from os import environ
-from pprint import pformat
 from statistics import mean
 from time import time
 from typing import Dict, Final, List
 
 from duckdb import connect as duckdb_connect
+from mercantile import bounding_tile, quadkey
+from shapely.geometry import Polygon
+from shapely.wkt import loads as loads_wkt
 
-_items_s3_uri: Final[str] = environ["ITEMS_S3_URI"]
-_test_iterations: Final[int] = int(environ.get("TEST_ITERATIONS", 10))
-_query_geometry_wkts: Dict[str, str] = {
+items_s3_uri: Final[str] = environ["ITEMS_S3_URI"]
+test_iterations: Final[int] = int(environ.get("TEST_ITERATIONS", 10))
+query_geometry_wkts: Dict[str, str] = {
     "global": "POLYGON ((-180 -90,180 -90,180 90,-180 90,-180 -90))",
     "smithers": "POLYGON ((-127.238439419634 54.7546385434538,-127.216133194381 54.7549525045737,-127.219397520028 54.7891596724424,-127.197091294774 54.7951194300481,-127.153566952816 54.7973149087645,-127.138333433131 54.7850814373478,-127.127452347642 54.7665673544697,-127.131804781837 54.7502428321231,-127.151390735718 54.7433343215248,-127.169344526776 54.7329693457563,-127.207972380264 54.7335976015998,-127.207972380264 54.7335976015998,-127.238439419634 54.7546385434538))",
     "hudson bay": "POLYGON ((-89.7956040194495 64.0253370126454,-90.8846476700107 63.1042571102515,-94.1517786216942 61.484451988897,-94.5873960819186 59.6659184454069,-94.5873960819186 58.6044990856905,-92.9538306060769 58.6044990856905,-91.8647869555157 56.9795576883863,-90.1223171146178 57.5683047516667,-85.1127163220365 55.1562291562977,-81.845585370353 55.2804781296734,-81.7366810052969 52.7869628944168,-79.7764024342868 51.109067197905,-79.1229762439501 51.5852134698359,-79.1229762439501 54.5291481575514,-75.9647496573227 56.5618124321783,-76.8359845777717 57.6849269437784,-78.4695500536134 58.7177809649809,-76.8359845777717 60.3733451725328,-77.7072194982206 62.5572675408605,-89.7956040194495 64.0253370126454))",
@@ -16,33 +19,105 @@ _query_geometry_wkts: Dict[str, str] = {
     "mali": "POLYGON ((-44.3546782490988 60.8003475398014,-53.7546654320703 67.144291188305,-59.7364754575977 76.3217173243123,-68.2819183512081 76.1181724825346,-74.2637283767354 79.2061431332646,-62.3001083256807 79.9776922762723,-65.718285483125 79.9776922762723,-58.8819311682366 82.4425124531754,-48.6273996959041 82.4425124531754,-45.2092225384599 83.2904655591803,-26.4092481725169 83.583431339848,-17.8638052789065 82.664001867581,-35.8092353554884 82.664001867581,-34.9546910661274 81.9793961506054,-11.8819952533792 82.3292871423411,-11.8819952533792 81.1001238651292,-22.1365267257117 78.3759565672889,-17.0092609895455 75.9116590865713,-19.5728938576286 71.0924184476793,-34.9546910661274 66.4712689158678,-44.3546782490988 60.8003475398014))",
     "borneo": "POLYGON ((114.785728916331 1.77378594055605,113.708889065533 1.72313471933159,113.683551657279 1.49518812468421,113.518858503628 1.49518812468421,113.442846278866 1.73579765247222,113.100791267436 1.72313471933159,113.100791267436 1.48252369756905,113.430177574739 1.40653563511098,113.404840166485 1.31787977739093,112.91076070553 1.39387071384507,112.872754593149 1.08989359033783,113.062785155055 0.950559971119585,113.062785155055 0.798553275667121,113.227478308706 0.798553275667121,113.227478308706 0.735215432138943,112.936098113784 0.595869122568977,112.404012540449 0.215818229979136,112.163307162035 0.165143695162414,112.163307162035 0.000450770171062,112.289994203306 -0.01221793386337,112.289994203306 -0.240253904171095,112.606711806481 -0.202248075853023,112.78407366426 -0.100898810694286,112.682724031244 0.038456879664645,112.809411072514 0.000450770171062,113.100791267436 -0.01221793386337,113.100791267436 -0.062892737834052,112.78407366426 -0.100898810694286,112.961435522038 -0.227585305651794,113.316159237595 -0.227585305651794,113.949594443947 0.13980637683375,114.228305934742 0.228486838853619,114.228305934742 0.760550681705927,114.40566779252 0.671876690094693,114.380330384266 1.03922752220059,114.988428182364 1.10255997573937,115.381158010302 1.41920048763913,115.507845051572 1.21655494501796,115.837231358875 1.20388906690841,116.356648228084 1.34321035377307,116.534010085862 1.64715537406305,116.749378056022 1.65981880309207,116.825390280784 1.97637656369517,116.686034535386 2.06500233835057,116.635359718878 2.43211124510083,116.470666565227 2.64726754666225,116.318642115702 2.84973353009598,115.9892558084 2.8370804231663,115.9892558084 2.64726754666225,115.799225246494 2.64726754666225,115.913243583637 2.43211124510083,115.596525980462 2.06500233835057,115.317814489667 2.10298331249605,115.140452631888 1.65981880309207,114.785728916331 1.77378594055605))",
 }
+test_times: Dict[str, Dict[str, List[float]]] = {
+    geom_name: {
+        "standard": [],
+        "minimum_bounding_quadkey": [],
+        "bbox_comparison": [],
+    }
+    for geom_name in query_geometry_wkts.keys()
+}
 
-test_times: Dict[str, List[float]] = {}
-for i in range(_test_iterations):
-    db_connection = duckdb_connect()
-    db_connection.execute("INSTALL httpfs; LOAD httpfs")
-    db_connection.execute("INSTALL spatial; LOAD spatial")
-    db_connection.execute("CREATE SECRET (TYPE S3, PROVIDER CREDENTIAL_CHAIN)")
-    for name, wkt in _query_geometry_wkts.items():
-        print(f"testing '{name}' ({i})")
-        start = time()
-        db_connection.execute(
-            "SELECT stac_location FROM '{items_uri}' WHERE ST_Intersects(ST_GeomFromWKB(geometry), ST_GeomFromText('{wkt}')) ORDER BY collection_id, id LIMIT 10".format(
-                items_uri=_items_s3_uri,
+db_connection = duckdb_connect()
+db_connection.execute("INSTALL httpfs; LOAD httpfs")
+db_connection.execute("INSTALL spatial; LOAD spatial")
+db_connection.execute("CREATE SECRET (TYPE S3, PROVIDER CREDENTIAL_CHAIN)")
+
+
+def standard() -> None:
+    test_name: Final[str] = "standard"
+    for i in range(test_iterations):
+        for geom_name, wkt in query_geometry_wkts.items():
+            print(f"testing {test_name} {geom_name} ({i})")
+            sql = """
+                SELECT stac_location
+                  FROM '{items_uri}'
+                 WHERE ST_Intersects(ST_GeomFromWKB(geometry), ST_GeomFromText('{wkt}'))
+              ORDER BY collection_id, id
+                 LIMIT 10
+            """.format(
+                items_uri=items_s3_uri,
                 wkt=wkt,
             )
-        ).fetchall()
-        duration = time() - start
-        if name not in test_times:
-            test_times[name] = []
-        test_times[name].append(duration)
+            start = time()
+            db_connection.execute(sql).fetchall()
+            duration = time() - start
+            test_times[geom_name][test_name].append(duration)
 
 
-print(
-    pformat(
-        {
-            key: {"mean": mean(value), "min": min(value), "max": max(value)}
-            for key, value in test_times.items()
+def minimum_bounding_quadkey() -> None:
+    test_name: Final[str] = "minimum_bounding_quadkey"
+    for i in range(test_iterations):
+        for geom_name, wkt in query_geometry_wkts.items():
+            print(f"testing {test_name} {geom_name} ({i})")
+            query_geometry: Polygon = loads_wkt(wkt)
+            query_minimum_bounding_quadkey = quadkey(
+                bounding_tile(*query_geometry.bounds)
+            )
+            params = [query_minimum_bounding_quadkey]
+            quadkey_ancestors_clause = ""
+            if len(query_minimum_bounding_quadkey) > 0:
+                query_minimum_bounding_quadkey_ancestors = [
+                    "".join(query_minimum_bounding_quadkey[:i])
+                    for i in range(len(query_minimum_bounding_quadkey))
+                ]
+                quadkey_ancestors_clause = "OR minimum_bounding_quadkey IN ({})".format(
+                    ", ".join(
+                        [
+                            "?"
+                            for _ in range(
+                                len(query_minimum_bounding_quadkey_ancestors)
+                            )
+                        ]
+                    )
+                )
+                params.extend(query_minimum_bounding_quadkey_ancestors)
+            sql = """
+                SELECT stac_location
+                  FROM '{items_uri}'
+                 WHERE unique_id IN (
+                         SELECT unique_id
+                           FROM '{items_uri}'
+                          WHERE STARTS_WITH(minimum_bounding_quadkey, ?)
+                             {quadkey_ancestors_clause}
+                       )
+                   AND ST_Intersects(ST_GeomFromWKB(geometry), ST_GeomFromText('{wkt}'))
+              ORDER BY collection_id, id
+                 LIMIT 10
+            """.format(
+                items_uri=items_s3_uri,
+                quadkey_ancestors_clause=quadkey_ancestors_clause,
+                wkt=wkt,
+            )
+            start = time()
+            db_connection.execute(sql, params).fetchall()
+            duration = time() - start
+            test_times[geom_name][test_name].append(duration)
+
+
+standard()
+minimum_bounding_quadkey()
+
+report: Dict[str, Dict[str, Dict[str, float]]] = {}
+for geom_name, tests in test_times.items():
+    report[geom_name] = {}
+    for test_name, values in tests.items():
+        report[geom_name][test_name] = {
+            "mean": mean(values),
+            "min": min(values),
+            "max": max(values),
         }
-    )
-)
+
+print("-----")
+print(dumps(report, indent=2))
+print("-----")
