@@ -10,7 +10,7 @@ from shapely.geometry import Polygon
 from shapely.wkt import loads as loads_wkt
 
 items_s3_uri: Final[str] = environ["ITEMS_S3_URI"]
-test_iterations: Final[int] = int(environ.get("TEST_ITERATIONS", 10))
+test_iterations: Final[int] = int(environ.get("TEST_ITERATIONS", 5))
 query_geometry_wkts: Dict[str, str] = {
     "global": "POLYGON ((-180 -90,180 -90,180 90,-180 90,-180 -90))",
     "smithers": "POLYGON ((-127.238439419634 54.7546385434538,-127.216133194381 54.7549525045737,-127.219397520028 54.7891596724424,-127.197091294774 54.7951194300481,-127.153566952816 54.7973149087645,-127.138333433131 54.7850814373478,-127.127452347642 54.7665673544697,-127.131804781837 54.7502428321231,-127.151390735718 54.7433343215248,-127.169344526776 54.7329693457563,-127.207972380264 54.7335976015998,-127.207972380264 54.7335976015998,-127.238439419634 54.7546385434538))",
@@ -22,8 +22,10 @@ query_geometry_wkts: Dict[str, str] = {
 test_times: Dict[str, Dict[str, List[float]]] = {
     geom_name: {
         "standard": [],
-        "minimum_bounding_quadkey": [],
-        "bbox_comparison": [],
+        "minimum_bounding_quadkey_subquery": [],
+        "minimum_bounding_quadkey_inline": [],
+        "bbox_subquery": [],
+        "bbox_inline": [],
     }
     for geom_name in query_geometry_wkts.keys()
 }
@@ -34,8 +36,9 @@ db_connection.execute("INSTALL spatial; LOAD spatial")
 db_connection.execute("CREATE SECRET (TYPE S3, PROVIDER CREDENTIAL_CHAIN)")
 
 
-def standard() -> None:
+def standard() -> Dict[str, List[str]]:
     test_name: Final[str] = "standard"
+    result: Dict[str, List[str]] = {}
     for i in range(test_iterations):
         for geom_name, wkt in query_geometry_wkts.items():
             print(f"testing {test_name} {geom_name} ({i})")
@@ -50,13 +53,18 @@ def standard() -> None:
                 wkt=wkt,
             )
             start = time()
-            db_connection.execute(sql).fetchall()
+            rows = db_connection.execute(sql).fetchall()
             duration = time() - start
             test_times[geom_name][test_name].append(duration)
+            if i == 0:
+                result[geom_name] = [row[0] for row in rows]
+    return result
 
 
-def minimum_bounding_quadkey() -> None:
-    test_name: Final[str] = "minimum_bounding_quadkey"
+def minimum_bounding_quadkey_subquery(
+    expected_stac_locations: Dict[str, List[str]],
+) -> None:
+    test_name: Final[str] = "minimum_bounding_quadkey_subquery"
     for i in range(test_iterations):
         for geom_name, wkt in query_geometry_wkts.items():
             print(f"testing {test_name} {geom_name} ({i})")
@@ -100,13 +108,145 @@ def minimum_bounding_quadkey() -> None:
                 wkt=wkt,
             )
             start = time()
-            db_connection.execute(sql, params).fetchall()
+            rows = db_connection.execute(sql, params).fetchall()
             duration = time() - start
             test_times[geom_name][test_name].append(duration)
+            if i == 0:
+                if not expected_stac_locations[geom_name] == [row[0] for row in rows]:
+                    raise Exception(f"Incorrect result in {test_name} for {geom_name}")
 
 
-standard()
-minimum_bounding_quadkey()
+def minimum_bounding_quadkey_inline(
+    expected_stac_locations: Dict[str, List[str]],
+) -> None:
+    test_name: Final[str] = "minimum_bounding_quadkey_inline"
+    for i in range(test_iterations):
+        for geom_name, wkt in query_geometry_wkts.items():
+            print(f"testing {test_name} {geom_name} ({i})")
+            query_geometry: Polygon = loads_wkt(wkt)
+            query_minimum_bounding_quadkey = quadkey(
+                bounding_tile(*query_geometry.bounds)
+            )
+            params = [query_minimum_bounding_quadkey]
+            quadkey_ancestors_clause = ""
+            if len(query_minimum_bounding_quadkey) > 0:
+                query_minimum_bounding_quadkey_ancestors = [
+                    "".join(query_minimum_bounding_quadkey[:i])
+                    for i in range(len(query_minimum_bounding_quadkey))
+                ]
+                quadkey_ancestors_clause = (
+                    " OR minimum_bounding_quadkey IN ({})".format(
+                        ", ".join(
+                            [
+                                "?"
+                                for _ in range(
+                                    len(query_minimum_bounding_quadkey_ancestors)
+                                )
+                            ]
+                        )
+                    )
+                )
+                params.extend(query_minimum_bounding_quadkey_ancestors)
+            sql = """
+                SELECT stac_location
+                  FROM '{items_uri}'
+                 WHERE (STARTS_WITH(minimum_bounding_quadkey, ?){quadkey_ancestors_clause})
+                   AND ST_Intersects(ST_GeomFromWKB(geometry), ST_GeomFromText('{wkt}'))
+              ORDER BY collection_id, id
+                 LIMIT 10
+            """.format(
+                items_uri=items_s3_uri,
+                quadkey_ancestors_clause=quadkey_ancestors_clause,
+                wkt=wkt,
+            )
+            start = time()
+            rows = db_connection.execute(sql, params).fetchall()
+            duration = time() - start
+            test_times[geom_name][test_name].append(duration)
+            if i == 0:
+                if not expected_stac_locations[geom_name] == [row[0] for row in rows]:
+                    raise Exception(f"Incorrect result in {test_name} for {geom_name}")
+
+
+def bbox_subquery(expected_stac_locations: Dict[str, List[str]]) -> None:
+    test_name: Final[str] = "bbox_subquery"
+    for i in range(test_iterations):
+        for geom_name, wkt in query_geometry_wkts.items():
+            print(f"testing {test_name} {geom_name} ({i})")
+            query_geometry: Polygon = loads_wkt(wkt)
+            sql = """
+                SELECT stac_location
+                  FROM '{items_uri}'
+                WHERE unique_id IN (
+                        SELECT unique_id
+                          FROM '{items_uri}'
+                         WHERE NOT (
+                                 bbox_x_max < ?  -- query x min
+                              OR bbox_y_max < ?  -- query y min
+                              OR bbox_x_min > ?  -- query x max
+                              OR bbox_y_min > ?  -- query y max
+                               )
+                      )
+                  AND ST_Intersects(
+                        ST_GeomFromWKB(geometry),
+                        ST_GeomFromText('{wkt}')
+                      )
+             ORDER BY collection_id, id
+                LIMIT 10
+            """.format(
+                items_uri=items_s3_uri,
+                wkt=wkt,
+            )
+            params = query_geometry.bounds
+            start = time()
+            rows = db_connection.execute(sql, params).fetchall()
+            duration = time() - start
+            test_times[geom_name][test_name].append(duration)
+            if i == 0:
+                if not expected_stac_locations[geom_name] == [row[0] for row in rows]:
+                    raise Exception(f"Incorrect result in {test_name} for {geom_name}")
+
+
+def bbox_inline(expected_stac_locations: Dict[str, List[str]]) -> None:
+    test_name: Final[str] = "bbox_inline"
+    for i in range(test_iterations):
+        for geom_name, wkt in query_geometry_wkts.items():
+            print(f"testing {test_name} {geom_name} ({i})")
+            query_geometry: Polygon = loads_wkt(wkt)
+            sql = """
+                SELECT stac_location
+                  FROM '{items_uri}'
+                WHERE NOT (
+                        bbox_x_max < ?  -- query x min
+                     OR bbox_y_max < ?  -- query y min
+                     OR bbox_x_min > ?  -- query x max
+                     OR bbox_y_min > ?  -- query y max
+                      )
+                  AND ST_Intersects(
+                        ST_GeomFromWKB(geometry),
+                        ST_GeomFromText('{wkt}')
+                      )
+             ORDER BY collection_id, id
+                LIMIT 10
+            """.format(
+                items_uri=items_s3_uri,
+                wkt=wkt,
+            )
+            params = query_geometry.bounds
+            start = time()
+            rows = db_connection.execute(sql, params).fetchall()
+            duration = time() - start
+            test_times[geom_name][test_name].append(duration)
+            if i == 0:
+                if not expected_stac_locations[geom_name] == [row[0] for row in rows]:
+                    raise Exception(f"Incorrect result in {test_name} for {geom_name}")
+
+
+expected_stac_locations = standard()
+minimum_bounding_quadkey_subquery(expected_stac_locations)
+minimum_bounding_quadkey_inline(expected_stac_locations)
+bbox_subquery(expected_stac_locations)
+bbox_inline(expected_stac_locations)
 
 report: Dict[str, Dict[str, Dict[str, float]]] = {}
 for geom_name, tests in test_times.items():
