@@ -32,27 +32,17 @@ _logger: Final[Logger] = getLogger(__file__)
 @attr.s
 class CoreCrudClient(AsyncBaseCoreClient):
     async def all_collections(self, request: Request, **kwargs) -> Collections:
-        fetch_tasks = [
-            fetch_dict(url)
-            for url in [
-                row[0] for row in fetchall("SELECT stac_location FROM collections")
-            ]
-        ]
-        collections = [
-            fix_collection_links(
-                Collection(**collection_dict),
-                request,
-            )
-            for collection_dict in await gather(*fetch_tasks)
-        ]
-        return Collections(
-            collections=collections,
-            links=[
-                get_catalog_link(request, rel_root),
-                get_catalog_link(request, rel_parent),
-                get_collections_link(request, rel_self),
-            ],
-        )
+        # Alter how call is answered based on who is asking.
+        # Catalog root requests (/) requires a link for each collection, but doesn't use any other collection data.
+        # All Collections requests (/collections) requires all data about all collections.
+        # Because collection data comes from JSON stored externally that must be retrieved, we should only get all collection data when actually required.
+        # If this request is to satisfy a Catalog root request, get the minimum information required to satisfy that request (collection IDs).
+        if request.url.path == "/":
+            _logger.debug(f"answering '{request.url}' as minimal collections response")
+            return self._get_minimal_collections_response()
+        else:
+            _logger.debug(f"answering '{request.url}' as full collections response")
+            return await self._get_full_collections_response(request)
 
     async def get_collection(
         self, collection_id: str, request: Request, **kwargs
@@ -195,3 +185,38 @@ class CoreCrudClient(AsyncBaseCoreClient):
         return await SearchHandler(
             search_request=search_request, request=request
         ).search()
+
+    def _get_minimal_collections_response(self) -> Collections:
+        return Collections(
+            collections=[
+                Collection(**{"id": id})
+                for id in [
+                    row[0] for row in fetchall("SELECT id FROM collections ORDER BY id")
+                ]
+            ],
+            links=[],
+        )
+
+    async def _get_full_collections_response(self, request: Request) -> Collections:
+        fetch_tasks = [
+            fetch_dict(url)
+            for url in [
+                row[0]
+                for row in fetchall("SELECT stac_location FROM collections ORDER BY id")
+            ]
+        ]
+        collections = [
+            fix_collection_links(
+                Collection(**collection_dict),
+                request,
+            )
+            for collection_dict in await gather(*fetch_tasks)
+        ]
+        return Collections(
+            collections=collections,
+            links=[
+                get_catalog_link(request, rel_root),
+                get_catalog_link(request, rel_parent),
+                get_collections_link(request, rel_self),
+            ],
+        )
