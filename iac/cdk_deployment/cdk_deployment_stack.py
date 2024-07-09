@@ -1,6 +1,4 @@
-import os
 from pathlib import Path
-
 from aws_cdk import Duration, RemovalPolicy, Stack
 from aws_cdk import aws_apigateway as apigw
 from aws_cdk import aws_lambda as _lambda
@@ -13,19 +11,22 @@ class CdkDeploymentStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
         build_arguments = {
-            "stac_api_indexed_parquet_index_source_uri": os.environ[
-                "stac_api_indexed_parquet_index_source_uri"
-            ],
-            "stac_api_indexed_token_jwt_secret": os.environ[
-                "stac_api_indexed_token_jwt_secret"
-            ],
-            "stac_api_indexed_log_level": os.environ["stac_api_indexed_log_level"],
-            "permit_boto_debug": os.environ["permit_boto_debug"],
+            "stac_api_indexed_parquet_index_source_uri": self.node.try_get_context(
+                "PARQUET_URI"
+            ),
+            "stac_api_indexed_token_jwt_secret": self.node.try_get_context(
+                "JWT_SECRET"
+            ),
+            "stac_api_indexed_log_level": self.node.try_get_context("LOG_LEVEL"),
+            "stac_api_indexed_permit_boto_debug": self.node.try_get_context(
+                "BOTO_DEBUG"
+            ),
+            "stac_api_indexed_duckdb_threads": self.node.try_get_context(
+                "DUCKDB_THREADS"
+            ),
         }
         build_path = Path("../")
-
         Bucket(self, id="ServerlessStacBucket", encryption=BucketEncryption.S3_MANAGED)
-        cors = apigw.CorsOptions(allow_origins=["*"])
         lamda_code = _lambda.DockerImageCode.from_image_asset(
             str(build_path.resolve()), file="iac/Dockerfile"
         )
@@ -35,22 +36,22 @@ class CdkDeploymentStack(Stack):
             code=lamda_code,
             timeout=Duration.seconds(300),
             environment=build_arguments,
-            memory_size=10240,
+            memory_size=1500,
         )
         cors = apigw.CorsOptions(allow_origins=["*"])
-        apigw.LambdaRestApi(
+        rest_api = apigw.LambdaRestApi(
             self,
             "ServerlessStacAPI",
             handler=stac_serverless_lambda,
             default_cors_preflight_options=cors,
             proxy=True,
-            binary_media_types=["*/*"],
+            binary_media_types=[],
             rest_api_name="STAC-API-Serverless",
         )
         LogGroup(
             self,
             id="ServerlessStacLogs",
-            retention=RetentionDays.ONE_DAY,
+            retention=RetentionDays.ONE_MONTH,
             log_group_name="ServerlessApiStacLogGroup",
-            removal_policy=RemovalPolicy.RETAIN,
+            removal_policy=RemovalPolicy.DESTROY,
         )
