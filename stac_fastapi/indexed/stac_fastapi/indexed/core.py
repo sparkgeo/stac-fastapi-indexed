@@ -1,7 +1,7 @@
 from asyncio import gather
 from json import loads
 from logging import Logger, getLogger
-from re import IGNORECASE, match, search
+from re import IGNORECASE, search
 from typing import Final, List, Optional
 from urllib.parse import unquote_plus
 
@@ -142,19 +142,6 @@ class CoreCrudClient(AsyncBaseCoreClient):
             "limit": limit,
             "token": token,
         }
-        if sortby:
-            # https://github.com/radiantearth/stac-spec/tree/master/api-spec/extensions/sort#http-get-or-post-form
-            sort_param = []
-            for sort in sortby:
-                sortparts = match(r"^([+-]?)(.*)$", sort)
-                if sortparts:
-                    sort_param.append(
-                        {
-                            "field": sortparts.group(2).strip(),
-                            "direction": "desc" if sortparts.group(1) == "-" else "asc",
-                        }
-                    )
-            base_args["sortby"] = sort_param
         if intersects:
             base_args["intersects"] = loads(unquote_plus(intersects))
         if filter:
