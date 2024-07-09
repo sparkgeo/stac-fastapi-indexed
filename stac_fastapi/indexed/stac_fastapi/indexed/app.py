@@ -41,7 +41,6 @@ api = StacApi(
     ),
     search_post_request_model=post_request_model,
     middlewares=[Middleware(CORSMiddleware), Middleware(ProxyHeaderMiddleware)],
-    # openapi_prefix="/prod",
 )
 app = api.app
 
