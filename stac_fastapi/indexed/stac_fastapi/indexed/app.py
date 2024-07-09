@@ -41,6 +41,7 @@ api = StacApi(
     ),
     search_post_request_model=post_request_model,
     middlewares=[Middleware(CORSMiddleware), Middleware(ProxyHeaderMiddleware)],
+    # openapi_prefix="/prod",
 )
 app = api.app
 
@@ -84,7 +85,15 @@ def create_handler(app):
     try:
         from mangum import Mangum
 
-        return Mangum(app)
+        return Mangum(
+            app,
+            text_mime_types=[
+                "text/",
+                "application/json",
+                "application/geo+json",
+                "application/vnd.oai.openapi",
+            ],
+        )
     except ImportError:
         return None
 
