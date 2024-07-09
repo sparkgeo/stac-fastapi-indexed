@@ -17,6 +17,7 @@ _bbox_parts_column_names: Final[Dict[str, str]] = {
     "maxx": "bbox_x_max",
     "maxy": "bbox_y_max",
 }
+_bbox_max_precision: Final[int] = 5
 _add_quadkey: Final[int] = int(environ.get("ADD_QUADKEYS", 0))
 _add_bbox: Final[int] = int(environ.get("ADD_BBOX", 0))
 
@@ -105,7 +106,10 @@ def execute(
                     continue
                 update_args.append(
                     (
-                        *polygon.bounds,
+                        *[
+                            round(bound, _bbox_max_precision)
+                            for bound in polygon.bounds
+                        ],
                         collection_id,
                         id,
                     )
