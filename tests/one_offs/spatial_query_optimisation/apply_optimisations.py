@@ -17,6 +17,8 @@ _bbox_parts_column_names: Final[Dict[str, str]] = {
     "maxx": "bbox_x_max",
     "maxy": "bbox_y_max",
 }
+_add_quadkey: Final[int] = int(environ.get("ADD_QUADKEYS", 0))
+_add_bbox: Final[int] = int(environ.get("ADD_BBOX", 0))
 
 
 def execute(
@@ -35,78 +37,86 @@ def execute(
     updates: Dict[str, List[Tuple[str, str, str]]] = {}
     update_args: List[Tuple[str, str, str]]
     polygon: Polygon
-    if _minimum_bounding_quadkey_column_name in existing_columns:
-        print(
-            "'{}' already exists, skipping".format(
-                _minimum_bounding_quadkey_column_name
+    if _add_quadkey > 0:
+        if _minimum_bounding_quadkey_column_name in existing_columns:
+            print(
+                "'{}' already exists, skipping".format(
+                    _minimum_bounding_quadkey_column_name
+                )
             )
-        )
+        else:
+            update_args = []
+            connection.execute(
+                "ALTER TABLE items ADD {} VARCHAR".format(
+                    _minimum_bounding_quadkey_column_name
+                )
+            )
+            connection.execute(
+                "ALTER TABLE items ADD {} VARCHAR".format(_composite_key_column_name)
+            )
+            for row in connection.execute(
+                "SELECT collection_id, id, ST_AsText(ST_GeomFromWKB(geometry)) FROM items{}".format(
+                    f" LIMIT {_test_limit}" if _test_limit is not None else ""
+                )
+            ).fetchall():
+                collection_id, id, wkt = row
+                composite_key = f"{collection_id}_{id}"
+                row_update_args: List[Optional[str]] = [composite_key]
+                polygon = loads_wkt(wkt)
+                if polygon.is_empty:
+                    row_update_args.append(None)
+                else:
+                    row_update_args.append(
+                        mercantile.quadkey(mercantile.bounding_tile(*polygon.bounds))
+                    )
+                update_args.append(
+                    (
+                        *row_update_args,
+                        collection_id,
+                        id,
+                    )
+                )
+            updates[
+                "UPDATE items SET {} = ?, {} = ? WHERE collection_id = ? and id = ?".format(
+                    _composite_key_column_name,
+                    _minimum_bounding_quadkey_column_name,
+                )
+            ] = update_args
     else:
-        update_args = []
-        connection.execute(
-            "ALTER TABLE items ADD {} VARCHAR".format(
-                _minimum_bounding_quadkey_column_name
-            )
-        )
-        connection.execute(
-            "ALTER TABLE items ADD {} VARCHAR".format(_composite_key_column_name)
-        )
-        for row in connection.execute(
-            "SELECT collection_id, id, ST_AsText(ST_GeomFromWKB(geometry)) FROM items{}".format(
-                f" LIMIT {_test_limit}" if _test_limit is not None else ""
-            )
-        ).fetchall():
-            collection_id, id, wkt = row
-            composite_key = f"{collection_id}_{id}"
-            row_update_args: List[Optional[str]] = [composite_key]
-            polygon = loads_wkt(wkt)
-            if polygon.is_empty:
-                row_update_args.append(None)
-            else:
-                row_update_args.append(
-                    mercantile.quadkey(mercantile.bounding_tile(*polygon.bounds))
-                )
-            update_args.append(
-                (
-                    *row_update_args,
-                    collection_id,
-                    id,
-                )
-            )
-        updates[
-            "UPDATE items SET {} = ?, {} = ? WHERE collection_id = ? and id = ?".format(
-                _composite_key_column_name,
-                _minimum_bounding_quadkey_column_name,
-            )
-        ] = update_args
+        print("not adding quadkey")
 
-    if _bbox_parts_column_names["minx"] in existing_columns:
-        print("'{}' already exists, skipping".format(_bbox_parts_column_names["minx"]))
-    else:
-        update_args = []
-        for column_name in _bbox_parts_column_names.values():
-            connection.execute("ALTER TABLE items ADD {} REAL".format(column_name))
-        for row in connection.execute(
-            "SELECT collection_id, id, ST_AsText(ST_GeomFromWKB(geometry)) FROM items{}".format(
-                f" LIMIT {_test_limit}" if _test_limit is not None else ""
+    if _add_bbox > 0:
+        if _bbox_parts_column_names["minx"] in existing_columns:
+            print(
+                "'{}' already exists, skipping".format(_bbox_parts_column_names["minx"])
             )
-        ).fetchall():
-            collection_id, id, wkt = row
-            polygon = loads_wkt(wkt)
-            if polygon.is_empty:
-                continue
-            update_args.append(
-                (
-                    *polygon.bounds,
-                    collection_id,
-                    id,
+        else:
+            update_args = []
+            for column_name in _bbox_parts_column_names.values():
+                connection.execute("ALTER TABLE items ADD {} REAL".format(column_name))
+            for row in connection.execute(
+                "SELECT collection_id, id, ST_AsText(ST_GeomFromWKB(geometry)) FROM items{}".format(
+                    f" LIMIT {_test_limit}" if _test_limit is not None else ""
                 )
-            )
-        updates[
-            "UPDATE items SET {} = ?, {} = ?, {} = ?, {} = ? WHERE collection_id = ? and id = ?".format(
-                *_bbox_parts_column_names.values()
-            )
-        ] = update_args
+            ).fetchall():
+                collection_id, id, wkt = row
+                polygon = loads_wkt(wkt)
+                if polygon.is_empty:
+                    continue
+                update_args.append(
+                    (
+                        *polygon.bounds,
+                        collection_id,
+                        id,
+                    )
+                )
+            updates[
+                "UPDATE items SET {} = ?, {} = ?, {} = ?, {} = ? WHERE collection_id = ? and id = ?".format(
+                    *_bbox_parts_column_names.values()
+                )
+            ] = update_args
+    else:
+        print("not adding bbox")
 
     for statement, args in updates.items():
         connection.executemany(
