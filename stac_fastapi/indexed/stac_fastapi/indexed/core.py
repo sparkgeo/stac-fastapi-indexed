@@ -1,4 +1,5 @@
 from asyncio import gather
+from json import loads
 from logging import Logger, getLogger
 from re import IGNORECASE, match, search
 from typing import Final, List, Optional
@@ -155,7 +156,7 @@ class CoreCrudClient(AsyncBaseCoreClient):
                     )
             base_args["sortby"] = sort_param
         if intersects:
-            base_args["intersects"] = unquote_plus(intersects)
+            base_args["intersects"] = loads(unquote_plus(intersects))
         if filter:
             # following block based on https://github.com/stac-utils/stac-fastapi-pgstac/blob/659ddc374b7001dc7c7ad2cc2fd29e3f420b0573/stac_fastapi/pgstac/core.py#L373
             # Kludgy fix because using factory does not allow alias for filter-lang

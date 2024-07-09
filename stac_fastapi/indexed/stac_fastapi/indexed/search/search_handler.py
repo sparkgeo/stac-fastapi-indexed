@@ -37,6 +37,10 @@ from stac_fastapi.indexed.search.filter.queryable_field_map import (
 )
 from stac_fastapi.indexed.search.filter_clause import FilterClause
 from stac_fastapi.indexed.search.query_info import QueryInfo
+from stac_fastapi.indexed.search.spatial import (
+    get_intersects_clause_for_bbox,
+    get_intersects_clause_for_wkt,
+)
 from stac_fastapi.indexed.search.token import (
     create_token_from_query,
     get_query_from_token,
@@ -205,25 +209,12 @@ class SearchHandler:
         if self.search_request.bbox is not None:
             bbox_2d = self._get_bbox_2d(self.search_request.bbox)
             if bbox_2d is not None:
-                return FilterClause(
-                    sql="ST_Intersects(ST_GeomFromText('{}'), ST_GeomFromWKB(geometry))".format(
-                        "POLYGON (({xmin} {ymin}, {xmax} {ymin}, {xmax} {ymax}, {xmin} {ymax}, {xmin} {ymin}))".format(
-                            xmin=bbox_2d[0],
-                            ymin=bbox_2d[1],
-                            xmax=bbox_2d[2],
-                            ymax=bbox_2d[3],
-                        )
-                    )
-                )
+                return get_intersects_clause_for_bbox(*bbox_2d)
         return None
 
     def _include_intersects(self) -> Optional[FilterClause]:
         if self.search_request.intersects is not None:
-            return FilterClause(
-                sql="ST_Intersects(ST_GeomFromGeoJSON('{}', ST_GeomFromWKB(geometry)))".format(
-                    self.search_request.intersects
-                )
-            )
+            return get_intersects_clause_for_wkt(self.search_request.intersects.wkt)
         return None
 
     def _include_datetime(self) -> Optional[FilterClause]:

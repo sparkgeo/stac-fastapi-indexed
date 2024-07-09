@@ -6,6 +6,7 @@ from os import makedirs, path
 from typing import Dict, Final, List, Tuple, cast
 
 from duckdb import connect
+from shapely import Geometry
 from shapely.wkt import loads as wkt_loads
 from stac_fastapi.types.stac import Collection
 
@@ -128,6 +129,10 @@ class IndexCreator:
             "id": "?",
             "collection_id": "?",
             "geometry": "ST_GeomFromText('{geometry_wkt}')",
+            "bbox_x_min": "?",
+            "bbox_y_min": "?",
+            "bbox_x_max": "?",
+            "bbox_y_max": "?",
             "datetime": "?",
             "datetime_end": "?",
             "stac_location": "?",
@@ -142,7 +147,8 @@ class IndexCreator:
 
         def processor(item: ItemWithLocation) -> List[str]:
             errors: List[str] = []
-            if not wkt_loads(item.geometry.wkt).is_valid:
+            geometry: Geometry = wkt_loads(item.geometry.wkt)
+            if not geometry.is_valid:
                 errors.append(
                     f"skipping invalid geometry '{item.collection}'/'{item.id}'"
                 )
@@ -152,6 +158,7 @@ class IndexCreator:
             insert_params = [
                 item.id,
                 item.collection,
+                *geometry.bounds,
                 item.properties.datetime or item.properties.start_datetime,
                 item.properties.end_datetime or item.properties.datetime,
                 item.location,

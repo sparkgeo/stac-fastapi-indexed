@@ -44,6 +44,7 @@ from stac_fastapi.indexed.search.filter.errors import (
     UnknownFunction,
 )
 from stac_fastapi.indexed.search.filter_clause import FilterClause
+from stac_fastapi.indexed.search.spatial import get_intersects_clause_for_bbox
 
 _COMPARISON_OP_MAP: Final[Dict[ast.ComparisonOp, str]] = {
     ast.ComparisonOp.EQ: "=",
@@ -232,12 +233,15 @@ class DubkDBSQLEvaluator(Evaluator):
         raise Exception(f"unknown error condition in '{func}'")
 
     @handle(ast.BBox)
-    def bbox(self, node: ast.BBox, lhs):
+    def bbox(self, node: ast.BBox, lhs) -> FilterClause:
         if type(lhs) is not _GeometrySql:
             raise NotAGeometryField(lhs)
-        func = _SPATIAL_COMPARISON_OP_MAP[ast.SpatialComparisonOp.INTERSECTS]
-        rhs = f"ST_GeomFromText('POLYGON(({node.minx} {node.miny}, {node.minx} {node.maxy}, {node.maxx} {node.maxy}, {node.maxx} {node.miny}, {node.minx} {node.miny}))')"  # noqa
-        return f"{func}({lhs.sql_part},{rhs})"
+        return get_intersects_clause_for_bbox(
+            node.minx,
+            node.miny,
+            node.maxx,
+            node.maxy,
+        )
 
     # inspired by https://github.com/geopython/pygeofilter/issues/90#issuecomment-2011712041
     @handle(ast.Attribute)
