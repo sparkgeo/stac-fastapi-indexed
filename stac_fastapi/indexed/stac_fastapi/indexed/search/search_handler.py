@@ -9,11 +9,9 @@ from fastapi import Request
 from pygeofilter.ast import Node
 from stac_fastapi.extensions.core.filter.filter import FilterExtensionPostRequest
 from stac_fastapi.extensions.core.pagination.token_pagination import POSTTokenPagination
-from stac_fastapi.extensions.core.sort.sort import SortExtensionPostRequest
 from stac_fastapi.types.errors import InvalidQueryParameter
 from stac_fastapi.types.search import BaseSearchPostRequest
 from stac_fastapi.types.stac import Item, ItemCollection
-from stac_pydantic.api.extensions.sort import SortDirections
 
 from stac_fastapi.indexed.constants import rel_root, rel_self
 from stac_fastapi.indexed.db import fetchall
@@ -167,21 +165,7 @@ class SearchHandler:
         )
 
     def _determine_order(self) -> List[str]:
-        sort_fields: List[str] = []
-        user_provided_sorts = cast(SortExtensionPostRequest, self.search_request).sortby
-        if user_provided_sorts is not None and len(user_provided_sorts) > 0:
-            for user_provided_sort in user_provided_sorts:
-                sort_fields.append(
-                    "{} {}".format(
-                        user_provided_sort.field,
-                        "ASC"
-                        if user_provided_sort.direction == SortDirections.asc
-                        else "DESC",
-                    )
-                )
-        else:
-            sort_fields.append("collection_id ASC, id ASC")
-        return sort_fields
+        return ["collection_id ASC", "id ASC"]
 
     def _include_ids(self) -> Optional[FilterClause]:
         if self.search_request.ids is not None:
