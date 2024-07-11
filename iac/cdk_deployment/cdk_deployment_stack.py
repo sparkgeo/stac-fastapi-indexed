@@ -48,7 +48,7 @@ class CdkDeploymentStack(Stack):
             binary_media_types=[],
             rest_api_name="STAC-API-Serverless",
         )
-        LogGroup(
+        log_group = LogGroup(
             self,
             id="ServerlessStacLogs",
             retention=RetentionDays.ONE_MONTH,
