@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: ./docker/tests/with_environment/Dockerfile
     environment:
-      API_ROOT_PATH: http://api/
+      API_ROOT_PATH: http://api
     depends_on:
       # Prefer a `condition:` approach here to only execute tests when `api` is healthy, but
       # this was causing timeouts in Docker Compose and erroneously failing smoke tests.
