@@ -4,7 +4,12 @@ from fastapi.middleware import Middleware
 from fastapi.responses import ORJSONResponse
 from stac_fastapi.api.app import StacApi
 from stac_fastapi.api.middleware import CORSMiddleware, ProxyHeaderMiddleware
-from stac_fastapi.api.models import create_get_request_model, create_post_request_model
+from stac_fastapi.api.models import (
+    ItemCollectionUri,
+    create_get_request_model,
+    create_post_request_model,
+    create_request_model,
+)
 from stac_fastapi.extensions.core import FilterExtension, TokenPaginationExtension
 
 from stac_fastapi.indexed.core import CoreCrudClient
@@ -25,6 +30,11 @@ api = StacApi(
     extensions=extensions,
     client=CoreCrudClient(post_request_model=post_request_model),  # type: ignore
     response_class=ORJSONResponse,
+    items_get_request_model=create_request_model(
+        "ItemCollectionURI",
+        base_model=ItemCollectionUri,
+        mixins=[TokenPaginationExtension().GET],
+    ),
     search_get_request_model=create_get_request_model(extensions),
     search_post_request_model=post_request_model,
     middlewares=[Middleware(CORSMiddleware), Middleware(ProxyHeaderMiddleware)],

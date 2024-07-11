@@ -69,6 +69,8 @@ class CoreCrudClient(AsyncBaseCoreClient):
         token: Optional[str] = None,
         **kwargs,
     ) -> ItemCollection:
+        _logger.info(f"url: '{request.url}'")
+        _logger.info(f"item_collection request with token '{token}'")
         try:
             search_request = self.post_request_model(
                 **{
@@ -83,6 +85,7 @@ class CoreCrudClient(AsyncBaseCoreClient):
                     if value is not None
                 }
             )
+            _logger.info(f"search_request.token: '{search_request.token}'")
         except ValidationError as e:
             raise HTTPException(
                 status_code=400, detail=f"Invalid parameters provided {e}"
