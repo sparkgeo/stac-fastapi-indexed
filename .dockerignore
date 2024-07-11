@@ -1,13 +1,11 @@
 data/index
 data/STAC/pc_partial_data
 **/*.egg-info
-cdk
 **/cdk.out
-.venv
+**/.venv
 .env
 .idea
 **/__pycache__
-iac/.venv
 data/index/**
 data/STAC/pc_partial_data/data/**
 stac_index/indexer/stac_index/indexer/index_data/**
@@ -17,4 +15,3 @@ minio/mc/config/**
 .vscode
 **/.DS_Store
 todo.md
-.env
