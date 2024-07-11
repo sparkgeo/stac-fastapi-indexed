@@ -1,8 +1,8 @@
 **/*.egg-info
 **/__pycache__
 .idea
-iac/cdk.out
-iac/.venv
+**/cdk.out
+**/.venv
 data/index/**
 data/STAC/pc_partial_data/data/**
 stac_index/indexer/stac_index/indexer/index_data/**

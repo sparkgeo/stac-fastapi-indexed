@@ -1,6 +1,4 @@
 data
 **/*.egg-info
-cdk
-cdk.out
-iac/cdk.out
+**/cdk.out
 .venv

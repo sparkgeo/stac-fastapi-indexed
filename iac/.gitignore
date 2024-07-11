@@ -1,9 +1,2 @@
-**/*.egg-info
-**/__pycache__
-minio/mc/config/**
-!**/.gitkeep
-.autoenv*.zsh
-.vscode
 **/.DS_Store
-todo.md
 .idea
