@@ -5,7 +5,6 @@ cdk
 .venv
 .env
 .idea
-
 **/__pycache__
 iac/.venv
 data/index/**
