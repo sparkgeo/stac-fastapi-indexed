@@ -45,12 +45,11 @@ async def connect_to_db() -> None:
     lambda_memory_size = os.environ.get("AWS_LAMBDA_FUNCTION_MEMORY_SIZE", None)
     if duckdb_thread_count:
         try:
-            duckdb_thread_count = int(duckdb_connection)
+            int(duckdb_thread_count)
             duckdb_max_memory = (
                 duckdb_thread_count * 125
             )  # duckdb suggest 125mb per thread
             if lambda_memory_size:
-                lambda_memory_size = int(lambda_memory_size)
                 if lambda_memory_size < duckdb_max_memory:
                     memory_error_message = f"MemoryError: duckdb {duckdb_thread_count} threads requires:\
                      '{duckdb_max_memory}MB'. Lambda memory: '{lambda_memory_size}MB'"
