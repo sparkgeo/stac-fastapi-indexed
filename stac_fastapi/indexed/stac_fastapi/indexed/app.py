@@ -1,5 +1,7 @@
+import os
 from os import getenv
 
+from fastapi import FastAPI
 from fastapi.middleware import Middleware
 from fastapi.responses import ORJSONResponse
 from stac_fastapi.api.app import StacApi
@@ -24,8 +26,9 @@ extensions_map = {
 
 extensions = list(extensions_map.values())
 post_request_model = create_post_request_model(extensions)
-
+stage_path = "/" + os.environ.get("API_STAGE", "")
 api = StacApi(
+    app=FastAPI(root_path=stage_path, docs_url="/api.html"),
     settings=get_settings(),
     extensions=extensions,
     client=CoreCrudClient(post_request_model=post_request_model),  # type: ignore
