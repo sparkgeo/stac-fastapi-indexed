@@ -28,13 +28,17 @@ extensions_map = {
 extensions = list(extensions_map.values())
 post_request_model = create_post_request_model(extensions)
 
-stage = os.environ.get("API_STAGE", None)
-if stage:
-    fast_api_app = FastAPI(root_path=f"/{stage}", docs_url="/api.html")
-else:
-    fast_api_app = FastAPI(docs_url="/api.html")
+
+def fastapi_factory(stage: str) -> FastAPI:
+    if stage:
+        fast_api_app = FastAPI(root_path=f"/{stage}", docs_url="/api.html")
+    else:
+        fast_api_app = FastAPI(docs_url="/api.html")
+    return fast_api_app
+
+
 api = StacApi(
-    app=fast_api_app,
+    app=fastapi_factory(os.environ.get("API_STAGE", "")),
     settings=get_settings(),
     extensions=extensions,
     client=CoreCrudClient(post_request_model=post_request_model),  # type: ignore
