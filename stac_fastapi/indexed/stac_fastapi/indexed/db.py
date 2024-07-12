@@ -42,28 +42,8 @@ async def connect_to_db() -> None:
     execute("LOAD httpfs")
     times["load httpfs extension"] = time()
     duckdb_thread_count = os.environ.get("DUCKDB_THREADS", None)
-    lambda_memory_size = os.environ.get("AWS_LAMBDA_FUNCTION_MEMORY_SIZE", None)
     if duckdb_thread_count:
-        try:
-            int(duckdb_thread_count)
-            duckdb_max_memory = (
-                duckdb_thread_count * 125
-            )  # duckdb suggest 125mb per thread
-            if lambda_memory_size:
-                if lambda_memory_size < duckdb_max_memory:
-                    memory_error_message = f"MemoryError: duckdb {duckdb_thread_count} threads requires:\
-                     '{duckdb_max_memory}MB'. Lambda memory: '{lambda_memory_size}MB'"
-                    _logger.error(memory_error_message)
-                    raise MemoryError(memory_error_message)
-            execute(f"SET memory_limit = '{duckdb_max_memory}MB'")
-            execute(f"SET threads to {duckdb_thread_count}")
-        except ValueError:
-            value_error_message = f"ValueError: invalid literal for duckdb thread count: '{duckdb_thread_count}'"
-            _logger.error(value_error_message)
-            raise ValueError(value_error_message)
-        except Exception as e:
-            _logger.error(e)
-            raise e
+        set_duckdb_threads(duckdb_thread_count)
     parquet_uris = await index_source.get_parquet_uris()
     if len(parquet_uris.keys()) == 0:
         raise Exception(f"no URIs found at '{index_source_uri}'")
@@ -126,3 +106,25 @@ def _sql_log_message(
             result_info="" if result_size is None else f" {result_size} row(s)",
         )
     )
+
+
+def set_duckdb_threads(duckdb_thread_count: str) -> None:
+    try:
+        int(duckdb_thread_count)
+        duckdb_max_memory = duckdb_thread_count * 125  # duckdb suggest 125mb per thread
+        lambda_memory_size = os.environ.get("AWS_LAMBDA_FUNCTION_MEMORY_SIZE", None)
+        if lambda_memory_size:
+            if lambda_memory_size < duckdb_max_memory:
+                memory_error_message = f"MemoryError: duckdb {duckdb_thread_count} threads requires:\
+                    '{duckdb_max_memory}MB'. Lambda memory: '{lambda_memory_size}MB'"
+                _logger.error(memory_error_message)
+                raise MemoryError(memory_error_message)
+        execute(f"SET memory_limit = '{duckdb_max_memory}MB'")
+        execute(f"SET threads to {duckdb_thread_count}")
+    except ValueError:
+        value_error_message = f"ValueError: invalid literal for duckdb thread count: '{duckdb_thread_count}'"
+        _logger.error(value_error_message)
+        raise ValueError(value_error_message)
+    except Exception as e:
+        _logger.error(e)
+        raise e
