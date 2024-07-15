@@ -10,6 +10,7 @@ from pygeofilter.ast import Node
 from stac_fastapi.extensions.core.filter.filter import FilterExtensionPostRequest
 from stac_fastapi.extensions.core.pagination.token_pagination import POSTTokenPagination
 from stac_fastapi.types.errors import InvalidQueryParameter
+from stac_fastapi.types.rfc3339 import str_to_interval
 from stac_fastapi.types.search import BaseSearchPostRequest
 from stac_fastapi.types.stac import Item, ItemCollection
 
@@ -203,10 +204,11 @@ class SearchHandler:
 
     def _include_datetime(self) -> Optional[FilterClause]:
         if self.search_request.datetime:
+            self.search_request.datetime = str_to_interval(self.search_request.datetime)
             if isinstance(self.search_request.datetime, datetime):
                 return FilterClause(
                     sql="datetime <= ? AND datetime_end >= ?",
-                    params=[self.search_request.datetime for _ in range(3)],
+                    params=[self.search_request.datetime, self.search_request.datetime],
                 )
             elif isinstance(self.search_request.datetime, tuple):
                 if (

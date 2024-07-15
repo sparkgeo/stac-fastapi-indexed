@@ -6,8 +6,14 @@ stac_json_root_dir: Final[str] = environ["STAC_JSON_ROOT_DIR"]
 
 
 def get_link_hrefs_by_rel(data_dict: Dict[str, Any], rel_type: str) -> List[str]:
+    return [link["href"] for link in get_link_dict_by_rel(data_dict, rel_type)]
+
+
+def get_link_dict_by_rel(
+    data_dict: Dict[str, Any], rel_type: str
+) -> List[Dict[str, Any]]:
     assert "links" in data_dict
-    return [link["href"] for link in data_dict["links"] if link["rel"] == rel_type]
+    return [link for link in data_dict["links"] if link["rel"] == rel_type]
 
 
 def get_collection_file_paths():
