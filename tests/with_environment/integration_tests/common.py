@@ -18,3 +18,7 @@ def get_item_file_paths_for_collection(collection_id: str):
     return glob(
         path.join(stac_json_root_dir, "collections", collection_id, "items", "*.json")
     )
+
+
+def get_index_config_path() -> str:
+    return path.join(stac_json_root_dir, "..", "index-config.json")
