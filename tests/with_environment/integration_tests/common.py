@@ -1,7 +1,10 @@
 from glob import glob
 from json import dumps
 from os import environ, path
-from typing import Any, Dict, Final, List
+from typing import Any, Dict, Final, List, Optional
+
+import requests
+from with_environment.common import api_base_url
 
 stac_json_root_dir: Final[str] = environ["STAC_JSON_ROOT_DIR"]
 
@@ -43,3 +46,41 @@ def compare_results_to_expected(
             if expected_result_json == dumps({**result, "links": []}):
                 found = True
         assert found
+
+
+def all_post_search_results(post_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    all_results: List[Dict[str, Any]] = []
+    last_search_data = None
+    search_data: Optional[Dict[str, Any]] = post_data.copy()
+    while search_data is not None:
+        response = requests.post(f"{api_base_url}/search", json=search_data).json()
+        all_results.extend(response["features"])
+        next_links = get_link_dict_by_rel(response, "next")
+        if len(next_links) == 1:
+            last_search_data = search_data
+            search_data = next_links[0]["body"]
+            if dumps(last_search_data) == dumps(search_data):
+                raise Exception("next search link is not advancing")
+        else:
+            search_data = None
+    return all_results
+
+
+def all_get_search_results(query_params: Dict[str, Any]) -> List[Dict[str, Any]]:
+    all_results: List[Dict[str, Any]] = []
+    last_url = None
+    search_url: Optional[str] = f"{api_base_url}/search"
+    search_data: Optional[Dict[str, Any]] = query_params.copy()
+    while search_url is not None:
+        response = requests.get(search_url, params=search_data).json()
+        all_results.extend(response["features"])
+        next_links = get_link_dict_by_rel(response, "next")
+        if len(next_links) == 1:
+            last_url = search_url
+            search_url = next_links[0]["href"]
+            if last_url == search_url:
+                raise Exception("next search link is not advancing")
+            search_data = None
+        else:
+            search_url = None
+    return all_results

@@ -1,12 +1,13 @@
 from datetime import datetime, timedelta
 from json import dumps, load
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import requests
 from shapely.geometry import Polygon, box, mapping
 from shapely.ops import unary_union
 from with_environment.common import api_base_url
 from with_environment.integration_tests.common import (
+    all_get_search_results,
     compare_results_to_expected,
     get_collection_file_paths,
     get_item_file_paths_for_collection,
@@ -35,14 +36,14 @@ def setup_module():
 
 
 def test_get_search_blank():
-    compare_results_to_expected(_all_items, _all_get_search_results({}))
+    compare_results_to_expected(_all_items, all_get_search_results({}))
 
 
 def test_get_search_collection():
     collection_id = list(_all_items_by_collection_id.keys())[0]
     compare_results_to_expected(
         _all_items_by_collection_id[collection_id],
-        _all_get_search_results({"collections": [collection_id]}),
+        all_get_search_results({"collections": [collection_id]}),
     )
 
 
@@ -51,7 +52,7 @@ def test_get_search_ids():
     test_items = _all_items[:3]
     compare_results_to_expected(
         test_items,
-        _all_get_search_results({"ids": ",".join([item["id"] for item in test_items])}),
+        all_get_search_results({"ids": ",".join([item["id"] for item in test_items])}),
     )
 
 
@@ -67,7 +68,7 @@ def test_get_search_bbox():
                 [test_polygon, Polygon(test_item["geometry"]["coordinates"][0])]
             )
     test_bbox = test_polygon.bounds
-    search_results = _all_get_search_results(
+    search_results = all_get_search_results(
         {
             "collections": [test_collection["id"]],
             "bbox": ",".join([str(part) for part in test_bbox]),
@@ -96,7 +97,7 @@ def test_get_search_intersects():
             test_polygon = unary_union(
                 [test_polygon, Polygon(test_item["geometry"]["coordinates"][0])]
             )
-    search_results = _all_get_search_results(
+    search_results = all_get_search_results(
         {
             "collections": [test_collection["id"]],
             "intersects": dumps(mapping(test_polygon)),
@@ -120,7 +121,7 @@ def test_get_search_datetime_include():
         item for item in _all_items if item["properties"]["datetime"] == test_datetime
     ]
     compare_results_to_expected(
-        expected_items, _all_get_search_results({"datetime": test_datetime})
+        expected_items, all_get_search_results({"datetime": test_datetime})
     )
 
 
@@ -131,7 +132,7 @@ def test_get_search_datetime_exclude():
         datetime.fromisoformat(sorted(list(unique_datetimes))[0]) + timedelta(days=-1)
     ).isoformat()
     assert test_datetime not in unique_datetimes
-    assert len(_all_get_search_results({"datetime": test_datetime})) == 0
+    assert len(all_get_search_results({"datetime": test_datetime})) == 0
 
 
 def test_get_search_datetime_open_start():
@@ -141,7 +142,7 @@ def test_get_search_datetime_open_start():
         datetime.fromisoformat(sorted(list(unique_datetimes))[0]) + timedelta(days=1)
     ).isoformat()
     compare_results_to_expected(
-        _all_items, _all_get_search_results({"datetime": f"../{test_datetime}"})
+        _all_items, all_get_search_results({"datetime": f"../{test_datetime}"})
     )
 
 
@@ -152,7 +153,7 @@ def test_get_search_datetime_open_end():
         datetime.fromisoformat(sorted(list(unique_datetimes))[0]) + timedelta(days=-1)
     ).isoformat()
     compare_results_to_expected(
-        _all_items, _all_get_search_results({"datetime": f"{test_datetime}/.."})
+        _all_items, all_get_search_results({"datetime": f"{test_datetime}/.."})
     )
 
 
@@ -181,23 +182,3 @@ def test_get_search_token():
     ).json()
     previous_item = previous_result["features"][0]
     assert dumps(previous_item) == dumps(first_item)
-
-
-def _all_get_search_results(query_params: Dict[str, Any]) -> List[Dict[str, Any]]:
-    all_results: List[Dict[str, Any]] = []
-    last_url = None
-    search_url: Optional[str] = f"{api_base_url}/search"
-    search_data: Optional[Dict[str, Any]] = query_params.copy()
-    while search_url is not None:
-        response = requests.get(search_url, params=search_data).json()
-        all_results.extend(response["features"])
-        next_links = get_link_dict_by_rel(response, "next")
-        if len(next_links) == 1:
-            last_url = search_url
-            search_url = next_links[0]["href"]
-            if last_url == search_url:
-                raise Exception("next search link is not advancing")
-            search_data = None
-        else:
-            search_url = None
-    return all_results
