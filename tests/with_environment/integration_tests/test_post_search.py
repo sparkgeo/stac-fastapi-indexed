@@ -7,6 +7,7 @@ from shapely.geometry import Polygon, box, mapping
 from shapely.ops import unary_union
 from with_environment.common import api_base_url
 from with_environment.integration_tests.common import (
+    compare_results_to_expected,
     get_collection_file_paths,
     get_item_file_paths_for_collection,
     get_link_dict_by_rel,
@@ -34,12 +35,12 @@ def setup_module():
 
 
 def test_post_search_blank():
-    _compare_results_to_expected(_all_items, _all_post_search_results({}))
+    compare_results_to_expected(_all_items, _all_post_search_results({}))
 
 
 def test_post_search_collection():
     collection_id = list(_all_items_by_collection_id.keys())[0]
-    _compare_results_to_expected(
+    compare_results_to_expected(
         _all_items_by_collection_id[collection_id],
         _all_post_search_results({"collections": [collection_id]}),
     )
@@ -48,7 +49,7 @@ def test_post_search_collection():
 def test_post_search_ids():
     # assumes more than 3 items in test dataset
     test_items = _all_items[:3]
-    _compare_results_to_expected(
+    compare_results_to_expected(
         test_items,
         _all_post_search_results({"ids": [item["id"] for item in test_items]}),
     )
@@ -78,7 +79,7 @@ def test_post_search_bbox():
             box(*test_bbox)
         )
     ]
-    _compare_results_to_expected(expected_items, search_results)
+    compare_results_to_expected(expected_items, search_results)
 
 
 def test_post_search_intersects():
@@ -102,7 +103,7 @@ def test_post_search_intersects():
         for item in _all_items_by_collection_id[test_collection["id"]]
         if Polygon(item["geometry"]["coordinates"][0]).intersects(test_polygon)
     ]
-    _compare_results_to_expected(expected_items, search_results)
+    compare_results_to_expected(expected_items, search_results)
 
 
 def test_post_search_datetime_include():
@@ -112,7 +113,7 @@ def test_post_search_datetime_include():
     expected_items = [
         item for item in _all_items if item["properties"]["datetime"] == test_datetime
     ]
-    _compare_results_to_expected(
+    compare_results_to_expected(
         expected_items, _all_post_search_results({"datetime": test_datetime})
     )
 
@@ -133,7 +134,7 @@ def test_post_search_datetime_open_start():
     test_datetime = (
         datetime.fromisoformat(sorted(list(unique_datetimes))[0]) + timedelta(days=1)
     ).isoformat()
-    _compare_results_to_expected(
+    compare_results_to_expected(
         _all_items, _all_post_search_results({"datetime": f"../{test_datetime}"})
     )
 
@@ -144,7 +145,7 @@ def test_post_search_datetime_open_end():
     test_datetime = (
         datetime.fromisoformat(sorted(list(unique_datetimes))[0]) + timedelta(days=-1)
     ).isoformat()
-    _compare_results_to_expected(
+    compare_results_to_expected(
         _all_items, _all_post_search_results({"datetime": f"{test_datetime}/.."})
     )
 
@@ -192,17 +193,3 @@ def _all_post_search_results(post_data: Dict[str, Any]) -> List[Dict[str, Any]]:
         else:
             search_data = None
     return all_results
-
-
-def _compare_results_to_expected(
-    expected_results: List[Dict[str, Any]], actual_results: List[Dict[str, Any]]
-):
-    assert len(actual_results) == len(expected_results)
-    for expected_result in expected_results:
-        # exclude links from comparison as they are modified by the API
-        expected_result_json = dumps({**expected_result, "links": []})
-        found = False
-        for result in actual_results:
-            if expected_result_json == dumps({**result, "links": []}):
-                found = True
-        assert found
