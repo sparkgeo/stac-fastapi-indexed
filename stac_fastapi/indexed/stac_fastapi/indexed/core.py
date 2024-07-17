@@ -123,7 +123,7 @@ class CoreCrudClient(AsyncBaseCoreClient):
         collections: Optional[List[str]] = None,
         ids: Optional[List[str]] = None,
         bbox: Optional[BBox] = None,
-        datetime: Optional[DateTimeType] = None,
+        datetime: Optional[str] = None,
         limit: Optional[int] = None,
         query: Optional[str] = None,
         token: Optional[str] = None,

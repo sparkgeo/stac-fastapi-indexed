@@ -1,2 +1,3 @@
-data
+data/index
+data/STAC/pc_partial_data
 **/*.egg-info
