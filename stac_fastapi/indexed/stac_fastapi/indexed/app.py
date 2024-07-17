@@ -15,6 +15,7 @@ from stac_fastapi.extensions.core import FilterExtension, TokenPaginationExtensi
 from stac_fastapi.indexed.core import CoreCrudClient
 from stac_fastapi.indexed.db import connect_to_db, disconnect_from_db
 from stac_fastapi.indexed.search.filter.filter_client import FiltersClient
+from stac_fastapi.indexed.search.search_get_request import SearchGetRequest
 from stac_fastapi.indexed.settings import get_settings
 
 extensions_map = {
@@ -35,7 +36,9 @@ api = StacApi(
         base_model=ItemCollectionUri,
         mixins=[TokenPaginationExtension().GET],
     ),
-    search_get_request_model=create_get_request_model(extensions),
+    search_get_request_model=create_get_request_model(
+        extensions, base_model=SearchGetRequest
+    ),
     search_post_request_model=post_request_model,
     middlewares=[Middleware(CORSMiddleware), Middleware(ProxyHeaderMiddleware)],
 )
