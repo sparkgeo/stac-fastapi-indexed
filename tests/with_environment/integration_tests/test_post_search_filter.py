@@ -45,7 +45,6 @@ def test_post_search_filter_numeric_between_include():
         expected_items,
         all_post_search_results(
             {
-                "filter-lang": "cql2-json",
                 "filter": {
                     "op": "between",
                     "args": [
@@ -75,7 +74,6 @@ def test_post_search_filter_numeric_between_exclude():
         expected_items,
         all_post_search_results(
             {
-                "filter-lang": "cql2-json",
                 "filter": {
                     "op": "between",
                     "args": [
@@ -104,7 +102,6 @@ def test_post_search_filter_numeric_gt():
         expected_items,
         all_post_search_results(
             {
-                "filter-lang": "cql2-json",
                 "filter": {
                     "op": "gt",
                     "args": [
@@ -133,7 +130,6 @@ def test_post_search_filter_numeric_lt():
         expected_items,
         all_post_search_results(
             {
-                "filter-lang": "cql2-json",
                 "filter": {
                     "op": "lt",
                     "args": [
@@ -154,7 +150,6 @@ def test_post_search_filter_string_equals():
         [test_item],
         all_post_search_results(
             {
-                "filter-lang": "cql2-json",
                 "filter": {
                     "op": "and",
                     "args": [
@@ -188,7 +183,6 @@ def test_post_search_filter_not():
         expected_items,
         all_post_search_results(
             {
-                "filter-lang": "cql2-json",
                 "filter": {
                     "op": "not",
                     "args": [
@@ -223,7 +217,6 @@ def test_post_search_filter_or():
         or_list,
         all_post_search_results(
             {
-                "filter-lang": "cql2-json",
                 "filter": {
                     "op": "or",
                     "args": [
@@ -266,7 +259,6 @@ def test_post_search_filter_string_like():
         expected_items,
         all_post_search_results(
             {
-                "filter-lang": "cql2-json",
                 "filter": {
                     "op": "and",
                     "args": [
@@ -293,7 +285,6 @@ def test_post_search_filter_string_in():
         in_list_items,
         all_post_search_results(
             {
-                "filter-lang": "cql2-json",
                 "filter": {
                     "op": "in",
                     "args": [
@@ -316,7 +307,6 @@ def test_post_search_filter_point_intersect():
     search_results = all_post_search_results(
         {
             "collections": [test_collection["id"]],
-            "filter-lang": "cql2-json",
             "filter": {
                 "op": "s_intersects",
                 "args": [
@@ -361,7 +351,6 @@ def test_post_search_filter_temporal_point_intersect():
         expected_items,
         all_post_search_results(
             {
-                "filter-lang": "cql2-json",
                 "filter": {
                     "op": "t_intersects",
                     "args": [
@@ -417,7 +406,6 @@ def test_post_search_filter_temporal_range_intersect():
         expected_items,
         all_post_search_results(
             {
-                "filter-lang": "cql2-json",
                 "filter": {
                     "op": "or",
                     "args": [

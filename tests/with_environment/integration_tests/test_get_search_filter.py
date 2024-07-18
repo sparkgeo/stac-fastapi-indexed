@@ -321,6 +321,3 @@ def test_get_search_filter_temporal_range_intersect():
             }
         ),
     )
-
-
-# remove filter-lang when default in post search
