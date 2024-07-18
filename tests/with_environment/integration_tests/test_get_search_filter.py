@@ -128,8 +128,9 @@ def test_get_search_filter_string_equals():
     )
 
 
-# pygeofilter appears to have some problem parsing around the NOT modifier, needs further investigation
-@mark.skip
+@mark.skip(
+    "pygeofilter CQL2-TEXT 'NOT' modifier currently broken: https://github.com/geopython/pygeofilter/issues/68"
+)
 def test_get_search_filter_not():
     exclude_item = _all_items[0]
     expected_items = [
@@ -238,8 +239,9 @@ def test_get_search_filter_point_intersect():
     compare_results_to_expected(expected_items, search_results)
 
 
-# pygeofilter appears to have some problem parsing around T_INTERSECTS, needs further investigation
-@mark.skip
+@mark.skip(
+    "pygeofilter CQL2-TEXT parser fails on T_INTERSECTS: https://github.com/geopython/pygeofilter/issues/105"
+)
 def test_get_search_filter_temporal_point_intersect():
     unique_point_datetimes = set(
         [
@@ -272,8 +274,9 @@ def test_get_search_filter_temporal_point_intersect():
     )
 
 
-# pygeofilter appears to have some problem parsing around T_INTERSECTS, needs further investigation
-@mark.skip
+@mark.skip(
+    "pygeofilter CQL2-TEXT parser fails on T_INTERSECTS: https://github.com/geopython/pygeofilter/issues/105"
+)
 def test_get_search_filter_temporal_range_intersect():
     unique_start_datetimes = set(
         [
