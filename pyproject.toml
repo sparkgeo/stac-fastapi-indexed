@@ -6,8 +6,5 @@ requires-python = ">=3.12"
 [tool.isort]
 profile = "black"
 
-[tool.ruff.lint]
-extend-select = ["I"]
-
 [tool.ruff.format]
 quote-style = "double"
