@@ -55,6 +55,8 @@ def all_post_search_results(post_data: Dict[str, Any]) -> List[Dict[str, Any]]:
     search_data: Optional[Dict[str, Any]] = post_data.copy()
     while search_data is not None:
         response = requests.post(f"{api_base_url}/search", json=search_data).json()
+        if not "features" in response:
+            raise Exception("unexpected response: ", response)
         all_results.extend(response["features"])
         next_links = get_link_dict_by_rel(response, "next")
         if len(next_links) == 1:
@@ -74,6 +76,8 @@ def all_get_search_results(query_params: Dict[str, Any]) -> List[Dict[str, Any]]
     search_data: Optional[Dict[str, Any]] = query_params.copy()
     while search_url is not None:
         response = requests.get(search_url, params=search_data).json()
+        if not "features" in response:
+            raise Exception("unexpected response: ", response)
         all_results.extend(response["features"])
         next_links = get_link_dict_by_rel(response, "next")
         if len(next_links) == 1:
