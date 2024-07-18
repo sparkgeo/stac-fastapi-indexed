@@ -1,3 +1,4 @@
+from datetime import datetime
 from json import load
 from typing import Any, Dict, List, cast
 
@@ -275,6 +276,52 @@ def test_post_search_filter_point_intersect():
     compare_results_to_expected(expected_items, search_results)
 
 
-# temporal intersects
+def test_post_search_filter_temporal_point_intersect():
+    unique_point_datetimes = set(
+        [
+            item
+            for item in [item["properties"]["datetime"] for item in _all_items]
+            if item is not None
+        ]
+    )
+    assert len(unique_point_datetimes) > 2
+    test_interval_start = "1970-01-01T00:00:00Z"
+    test_interval_end = list(unique_point_datetimes)[1]
+    expected_items: List[Dict[str, Any]] = []
+    for item in _all_items:
+        properties = item["properties"]
+        if properties["datetime"] is not None:
+            if datetime.fromisoformat(properties["datetime"]) >= datetime.fromisoformat(
+                test_interval_start
+            ) and datetime.fromisoformat(
+                properties["datetime"]
+            ) <= datetime.fromisoformat(test_interval_end):
+                expected_items.append(item)
+    assert len(expected_items) > 0
+    compare_results_to_expected(
+        expected_items,
+        all_post_search_results(
+            {
+                "filter-lang": "cql2-json",
+                "filter": {
+                    "op": "t_intersects",
+                    "args": [
+                        {"property": "datetime"},
+                        {
+                            "interval": [
+                                test_interval_start,
+                                test_interval_end,
+                            ]
+                        },
+                    ],
+                },
+            }
+        ),
+    )
+
+
+# 'or'-enabled datetime range intersect
+# possible issue with setting tz when interpreting iso timestamps
+# tz info is not persistent in token, see debug SQL from single test
+# might be able to use
 # numeric GT/LT
-# consider changing some of the sample data to make tests more meaningful
