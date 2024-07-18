@@ -62,6 +62,7 @@ def test_post_search_filter_numeric_between_include():
 
 def test_post_search_filter_numeric_between_exclude():
     unique_gsd = sorted(list(set([item["properties"]["gsd"] for item in _all_items])))
+    assert len(unique_gsd) > 1
     gsd_min = unique_gsd[-1] + 0.1
     gsd_max = gsd_min + 0.1
     expected_items = [
@@ -82,6 +83,64 @@ def test_post_search_filter_numeric_between_exclude():
                             "property": "gsd",
                         },
                         [gsd_min, gsd_max],
+                    ],
+                },
+            }
+        ),
+    )
+
+
+def test_post_search_filter_numeric_gt():
+    unique_gsd = sorted(list(set([item["properties"]["gsd"] for item in _all_items])))
+    assert len(unique_gsd) > 2
+    gsd_range = unique_gsd[-1] - unique_gsd[0]
+    assert gsd_range > 0
+    gsd_splitter = unique_gsd[0] + gsd_range / 2
+    expected_items = [
+        item for item in _all_items if item["properties"]["gsd"] > gsd_splitter
+    ]
+    assert len(expected_items) > 0
+    compare_results_to_expected(
+        expected_items,
+        all_post_search_results(
+            {
+                "filter-lang": "cql2-json",
+                "filter": {
+                    "op": "gt",
+                    "args": [
+                        {
+                            "property": "gsd",
+                        },
+                        gsd_splitter,
+                    ],
+                },
+            }
+        ),
+    )
+
+
+def test_post_search_filter_numeric_lt():
+    unique_gsd = sorted(list(set([item["properties"]["gsd"] for item in _all_items])))
+    assert len(unique_gsd) > 2
+    gsd_range = unique_gsd[-1] - unique_gsd[0]
+    assert gsd_range > 0
+    gsd_splitter = unique_gsd[0] + gsd_range / 2
+    expected_items = [
+        item for item in _all_items if item["properties"]["gsd"] < gsd_splitter
+    ]
+    assert len(expected_items) > 0
+    compare_results_to_expected(
+        expected_items,
+        all_post_search_results(
+            {
+                "filter-lang": "cql2-json",
+                "filter": {
+                    "op": "lt",
+                    "args": [
+                        {
+                            "property": "gsd",
+                        },
+                        gsd_splitter,
                     ],
                 },
             }
@@ -320,5 +379,74 @@ def test_post_search_filter_temporal_point_intersect():
     )
 
 
-# 'or'-enabled datetime range intersect
-# numeric GT/LT
+def test_post_search_filter_temporal_range_intersect():
+    unique_start_datetimes = set(
+        [
+            item
+            for item in [
+                item["properties"].get("start_datetime") for item in _all_items
+            ]
+            if item is not None
+        ]
+    )
+    assert len(unique_start_datetimes) > 2
+    unique_end_datetimes = set(
+        [
+            item
+            for item in [item["properties"].get("end_datetime") for item in _all_items]
+            if item is not None
+        ]
+    )
+    assert len(unique_end_datetimes) > 2
+    test_interval_start = sorted(list(unique_start_datetimes))[1]
+    test_interval_end = sorted(list(unique_end_datetimes))[-2]
+    expected_items: List[Dict[str, Any]] = []
+    for item in _all_items:
+        properties = item["properties"]
+        if properties.get("start_datetime") is not None:
+            if not (
+                datetime.fromisoformat(properties["start_datetime"])
+                >= datetime.fromisoformat(test_interval_end)
+                or datetime.fromisoformat(properties["end_datetime"])
+                <= datetime.fromisoformat(test_interval_start)
+            ):
+                expected_items.append(item)
+    assert len(expected_items) > 0
+    assert len(expected_items) < len(_all_items)
+    compare_results_to_expected(
+        expected_items,
+        all_post_search_results(
+            {
+                "filter-lang": "cql2-json",
+                "filter": {
+                    "op": "or",
+                    "args": [
+                        {
+                            "op": "t_intersects",
+                            "args": [
+                                {"property": "start_datetime"},
+                                {
+                                    "interval": [
+                                        test_interval_start,
+                                        test_interval_end,
+                                    ]
+                                },
+                            ],
+                        },
+                        {
+                            "op": "t_intersects",
+                            "args": [
+                                {"property": "end_datetime"},
+                                {
+                                    "interval": [
+                                        test_interval_start,
+                                        test_interval_end,
+                                    ]
+                                },
+                            ],
+                        },
+                    ],
+                },
+            }
+        ),
+    )
