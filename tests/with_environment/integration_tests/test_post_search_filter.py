@@ -321,7 +321,4 @@ def test_post_search_filter_temporal_point_intersect():
 
 
 # 'or'-enabled datetime range intersect
-# possible issue with setting tz when interpreting iso timestamps
-# tz info is not persistent in token, see debug SQL from single test
-# might be able to use
 # numeric GT/LT
