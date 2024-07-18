@@ -11,7 +11,8 @@ _global_queryables: Final[List[str]] = [
     "collection",
     "geometry",
     "datetime",
-    "datetime_end",
+    "start_datetime",
+    "end_datetime",
 ]
 
 

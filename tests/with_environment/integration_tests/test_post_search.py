@@ -1,16 +1,20 @@
 from datetime import datetime, timedelta
 from json import dumps, load
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import requests
 from shapely.geometry import Polygon, box, mapping
 from shapely.ops import unary_union
 from with_environment.common import api_base_url
 from with_environment.integration_tests.common import (
+    all_post_search_results,
     compare_results_to_expected,
+    get_claims_from_token,
     get_collection_file_paths,
     get_item_file_paths_for_collection,
+    get_items_with_intersecting_datetime,
     get_link_dict_by_rel,
+    rebuild_token_with_altered_claims,
 )
 from with_environment.wait import wait_for_api
 
@@ -35,14 +39,14 @@ def setup_module():
 
 
 def test_post_search_blank():
-    compare_results_to_expected(_all_items, _all_post_search_results({}))
+    compare_results_to_expected(_all_items, all_post_search_results({}))
 
 
 def test_post_search_collection():
     collection_id = list(_all_items_by_collection_id.keys())[0]
     compare_results_to_expected(
         _all_items_by_collection_id[collection_id],
-        _all_post_search_results({"collections": [collection_id]}),
+        all_post_search_results({"collections": [collection_id]}),
     )
 
 
@@ -51,7 +55,7 @@ def test_post_search_ids():
     test_items = _all_items[:3]
     compare_results_to_expected(
         test_items,
-        _all_post_search_results({"ids": [item["id"] for item in test_items]}),
+        all_post_search_results({"ids": [item["id"] for item in test_items]}),
     )
 
 
@@ -67,7 +71,7 @@ def test_post_search_bbox():
                 [test_polygon, Polygon(test_item["geometry"]["coordinates"][0])]
             )
     test_bbox = test_polygon.bounds
-    search_results = _all_post_search_results(
+    search_results = all_post_search_results(
         {"collections": [test_collection["id"]], "bbox": test_bbox}
     )
     assert len(search_results) > 0
@@ -84,7 +88,7 @@ def test_post_search_bbox():
 
 def test_post_search_intersects():
     test_collection = _all_collections[0]
-    test_items = _all_items[:2]
+    test_items = _all_items_by_collection_id[test_collection["id"]][:2]
     test_polygon: Polygon = None
     for test_item in test_items:
         if test_polygon is None:
@@ -93,7 +97,7 @@ def test_post_search_intersects():
             test_polygon = unary_union(
                 [test_polygon, Polygon(test_item["geometry"]["coordinates"][0])]
             )
-    search_results = _all_post_search_results(
+    search_results = all_post_search_results(
         {"collections": [test_collection["id"]], "intersects": mapping(test_polygon)}
     )
     assert len(search_results) > 0
@@ -107,46 +111,64 @@ def test_post_search_intersects():
 
 
 def test_post_search_datetime_include():
-    unique_datetimes = set([item["properties"]["datetime"] for item in _all_items])
+    unique_datetimes = set(
+        [
+            item["properties"]["datetime"] or item["properties"]["start_datetime"]
+            for item in _all_items
+        ]
+    )
     assert len(unique_datetimes) > 0
     test_datetime = list(unique_datetimes)[0]
-    expected_items = [
-        item for item in _all_items if item["properties"]["datetime"] == test_datetime
-    ]
+    expected_items = get_items_with_intersecting_datetime(_all_items, test_datetime)
     compare_results_to_expected(
-        expected_items, _all_post_search_results({"datetime": test_datetime})
+        expected_items, all_post_search_results({"datetime": test_datetime})
     )
 
 
 def test_post_search_datetime_exclude():
-    unique_datetimes = set([item["properties"]["datetime"] for item in _all_items])
+    unique_datetimes = set(
+        [
+            item["properties"]["datetime"] or item["properties"]["start_datetime"]
+            for item in _all_items
+        ]
+    )
     assert len(unique_datetimes) > 0
     test_datetime = (
         datetime.fromisoformat(sorted(list(unique_datetimes))[0]) + timedelta(days=-1)
     ).isoformat()
     assert test_datetime not in unique_datetimes
-    assert len(_all_post_search_results({"datetime": test_datetime})) == 0
+    assert len(all_post_search_results({"datetime": test_datetime})) == 0
 
 
 def test_post_search_datetime_open_start():
-    unique_datetimes = set([item["properties"]["datetime"] for item in _all_items])
+    unique_datetimes = set(
+        [
+            item["properties"]["datetime"] or item["properties"]["end_datetime"]
+            for item in _all_items
+        ]
+    )
     assert len(unique_datetimes) > 0
     test_datetime = (
-        datetime.fromisoformat(sorted(list(unique_datetimes))[0]) + timedelta(days=1)
+        datetime.fromisoformat(sorted(list(unique_datetimes))[-1]) + timedelta(days=1)
     ).isoformat()
     compare_results_to_expected(
-        _all_items, _all_post_search_results({"datetime": f"../{test_datetime}"})
+        _all_items, all_post_search_results({"datetime": f"../{test_datetime}"})
     )
 
 
 def test_post_search_datetime_open_end():
-    unique_datetimes = set([item["properties"]["datetime"] for item in _all_items])
+    unique_datetimes = set(
+        [
+            item["properties"]["datetime"] or item["properties"]["start_datetime"]
+            for item in _all_items
+        ]
+    )
     assert len(unique_datetimes) > 0
     test_datetime = (
         datetime.fromisoformat(sorted(list(unique_datetimes))[0]) + timedelta(days=-1)
     ).isoformat()
     compare_results_to_expected(
-        _all_items, _all_post_search_results({"datetime": f"{test_datetime}/.."})
+        _all_items, all_post_search_results({"datetime": f"{test_datetime}/.."})
     )
 
 
@@ -177,19 +199,21 @@ def test_post_search_token():
     assert dumps(previous_item) == dumps(first_item)
 
 
-def _all_post_search_results(post_data: Dict[str, Any]) -> List[Dict[str, Any]]:
-    all_results: List[Dict[str, Any]] = []
-    last_search_data = None
-    search_data: Optional[Dict[str, Any]] = post_data.copy()
-    while search_data is not None:
-        response = requests.post(f"{api_base_url}/search", json=search_data).json()
-        all_results.extend(response["features"])
-        next_links = get_link_dict_by_rel(response, "next")
-        if len(next_links) == 1:
-            last_search_data = search_data
-            search_data = next_links[0]["body"]
-            if dumps(last_search_data) == dumps(search_data):
-                raise Exception("next search link is not advancing")
-        else:
-            search_data = None
-    return all_results
+def test_post_search_token_immutable():
+    limit = 1
+    assert len(_all_items) > limit
+    search_result = requests.post(
+        f"{api_base_url}/search", json={"limit": limit}
+    ).json()
+    next_link = get_link_dict_by_rel(search_result, "next")[0]
+    token = next_link["body"]["token"]
+    token_claims = get_claims_from_token(token)
+    assert "limit" in token_claims
+    assert token_claims["limit"] == limit
+    altered_claims = {
+        **token_claims,
+        "limit": limit + 1,
+    }
+    altered_token = rebuild_token_with_altered_claims(token, altered_claims)
+    response = requests.post(f"{api_base_url}/search", json={"token": altered_token})
+    assert response.status_code == 400

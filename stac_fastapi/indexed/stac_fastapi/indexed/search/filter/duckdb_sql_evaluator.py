@@ -113,9 +113,10 @@ class DubkDBSQLEvaluator(Evaluator):
         self.function_map = function_map
 
     @handle(ast.Not)
-    def not_(self, _, sub) -> FilterClause:
+    def not_(self, _, sub: FilterClause) -> FilterClause:
         return FilterClause(
-            sql=f"NOT {sub}",
+            sql=f"NOT {sub.sql}",
+            params=sub.params,
         )
 
     @handle(ast.And, ast.Or)
