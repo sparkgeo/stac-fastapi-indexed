@@ -1,3 +1,4 @@
+from datetime import datetime
 from glob import glob
 from json import dumps
 from os import environ, path
@@ -84,3 +85,21 @@ def all_get_search_results(query_params: Dict[str, Any]) -> List[Dict[str, Any]]
         else:
             search_url = None
     return all_results
+
+
+def get_items_with_intersecting_datetime(
+    item_set: List[Dict[str, Any]], comparison_datetime: datetime
+) -> List[Dict[str, Any]]:
+    intersecting_set: List[Dict[str, Any]] = []
+    for item in item_set:
+        properties = item["properties"]
+        if properties["datetime"] is None:
+            if (
+                properties["start_datetime"] <= comparison_datetime
+                and properties["end_datetime"] >= comparison_datetime
+            ):
+                intersecting_set.append(item)
+        else:
+            if properties["datetime"] == comparison_datetime:
+                intersecting_set.append(item)
+    return intersecting_set

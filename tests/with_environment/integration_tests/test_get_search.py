@@ -11,6 +11,7 @@ from with_environment.integration_tests.common import (
     compare_results_to_expected,
     get_collection_file_paths,
     get_item_file_paths_for_collection,
+    get_items_with_intersecting_datetime,
     get_link_dict_by_rel,
 )
 from with_environment.wait import wait_for_api
@@ -114,19 +115,27 @@ def test_get_search_intersects():
 
 
 def test_get_search_datetime_include():
-    unique_datetimes = set([item["properties"]["datetime"] for item in _all_items])
+    unique_datetimes = set(
+        [
+            item["properties"]["datetime"] or item["properties"]["start_datetime"]
+            for item in _all_items
+        ]
+    )
     assert len(unique_datetimes) > 0
     test_datetime = list(unique_datetimes)[0]
-    expected_items = [
-        item for item in _all_items if item["properties"]["datetime"] == test_datetime
-    ]
+    expected_items = get_items_with_intersecting_datetime(_all_items, test_datetime)
     compare_results_to_expected(
         expected_items, all_get_search_results({"datetime": test_datetime})
     )
 
 
 def test_get_search_datetime_exclude():
-    unique_datetimes = set([item["properties"]["datetime"] for item in _all_items])
+    unique_datetimes = set(
+        [
+            item["properties"]["datetime"] or item["properties"]["start_datetime"]
+            for item in _all_items
+        ]
+    )
     assert len(unique_datetimes) > 0
     test_datetime = (
         datetime.fromisoformat(sorted(list(unique_datetimes))[0]) + timedelta(days=-1)
@@ -136,10 +145,15 @@ def test_get_search_datetime_exclude():
 
 
 def test_get_search_datetime_open_start():
-    unique_datetimes = set([item["properties"]["datetime"] for item in _all_items])
+    unique_datetimes = set(
+        [
+            item["properties"]["datetime"] or item["properties"]["end_datetime"]
+            for item in _all_items
+        ]
+    )
     assert len(unique_datetimes) > 0
     test_datetime = (
-        datetime.fromisoformat(sorted(list(unique_datetimes))[0]) + timedelta(days=1)
+        datetime.fromisoformat(sorted(list(unique_datetimes))[-1]) + timedelta(days=1)
     ).isoformat()
     compare_results_to_expected(
         _all_items, all_get_search_results({"datetime": f"../{test_datetime}"})
@@ -147,7 +161,12 @@ def test_get_search_datetime_open_start():
 
 
 def test_get_search_datetime_open_end():
-    unique_datetimes = set([item["properties"]["datetime"] for item in _all_items])
+    unique_datetimes = set(
+        [
+            item["properties"]["datetime"] or item["properties"]["start_datetime"]
+            for item in _all_items
+        ]
+    )
     assert len(unique_datetimes) > 0
     test_datetime = (
         datetime.fromisoformat(sorted(list(unique_datetimes))[0]) + timedelta(days=-1)
