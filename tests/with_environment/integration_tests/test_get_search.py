@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from json import dumps, load
+from re import match
 from typing import Any, Dict, List
 
 import requests
@@ -9,10 +10,12 @@ from with_environment.common import api_base_url
 from with_environment.integration_tests.common import (
     all_get_search_results,
     compare_results_to_expected,
+    get_claims_from_token,
     get_collection_file_paths,
     get_item_file_paths_for_collection,
     get_items_with_intersecting_datetime,
     get_link_dict_by_rel,
+    rebuild_token_with_altered_claims,
 )
 from with_environment.wait import wait_for_api
 
@@ -201,3 +204,25 @@ def test_get_search_token():
     ).json()
     previous_item = previous_result["features"][0]
     assert dumps(previous_item) == dumps(first_item)
+
+
+def test_get_search_token_immutable():
+    limit = 1
+    assert len(_all_items) > limit
+    search_result = requests.get(
+        f"{api_base_url}/search", params={"limit": limit}
+    ).json()
+    next_link = get_link_dict_by_rel(search_result, "next")[0]
+    token_match = match(r".+\?token=(.+)$", next_link["href"])
+    assert token_match
+    token = token_match.group(1)
+    token_claims = get_claims_from_token(token)
+    assert "limit" in token_claims
+    assert token_claims["limit"] == limit
+    altered_claims = {
+        **token_claims,
+        "limit": limit + 1,
+    }
+    altered_token = rebuild_token_with_altered_claims(token, altered_claims)
+    response = requests.post(f"{api_base_url}/search", json={"token": altered_token})
+    assert response.status_code == 400

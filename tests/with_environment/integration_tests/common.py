@@ -1,6 +1,7 @@
+from base64 import b64decode, b64encode
 from datetime import datetime
 from glob import glob
-from json import dumps
+from json import dumps, loads
 from os import environ, path
 from typing import Any, Dict, Final, List, Optional
 
@@ -55,7 +56,7 @@ def all_post_search_results(post_data: Dict[str, Any]) -> List[Dict[str, Any]]:
     search_data: Optional[Dict[str, Any]] = post_data.copy()
     while search_data is not None:
         response = requests.post(f"{api_base_url}/search", json=search_data).json()
-        if not "features" in response:
+        if "features" not in response:
             raise Exception("unexpected response: ", response)
         all_results.extend(response["features"])
         next_links = get_link_dict_by_rel(response, "next")
@@ -76,7 +77,7 @@ def all_get_search_results(query_params: Dict[str, Any]) -> List[Dict[str, Any]]
     search_data: Optional[Dict[str, Any]] = query_params.copy()
     while search_url is not None:
         response = requests.get(search_url, params=search_data).json()
-        if not "features" in response:
+        if "features" not in response:
             raise Exception("unexpected response: ", response)
         all_results.extend(response["features"])
         next_links = get_link_dict_by_rel(response, "next")
@@ -107,3 +108,26 @@ def get_items_with_intersecting_datetime(
             if properties["datetime"] == comparison_datetime:
                 intersecting_set.append(item)
     return intersecting_set
+
+
+def get_claims_from_token(token: str) -> Dict[str, Any]:
+    token_parts = token.split(".")
+    assert len(token_parts) == 3
+    claims_part = token_parts[1]
+    missing_padding = len(claims_part) % 4
+    if missing_padding:
+        claims_part += "=" * (4 - missing_padding)
+    decoded_bytes = b64decode(claims_part)
+    return loads(decoded_bytes.decode("UTF-8"))
+
+
+def rebuild_token_with_altered_claims(
+    original_token: str, altered_claims: Dict[str, Any]
+) -> str:
+    token_parts = original_token.split(".")
+    assert len(token_parts) == 3
+    return "{}.{}.{}".format(
+        token_parts[0],
+        b64encode(dumps(altered_claims).encode("UTF-8")).decode("UTF-8"),
+        token_parts[2],
+    )
