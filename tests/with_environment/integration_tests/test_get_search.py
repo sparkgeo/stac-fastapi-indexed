@@ -1,16 +1,21 @@
 from datetime import datetime, timedelta
 from json import dumps, load
-from typing import Any, Dict, List, Optional
+from re import match
+from typing import Any, Dict, List
 
 import requests
 from shapely.geometry import Polygon, box, mapping
 from shapely.ops import unary_union
 from with_environment.common import api_base_url
 from with_environment.integration_tests.common import (
+    all_get_search_results,
     compare_results_to_expected,
+    get_claims_from_token,
     get_collection_file_paths,
     get_item_file_paths_for_collection,
+    get_items_with_intersecting_datetime,
     get_link_dict_by_rel,
+    rebuild_token_with_altered_claims,
 )
 from with_environment.wait import wait_for_api
 
@@ -35,14 +40,14 @@ def setup_module():
 
 
 def test_get_search_blank():
-    compare_results_to_expected(_all_items, _all_get_search_results({}))
+    compare_results_to_expected(_all_items, all_get_search_results({}))
 
 
 def test_get_search_collection():
     collection_id = list(_all_items_by_collection_id.keys())[0]
     compare_results_to_expected(
         _all_items_by_collection_id[collection_id],
-        _all_get_search_results({"collections": [collection_id]}),
+        all_get_search_results({"collections": [collection_id]}),
     )
 
 
@@ -51,7 +56,7 @@ def test_get_search_ids():
     test_items = _all_items[:3]
     compare_results_to_expected(
         test_items,
-        _all_get_search_results({"ids": ",".join([item["id"] for item in test_items])}),
+        all_get_search_results({"ids": ",".join([item["id"] for item in test_items])}),
     )
 
 
@@ -67,7 +72,7 @@ def test_get_search_bbox():
                 [test_polygon, Polygon(test_item["geometry"]["coordinates"][0])]
             )
     test_bbox = test_polygon.bounds
-    search_results = _all_get_search_results(
+    search_results = all_get_search_results(
         {
             "collections": [test_collection["id"]],
             "bbox": ",".join([str(part) for part in test_bbox]),
@@ -96,7 +101,7 @@ def test_get_search_intersects():
             test_polygon = unary_union(
                 [test_polygon, Polygon(test_item["geometry"]["coordinates"][0])]
             )
-    search_results = _all_get_search_results(
+    search_results = all_get_search_results(
         {
             "collections": [test_collection["id"]],
             "intersects": dumps(mapping(test_polygon)),
@@ -113,46 +118,64 @@ def test_get_search_intersects():
 
 
 def test_get_search_datetime_include():
-    unique_datetimes = set([item["properties"]["datetime"] for item in _all_items])
+    unique_datetimes = set(
+        [
+            item["properties"]["datetime"] or item["properties"]["start_datetime"]
+            for item in _all_items
+        ]
+    )
     assert len(unique_datetimes) > 0
     test_datetime = list(unique_datetimes)[0]
-    expected_items = [
-        item for item in _all_items if item["properties"]["datetime"] == test_datetime
-    ]
+    expected_items = get_items_with_intersecting_datetime(_all_items, test_datetime)
     compare_results_to_expected(
-        expected_items, _all_get_search_results({"datetime": test_datetime})
+        expected_items, all_get_search_results({"datetime": test_datetime})
     )
 
 
 def test_get_search_datetime_exclude():
-    unique_datetimes = set([item["properties"]["datetime"] for item in _all_items])
+    unique_datetimes = set(
+        [
+            item["properties"]["datetime"] or item["properties"]["start_datetime"]
+            for item in _all_items
+        ]
+    )
     assert len(unique_datetimes) > 0
     test_datetime = (
         datetime.fromisoformat(sorted(list(unique_datetimes))[0]) + timedelta(days=-1)
     ).isoformat()
     assert test_datetime not in unique_datetimes
-    assert len(_all_get_search_results({"datetime": test_datetime})) == 0
+    assert len(all_get_search_results({"datetime": test_datetime})) == 0
 
 
 def test_get_search_datetime_open_start():
-    unique_datetimes = set([item["properties"]["datetime"] for item in _all_items])
+    unique_datetimes = set(
+        [
+            item["properties"]["datetime"] or item["properties"]["end_datetime"]
+            for item in _all_items
+        ]
+    )
     assert len(unique_datetimes) > 0
     test_datetime = (
-        datetime.fromisoformat(sorted(list(unique_datetimes))[0]) + timedelta(days=1)
+        datetime.fromisoformat(sorted(list(unique_datetimes))[-1]) + timedelta(days=1)
     ).isoformat()
     compare_results_to_expected(
-        _all_items, _all_get_search_results({"datetime": f"../{test_datetime}"})
+        _all_items, all_get_search_results({"datetime": f"../{test_datetime}"})
     )
 
 
 def test_get_search_datetime_open_end():
-    unique_datetimes = set([item["properties"]["datetime"] for item in _all_items])
+    unique_datetimes = set(
+        [
+            item["properties"]["datetime"] or item["properties"]["start_datetime"]
+            for item in _all_items
+        ]
+    )
     assert len(unique_datetimes) > 0
     test_datetime = (
         datetime.fromisoformat(sorted(list(unique_datetimes))[0]) + timedelta(days=-1)
     ).isoformat()
     compare_results_to_expected(
-        _all_items, _all_get_search_results({"datetime": f"{test_datetime}/.."})
+        _all_items, all_get_search_results({"datetime": f"{test_datetime}/.."})
     )
 
 
@@ -183,21 +206,23 @@ def test_get_search_token():
     assert dumps(previous_item) == dumps(first_item)
 
 
-def _all_get_search_results(query_params: Dict[str, Any]) -> List[Dict[str, Any]]:
-    all_results: List[Dict[str, Any]] = []
-    last_url = None
-    search_url: Optional[str] = f"{api_base_url}/search"
-    search_data: Optional[Dict[str, Any]] = query_params.copy()
-    while search_url is not None:
-        response = requests.get(search_url, params=search_data).json()
-        all_results.extend(response["features"])
-        next_links = get_link_dict_by_rel(response, "next")
-        if len(next_links) == 1:
-            last_url = search_url
-            search_url = next_links[0]["href"]
-            if last_url == search_url:
-                raise Exception("next search link is not advancing")
-            search_data = None
-        else:
-            search_url = None
-    return all_results
+def test_get_search_token_immutable():
+    limit = 1
+    assert len(_all_items) > limit
+    search_result = requests.get(
+        f"{api_base_url}/search", params={"limit": limit}
+    ).json()
+    next_link = get_link_dict_by_rel(search_result, "next")[0]
+    token_match = match(r".+\?token=(.+)$", next_link["href"])
+    assert token_match
+    token = token_match.group(1)
+    token_claims = get_claims_from_token(token)
+    assert "limit" in token_claims
+    assert token_claims["limit"] == limit
+    altered_claims = {
+        **token_claims,
+        "limit": limit + 1,
+    }
+    altered_token = rebuild_token_with_altered_claims(token, altered_claims)
+    response = requests.post(f"{api_base_url}/search", json={"token": altered_token})
+    assert response.status_code == 400

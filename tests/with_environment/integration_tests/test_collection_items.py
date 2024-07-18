@@ -1,11 +1,15 @@
 from json import dumps, load
+from re import match
 from typing import Any, Dict
 
 import requests
 from with_environment.common import api_base_url
 from with_environment.integration_tests.common import (
+    get_claims_from_token,
     get_item_file_paths_for_collection,
+    get_link_dict_by_rel,
     get_link_hrefs_by_rel,
+    rebuild_token_with_altered_claims,
 )
 from with_environment.wait import wait_for_api
 
@@ -47,3 +51,28 @@ def test_collection_items_paged():
             assert dumps({**item_from_api, "links": []}) == dumps(
                 {**items_from_file[id], "links": []}
             )
+
+
+def test_collection_items_token_immutable():
+    collection_hrefs = get_link_hrefs_by_rel(requests.get(api_base_url).json(), "child")
+    assert len(collection_hrefs) > 0
+    limit = 1
+    collection = requests.get(collection_hrefs[0], params={"limit": limit}).json()
+    items_links = get_link_hrefs_by_rel(collection, "items")
+    assert len(items_links) == 1
+    items_link = items_links[0]
+    items = requests.get(items_link, params={"limit": limit}).json()
+    next_link = get_link_dict_by_rel(items, "next")[0]
+    token_match = match(r".+\?token=(.+)$", next_link["href"])
+    assert token_match
+    token = token_match.group(1)
+    token_claims = get_claims_from_token(token)
+    assert "limit" in token_claims
+    assert token_claims["limit"] == limit
+    altered_claims = {
+        **token_claims,
+        "limit": limit + 1,
+    }
+    altered_token = rebuild_token_with_altered_claims(token, altered_claims)
+    response = requests.get(items_link, params={"token": altered_token})
+    assert response.status_code == 400
