@@ -1,14 +1,13 @@
 from json import loads
-from typing import Any, Dict, Final, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import Request
 from stac_fastapi.types.core import AsyncBaseFiltersClient
 
+from stac_fastapi.indexed.constants import collection_wildcard
 from stac_fastapi.indexed.queryables.queryable_field_map import (
     get_queryable_config_by_name,
 )
-
-_collection_wildcard: Final[str] = "*"
 
 
 class FiltersClient(AsyncBaseFiltersClient):
@@ -22,10 +21,10 @@ class FiltersClient(AsyncBaseFiltersClient):
         for field_config in get_queryable_config_by_name().values():
             if (
                 collection_id is None
-                and field_config.collection_id == _collection_wildcard
+                and field_config.collection_id == collection_wildcard
             ) or (
                 collection_id is not None
-                and field_config.collection_id in [collection_id, _collection_wildcard]
+                and field_config.collection_id in [collection_id, collection_wildcard]
             ):
                 queryables[field_config.name] = {
                     **loads(field_config.json_schema),
