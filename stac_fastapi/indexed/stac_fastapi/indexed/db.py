@@ -31,7 +31,7 @@ async def connect_to_db() -> None:
     for config_command in index_source.get_duckdb_configuration_statements():
         execute(
             config_command[0],
-            config_command[1] if len(config_command) > 1 else None,
+            config_command[1],
         )
     times["index source configuration"] = time()
     execute("INSTALL spatial")
