@@ -1,5 +1,5 @@
 from json import load
-from typing import Final, List
+from typing import Dict, Final, List
 
 import requests
 from with_environment.common import api_base_url
@@ -32,10 +32,14 @@ def test_sortables_all_collections():
 def test_sortables_by_collection():
     with open(get_index_config_path(), "r") as f:
         index_config = load(f)
-    for collection_id, sortable_config in index_config["sortables"][
-        "collection"
-    ].items():
-        expected_sortables = list(sortable_config.keys())
+    sortables_by_collection: Dict[str, List[str]] = {}
+    for name, queryable in index_config["queryables"].items():
+        for collection_id in queryable["collections"]:
+            if collection_id not in sortables_by_collection:
+                sortables_by_collection[collection_id] = []
+        sortables_by_collection[collection_id].append(name)
+    for collection_id, sortable_names in sortables_by_collection.items():
+        expected_sortables = sortable_names
         collection_sortable_property_titles = [
             entry["title"]
             for entry in requests.get(

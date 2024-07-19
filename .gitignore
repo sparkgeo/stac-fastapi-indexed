@@ -11,5 +11,6 @@ minio/mc/config/**
 .autoenv*.zsh
 .vscode
 **/.DS_Store
+**/._.DS_Store
 todo.md
 .env

@@ -1,5 +1,5 @@
 from json import load
-from typing import Final, List
+from typing import Dict, Final, List
 
 import requests
 from with_environment.common import api_base_url
@@ -32,15 +32,18 @@ def test_queryables_all_collections():
 def test_queryables_by_collection():
     with open(get_index_config_path(), "r") as f:
         index_config = load(f)
-    for collection_id, queryable_config in index_config["queryables"][
-        "collection"
-    ].items():
-        expected_queryables = list(queryable_config.keys())
+    queryables_by_collection: Dict[str, List[str]] = {}
+    for name, queryable in index_config["queryables"].items():
+        for collection_id in queryable["collections"]:
+            if collection_id not in queryables_by_collection:
+                queryables_by_collection[collection_id] = []
+        queryables_by_collection[collection_id].append(name)
+    for collection_id, queryable_names in queryables_by_collection.items():
         collection_queryable_properties = requests.get(
             f"{api_base_url}/collections/{collection_id}/queryables"
         ).json()["properties"]
         assert len(collection_queryable_properties.keys()) == len(
-            _global_queryables + expected_queryables
+            _global_queryables + queryable_names
         )
-        for expected_property_name in _global_queryables + expected_queryables:
+        for expected_property_name in _global_queryables + queryable_names:
             assert expected_property_name in collection_queryable_properties

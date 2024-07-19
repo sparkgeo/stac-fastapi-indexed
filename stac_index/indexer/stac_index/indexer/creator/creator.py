@@ -10,9 +10,9 @@ from shapely import Geometry
 from shapely.wkt import loads as wkt_loads
 from stac_fastapi.types.stac import Collection
 
-from stac_index.indexer.creator.queryables.configurer import (
-    configure,
-    queryable_field_name_to_column_name,
+from stac_index.indexer.creator.configurer import (
+    add_items_columns,
+    configure_indexables,
 )
 from stac_index.indexer.reader.reader import Reader
 from stac_index.indexer.settings import get_settings
@@ -39,10 +39,11 @@ class IndexCreator:
     async def process(self, reader: Reader) -> List[str]:
         _logger.info("creating parquet index")
         # may eventually want some logic here to find an update an existing index, for not just creating from scratch each time
-        self._create_tables()
-        configure(self._index_config, self._conn)
+        self._create_db_objects()
+        add_items_columns(self._index_config, self._conn)
         collections, collection_errors = await self._request_collections(reader)
         items_errors = await self._request_items(reader, collections)
+        configure_indexables(self._index_config, self._conn)
         self._insert_metadata()
         output_dir = path.join(get_settings().output_dir, "parquet")
         try:
@@ -56,6 +57,14 @@ class IndexCreator:
         for table_name in [
             row[0] for row in self._conn.execute("SHOW tables").fetchall()
         ]:
+            if table_name not in [
+                "collections",
+                "items",
+                "queryables_by_collection",
+                "sortables_by_collection",
+                "audit",
+            ]:
+                continue
             geometry_column_name = None  # assumes max 1 geometry column per table
             for row in self._conn.execute(
                 f"SELECT column_name, column_type FROM (DESCRIBE {table_name})"
@@ -86,7 +95,7 @@ class IndexCreator:
             )
         return collection_errors + items_errors
 
-    def _create_tables(self) -> None:
+    def _create_db_objects(self) -> None:
         sql_directory = path.join(path.dirname(__file__), "sql")
         for sql_path in sorted(
             glob(path.join(sql_directory, "**", "*.sql"), recursive=True)
@@ -138,13 +147,8 @@ class IndexCreator:
             "end_datetime": "?",
             "stac_location": "?",
         }
-        for (
-            queryables_by_field_name
-        ) in self._index_config.queryables.collection.values():
-            for field_name in queryables_by_field_name.keys():
-                insert_fields_and_values_template[
-                    queryable_field_name_to_column_name(field_name)
-                ] = "?"
+        for indexable in self._index_config.indexables.values():
+            insert_fields_and_values_template[indexable.table_column_name] = "?"
 
         def processor(item: ItemWithLocation) -> List[str]:
             errors: List[str] = []
@@ -167,15 +171,15 @@ class IndexCreator:
             ]
             for (
                 collection_id,
-                queryables_by_field_name,
-            ) in self._index_config.queryables.collection.items():
-                for field_name, queryable in queryables_by_field_name.items():
-                    insert_param = None
-                    if (
-                        collection_id == collection_wildcard
-                        or collection_id == item.collection
-                    ):
-                        for path_option in queryable.json_path.split("|"):
+                indexable_by_field_name,
+            ) in self._index_config.all_indexables_by_collection.items():
+                if (
+                    collection_id == collection_wildcard
+                    or collection_id == item.collection
+                ):
+                    for field_name, indexable in indexable_by_field_name.items():
+                        insert_param = None
+                        for path_option in indexable.json_path.split("|"):
                             # where multiple JSON paths are possible accept the first that is not-None
                             path_parts = path_option.split(".")
                             path_parents, path_key = path_parts[:-1], path_parts[-1:][0]
@@ -190,16 +194,17 @@ class IndexCreator:
                                 break
                             except KeyError:
                                 pass
-                    if insert_param is None:
-                        errors.append(
-                            "could not locate path '{}' for field '{}' in '{}'/'{}'".format(
-                                queryable.json_path,
-                                field_name,
-                                item.collection,
-                                item.id,
+                        if insert_param is None:
+                            errors.append(
+                                "could not locate path '{}' for field '{}' in '{}'/'{}'".format(
+                                    indexable.json_path,
+                                    field_name,
+                                    item.collection,
+                                    item.id,
+                                )
                             )
-                        )
-                    insert_params.append(insert_param)
+                        else:
+                            insert_params.append(insert_param)
             try:
                 self._conn.execute(
                     "INSERT INTO items ({}) VALUES ({})".format(
