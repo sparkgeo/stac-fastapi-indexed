@@ -19,6 +19,9 @@ from stac_fastapi.indexed.db import fetchall
 from stac_fastapi.indexed.links.catalog import get_catalog_link
 from stac_fastapi.indexed.links.item import fix_item_links
 from stac_fastapi.indexed.links.search import get_search_link, get_token_link
+from stac_fastapi.indexed.queryables.queryable_field_map import (
+    get_queryable_config_by_name,
+)
 from stac_fastapi.indexed.search.filter.errors import (
     NotAGeometryField,
     NotATemporalField,
@@ -30,9 +33,6 @@ from stac_fastapi.indexed.search.filter.parser import (
     ast_to_filter_clause,
     filter_to_ast,
     parse_filter_language,
-)
-from stac_fastapi.indexed.search.filter.queryable_field_map import (
-    get_queryable_config_by_name,
 )
 from stac_fastapi.indexed.search.filter_clause import FilterClause
 from stac_fastapi.indexed.search.query_info import QueryInfo

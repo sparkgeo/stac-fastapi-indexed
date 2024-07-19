@@ -4,7 +4,7 @@ from typing import Any, Dict, Final, Optional
 from fastapi import Request
 from stac_fastapi.types.core import AsyncBaseFiltersClient
 
-from stac_fastapi.indexed.search.filter.queryable_field_map import (
+from stac_fastapi.indexed.queryables.queryable_field_map import (
     get_queryable_config_by_name,
 )
 
