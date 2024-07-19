@@ -9,10 +9,12 @@ from fastapi import Request
 from pygeofilter.ast import Node
 from stac_fastapi.extensions.core.filter.filter import FilterExtensionPostRequest
 from stac_fastapi.extensions.core.pagination.token_pagination import POSTTokenPagination
+from stac_fastapi.extensions.core.sort.sort import SortExtensionPostRequest
 from stac_fastapi.types.errors import InvalidQueryParameter
 from stac_fastapi.types.rfc3339 import str_to_interval
 from stac_fastapi.types.search import BaseSearchPostRequest
 from stac_fastapi.types.stac import Item, ItemCollection
+from stac_pydantic.api.extensions.sort import SortDirections
 
 from stac_fastapi.indexed.constants import rel_root, rel_self
 from stac_fastapi.indexed.db import fetchall
@@ -45,6 +47,7 @@ from stac_fastapi.indexed.search.token import (
     get_query_from_token,
 )
 from stac_fastapi.indexed.search.types import SearchDirection, SearchMethod
+from stac_fastapi.indexed.sortables.sortable_config import get_sortable_configs_by_field
 from stac_fastapi.indexed.stac.fetcher import fetch_dict
 
 _logger: Final[Logger] = getLogger(__file__)
@@ -166,7 +169,26 @@ class SearchHandler:
         )
 
     def _determine_order(self) -> List[str]:
-        return ["collection_id ASC", "id ASC"]
+        sort_fields: List[str] = []
+        user_provided_sorts = cast(SortExtensionPostRequest, self.search_request).sortby
+        if user_provided_sorts is not None and len(user_provided_sorts) > 0:
+            sortables = get_sortable_configs_by_field()
+            for user_provided_sort in user_provided_sorts:
+                if user_provided_sort.field not in sortables:
+                    raise InvalidQueryParameter(
+                        f"'{user_provided_sort.field}' is not sortable, see sortables endpoints"
+                    )
+                sort_fields.append(
+                    "{} {}".format(
+                        sortables[user_provided_sort.field].items_column,
+                        "ASC"
+                        if user_provided_sort.direction == SortDirections.asc
+                        else "DESC",
+                    )
+                )
+        else:
+            sort_fields.append("collection_id ASC, id ASC")
+        return sort_fields
 
     def _include_ids(self) -> Optional[FilterClause]:
         if self.search_request.ids is not None:

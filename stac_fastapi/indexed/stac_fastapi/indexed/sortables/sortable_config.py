@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from functools import lru_cache
 from logging import Logger, getLogger
-from typing import Final, List
+from typing import Dict, Final, List
 
 from stac_fastapi.indexed.db import fetchall
 
@@ -36,3 +36,7 @@ def get_sortable_configs() -> List[SortableConfig]:
     """
         )
     ]
+
+
+def get_sortable_configs_by_field() -> Dict[str, SortableConfig]:
+    return {config.name: config for config in get_sortable_configs()}
