@@ -32,6 +32,19 @@ class Queryables(BaseModel):
     collection: QueryablesByCollection
 
 
+class Sortable(BaseModel):
+    description: str
+
+
+SortablesByFieldName = Dict[str, Sortable]
+SortablesByCollection = Dict[str, SortablesByFieldName]
+
+
+class Sortables(BaseModel):
+    collection: SortablesByCollection
+
+
 class IndexConfig(BaseModel):
     root_catalog_uri: str
     queryables: Queryables
+    sortables: Sortables

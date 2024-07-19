@@ -14,5 +14,14 @@
                 }
             }
         }
+    },
+    "sortables": {
+        "collection": {
+            "joplin": {
+                "gsd": {
+                    "description": "Ground Sample Distance"
+                }
+            }
+        }
     }
 }

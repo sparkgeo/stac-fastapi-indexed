@@ -6,6 +6,11 @@ from stac_index.indexer.types.index_config import IndexConfig
 
 
 def configure(config: IndexConfig, connection: DuckDBPyConnection) -> None:
+    _configure_queryables(config, connection)
+    _configure_sortables(config, connection)
+
+
+def _configure_queryables(config: IndexConfig, connection: DuckDBPyConnection) -> None:
     for collection_id, queryables_by_field_name in config.queryables.collection.items():
         for field_name, queryable in queryables_by_field_name.items():
             connection.execute(
@@ -29,6 +34,23 @@ def configure(config: IndexConfig, connection: DuckDBPyConnection) -> None:
                 ALTER TABLE items
                 ADD COLUMN {queryable_field_name_to_column_name(field_name)} {queryable.storage_type.value}
             """
+            )
+
+
+def _configure_sortables(config: IndexConfig, connection: DuckDBPyConnection) -> None:
+    for collection_id, sortables_by_field_name in config.sortables.collection.items():
+        for field_name, sortable in sortables_by_field_name.items():
+            connection.execute(
+                """
+                INSERT INTO sortables (collection_id, name, description, items_column)
+                    VALUES (?, ?, ?, ?)
+            """,
+                [
+                    collection_id,
+                    field_name,
+                    sortable.description,
+                    queryable_field_name_to_column_name(field_name),
+                ],
             )
 
 
