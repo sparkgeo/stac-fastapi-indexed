@@ -50,6 +50,15 @@ def test_get_queryables_endpoint():
     assert requests.get(f"{api_base_url}/queryables").ok
 
 
+def test_get_collection_sortables_endpoint():
+    collection_id = _get_single_collection()["id"]
+    assert requests.get(f"{api_base_url}/collections/{collection_id}/sortables").ok
+
+
+def test_get_sortables_endpoint():
+    assert requests.get(f"{api_base_url}/sortables").ok
+
+
 def test_get_search_empty_endpoint():
     assert requests.get(f"{api_base_url}/search").ok
 
