@@ -37,5 +37,6 @@ class S3IndexReader(IndexReader):
                 "CREATE SECRET ({})".format(
                     ", ".join([f"{key} {value}" for key, value in config_parts.items()])
                 ),
+                None,
             )
         ]

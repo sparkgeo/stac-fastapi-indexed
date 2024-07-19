@@ -1,6 +1,7 @@
 from functools import partial
 from logging import Logger, getLogger
 from re import Match, match
+from time import time
 from typing import Final, List, Optional, Tuple, cast
 
 from boto3 import client
@@ -42,13 +43,22 @@ class S3SourceReader(SourceReader):
             Bucket=bucket,
             Key=key,
         )
-        return (
+        start = time()
+        response = (
             (await get_callable_event_loop().run_in_executor(None, get_object_partial))[
                 "Body"
             ]
             .read()
             .decode("UTF-8")
         )
+        _logger.debug(
+            "S3: fetched '{}/{}' in {}s".format(
+                bucket,
+                key,
+                round(time() - start, 3),
+            )
+        )
+        return response
 
     async def list_uris_by_prefix(
         self,
