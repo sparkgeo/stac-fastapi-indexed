@@ -1,12 +1,12 @@
 from asyncio import gather
+from json import loads
 from logging import Logger, getLogger
-from re import IGNORECASE, match, search
+from re import IGNORECASE, search
 from typing import Final, List, Optional, cast
 from urllib.parse import unquote_plus
 
 import attr
-from duckdb import DuckDBPyConnection
-from fastapi import HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import ValidationError
 from stac_fastapi.types.core import AsyncBaseCoreClient
 from stac_fastapi.types.errors import NotFoundError
@@ -16,6 +16,7 @@ from stac_fastapi.types.stac import Collection, Collections, Item, ItemCollectio
 from stac_pydantic.shared import BBox
 
 from stac_fastapi.indexed.constants import rel_parent, rel_root, rel_self
+from stac_fastapi.indexed.db import fetchall, fetchone
 from stac_fastapi.indexed.links.catalog import get_catalog_link
 from stac_fastapi.indexed.links.collection import (
     fix_collection_links,
@@ -32,41 +33,27 @@ _logger: Final[Logger] = getLogger(__file__)
 @attr.s
 class CoreCrudClient(AsyncBaseCoreClient):
     async def all_collections(self, request: Request, **kwargs) -> Collections:
-        fetch_tasks = [
-            fetch_dict(url)
-            for url in [
-                row[0]
-                for row in cast(DuckDBPyConnection, request.app.state.db_connection)
-                .execute("SELECT stac_location FROM collections")
-                .fetchall()
-            ]
-        ]
-        collections = [
-            fix_collection_links(
-                Collection(**collection_dict),
-                request,
-            )
-            for collection_dict in await gather(*fetch_tasks)
-        ]
-        return Collections(
-            collections=collections,
-            links=[
-                get_catalog_link(request, rel_root),
-                get_catalog_link(request, rel_parent),
-                get_collections_link(request, rel_self),
-            ],
-        )
+        # Alter how call is answered based on who is asking.
+        # Catalog root requests (/) requires a link for each collection, but doesn't use any other collection data.
+        # All Collections requests (/collections) requires all data about all collections.
+        # Because collection data comes from JSON stored externally that must be retrieved, we should only get all collection data when actually required.
+        # If this request is to satisfy a Catalog root request, get the minimum information required to satisfy that request (collection IDs).
+        if (
+            request.url.path.replace(cast(FastAPI, request.scope["app"]).root_path, "")
+            == "/"
+        ):
+            _logger.debug(f"answering '{request.url}' as minimal collections response")
+            return self._get_minimal_collections_response()
+        else:
+            _logger.debug(f"answering '{request.url}' as full collections response")
+            return await self._get_full_collections_response(request)
 
     async def get_collection(
         self, collection_id: str, request: Request, **kwargs
     ) -> Collection:
-        row = (
-            cast(DuckDBPyConnection, request.app.state.db_connection)
-            .execute(
-                "SELECT stac_location FROM collections WHERE id = ?",
-                [collection_id],
-            )
-            .fetchone()
+        row = fetchone(
+            "SELECT stac_location FROM collections WHERE id = ?",
+            [collection_id],
         )
         if row is not None:
             return fix_collection_links(
@@ -113,13 +100,9 @@ class CoreCrudClient(AsyncBaseCoreClient):
         await self.get_collection(
             collection_id, request=request
         )  # will error if collection does not exist
-        row = (
-            cast(DuckDBPyConnection, request.app.state.db_connection)
-            .execute(
-                "SELECT stac_location FROM items WHERE collection_id = ? and id = ?",
-                [collection_id, item_id],
-            )
-            .fetchone()
+        row = fetchone(
+            "SELECT stac_location FROM items WHERE collection_id = ? and id = ?",
+            [collection_id, item_id],
         )
         if row is not None:
             return fix_item_links(
@@ -143,7 +126,7 @@ class CoreCrudClient(AsyncBaseCoreClient):
         collections: Optional[List[str]] = None,
         ids: Optional[List[str]] = None,
         bbox: Optional[BBox] = None,
-        datetime: Optional[DateTimeType] = None,
+        datetime: Optional[str] = None,
         limit: Optional[int] = None,
         query: Optional[str] = None,
         token: Optional[str] = None,
@@ -162,21 +145,8 @@ class CoreCrudClient(AsyncBaseCoreClient):
             "limit": limit,
             "token": token,
         }
-        if sortby:
-            # https://github.com/radiantearth/stac-spec/tree/master/api-spec/extensions/sort#http-get-or-post-form
-            sort_param = []
-            for sort in sortby:
-                sortparts = match(r"^([+-]?)(.*)$", sort)
-                if sortparts:
-                    sort_param.append(
-                        {
-                            "field": sortparts.group(2).strip(),
-                            "direction": "desc" if sortparts.group(1) == "-" else "asc",
-                        }
-                    )
-            base_args["sortby"] = sort_param
         if intersects:
-            base_args["intersects"] = unquote_plus(intersects)
+            base_args["intersects"] = loads(unquote_plus(intersects))
         if filter:
             # following block based on https://github.com/stac-utils/stac-fastapi-pgstac/blob/659ddc374b7001dc7c7ad2cc2fd29e3f420b0573/stac_fastapi/pgstac/core.py#L373
             # Kludgy fix because using factory does not allow alias for filter-lang
@@ -206,3 +176,38 @@ class CoreCrudClient(AsyncBaseCoreClient):
         return await SearchHandler(
             search_request=search_request, request=request
         ).search()
+
+    def _get_minimal_collections_response(self) -> Collections:
+        return Collections(
+            collections=[
+                Collection(**{"id": id})
+                for id in [
+                    row[0] for row in fetchall("SELECT id FROM collections ORDER BY id")
+                ]
+            ],
+            links=[],
+        )
+
+    async def _get_full_collections_response(self, request: Request) -> Collections:
+        fetch_tasks = [
+            fetch_dict(url)
+            for url in [
+                row[0]
+                for row in fetchall("SELECT stac_location FROM collections ORDER BY id")
+            ]
+        ]
+        collections = [
+            fix_collection_links(
+                Collection(**collection_dict),
+                request,
+            )
+            for collection_dict in await gather(*fetch_tasks)
+        ]
+        return Collections(
+            collections=collections,
+            links=[
+                get_catalog_link(request, rel_root),
+                get_catalog_link(request, rel_parent),
+                get_collections_link(request, rel_self),
+            ],
+        )

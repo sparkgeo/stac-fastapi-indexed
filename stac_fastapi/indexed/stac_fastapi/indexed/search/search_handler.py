@@ -5,18 +5,17 @@ from logging import Logger, getLogger
 from re import sub
 from typing import Any, Dict, Final, List, Optional, Union, cast
 
-from duckdb import DuckDBPyConnection
 from fastapi import Request
 from pygeofilter.ast import Node
 from stac_fastapi.extensions.core.filter.filter import FilterExtensionPostRequest
 from stac_fastapi.extensions.core.pagination.token_pagination import POSTTokenPagination
-from stac_fastapi.extensions.core.sort.sort import SortExtensionPostRequest
 from stac_fastapi.types.errors import InvalidQueryParameter
+from stac_fastapi.types.rfc3339 import str_to_interval
 from stac_fastapi.types.search import BaseSearchPostRequest
 from stac_fastapi.types.stac import Item, ItemCollection
-from stac_pydantic.api.extensions.sort import SortDirections
 
 from stac_fastapi.indexed.constants import rel_root, rel_self
+from stac_fastapi.indexed.db import fetchall
 from stac_fastapi.indexed.links.catalog import get_catalog_link
 from stac_fastapi.indexed.links.item import fix_item_links
 from stac_fastapi.indexed.links.search import get_search_link, get_token_link
@@ -37,6 +36,10 @@ from stac_fastapi.indexed.search.filter.queryable_field_map import (
 )
 from stac_fastapi.indexed.search.filter_clause import FilterClause
 from stac_fastapi.indexed.search.query_info import QueryInfo
+from stac_fastapi.indexed.search.spatial import (
+    get_intersects_clause_for_bbox,
+    get_intersects_clause_for_wkt,
+)
 from stac_fastapi.indexed.search.token import (
     create_token_from_query,
     get_query_from_token,
@@ -81,14 +84,9 @@ class SearchHandler:
             limit=limit_text,
             offset=offset_text,
         )
-        _logger.debug(f"{current_query}: {query_info.params}")
-        rows = (
-            cast(DuckDBPyConnection, self.request.app.state.db_connection)
-            .execute(
-                current_query,
-                query_info.params,
-            )
-            .fetchall()
+        rows = fetchall(
+            current_query,
+            query_info.params,
         )
         has_next_page = len(rows) > query_info.limit
         has_previous_page = query_info.offset is not None
@@ -168,21 +166,7 @@ class SearchHandler:
         )
 
     def _determine_order(self) -> List[str]:
-        sort_fields: List[str] = []
-        user_provided_sorts = cast(SortExtensionPostRequest, self.search_request).sortby
-        if user_provided_sorts is not None and len(user_provided_sorts) > 0:
-            for user_provided_sort in user_provided_sorts:
-                sort_fields.append(
-                    "{} {}".format(
-                        user_provided_sort.field,
-                        "ASC"
-                        if user_provided_sort.direction == SortDirections.asc
-                        else "DESC",
-                    )
-                )
-        else:
-            sort_fields.append("collection_id ASC, id ASC")
-        return sort_fields
+        return ["collection_id ASC", "id ASC"]
 
     def _include_ids(self) -> Optional[FilterClause]:
         if self.search_request.ids is not None:
@@ -210,32 +194,25 @@ class SearchHandler:
         if self.search_request.bbox is not None:
             bbox_2d = self._get_bbox_2d(self.search_request.bbox)
             if bbox_2d is not None:
-                return FilterClause(
-                    sql="ST_Intersects(ST_GeomFromText('{}'), ST_GeomFromWKB(geometry))".format(
-                        "POLYGON (({xmin} {ymin}, {xmax} {ymin}, {xmax} {ymax}, {xmin} {ymax}, {xmin} {ymin}))".format(
-                            xmin=bbox_2d[0],
-                            ymin=bbox_2d[1],
-                            xmax=bbox_2d[2],
-                            ymax=bbox_2d[3],
-                        )
-                    )
-                )
+                return get_intersects_clause_for_bbox(*bbox_2d)
         return None
 
     def _include_intersects(self) -> Optional[FilterClause]:
         if self.search_request.intersects is not None:
-            return FilterClause(
-                sql="ST_Intersects(ST_GeomFromGeoJSON('{}', ST_GeomFromWKB(geometry)))".format(
-                    self.search_request.intersects
-                )
-            )
+            return get_intersects_clause_for_wkt(self.search_request.intersects.wkt)
         return None
 
     def _include_datetime(self) -> Optional[FilterClause]:
         if self.search_request.datetime:
+            self.search_request.datetime = str_to_interval(self.search_request.datetime)
             if isinstance(self.search_request.datetime, datetime):
                 return FilterClause(
-                    sql="datetime <= ? AND datetime_end >= ?",
+                    sql="""
+                    CASE
+                        WHEN datetime IS NOT NULL THEN datetime = ?
+                        ELSE start_datetime <= ? AND end_datetime >= ?
+                    END
+                    """,
                     params=[self.search_request.datetime for _ in range(3)],
                 )
             elif isinstance(self.search_request.datetime, tuple):
@@ -243,25 +220,48 @@ class SearchHandler:
                     self.search_request.datetime[0] is None
                     and self.search_request.datetime[1] is not None
                 ):
+                    # ../2000-01-02T00:00:00Z
+                    # Start is open, end is not
                     return FilterClause(
-                        sql="datetime <= ?",
-                        params=[self.search_request.datetime[1]],
+                        sql="""
+                        CASE
+                            WHEN datetime IS NOT NULL THEN datetime <= ?
+                            ELSE start_datetime <= ?
+                        END
+                        """,
+                        params=[self.search_request.datetime[1] for _ in range(2)],
                     )
                 elif (
                     self.search_request.datetime[0] is not None
                     and self.search_request.datetime[1] is None
                 ):
+                    # 2000-01-01T00:00:00Z/..
+                    # End is open, start is not
                     return FilterClause(
-                        sql="datetime >= ?",
-                        params=[self.search_request.datetime[0]],
+                        sql="""
+                        CASE
+                            WHEN datetime IS NOT NULL THEN datetime >= ?
+                            ELSE end_datetime >= ?
+                        END
+                        """,
+                        params=[self.search_request.datetime[0] for _ in range(2)],
                     )
                 elif (
                     self.search_request.datetime[0] is not None
                     and self.search_request[1] is not None
                 ):
+                    # 2000-01-01T00:00:00Z/2000-01-02T00:00:00Z
+                    # Neither start or end are open
                     return FilterClause(
-                        sql="NOT (datetime_end < ? OR datetime > ?)",
+                        sql="""
+                        CASE
+                            WHEN datetime IS NOT NULL THEN datetime >= ? AND datetime <= ?
+                            ELSE NOT (end_datetime < ? OR start_datetime > ?)
+                        END
+                        """,
                         params=[
+                            self.search_request.datetime[0],
+                            self.search_request.datetime[1],
                             self.search_request.datetime[0],
                             self.search_request.datetime[1],
                         ],
@@ -276,9 +276,7 @@ class SearchHandler:
             ast = self._get_ast_from_filter(
                 search_request.filter, search_request.filter_lang
             )
-            queryable_config = get_queryable_config_by_name(
-                cast(DuckDBPyConnection, self.request.app.state.db_connection)
-            )
+            queryable_config = get_queryable_config_by_name()
             try:
                 return ast_to_filter_clause(
                     ast=ast,

@@ -1,0 +1,13 @@
+services:
+  tester:
+    image: sparkgeo/stac_fastapi_indexed_tester
+    build:
+      context: .
+      dockerfile: ./docker/tests/with_environment/Dockerfile
+    environment:
+      API_ROOT_PATH: http://api
+    depends_on:
+      # Prefer a `condition:` approach here to only execute tests when `api` is healthy, but
+      # this was causing timeouts in Docker Compose and erroneously failing smoke tests.
+      # Instead have the test script wait for the API to become available.
+      - api

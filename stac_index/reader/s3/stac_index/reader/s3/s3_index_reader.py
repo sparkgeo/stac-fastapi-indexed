@@ -1,14 +1,9 @@
-from logging import Logger, getLogger
 from re import sub
-from typing import Final
-
-from duckdb import DuckDBPyConnection
+from typing import Any, List, Optional, Tuple
 
 from stac_index.common.index_reader import IndexReader
 from stac_index.reader.s3.s3_source_reader import S3SourceReader
 from stac_index.reader.s3.settings import get_settings
-
-_logger: Final[Logger] = getLogger(__file__)
 
 
 class S3IndexReader(IndexReader):
@@ -23,7 +18,9 @@ class S3IndexReader(IndexReader):
             self._s3_endpoint is not None and self._s3_endpoint.startswith("http://")
         )
 
-    def configure_duckdb(self, connection: DuckDBPyConnection) -> None:
+    def get_duckdb_configuration_statements(
+        self,
+    ) -> List[Tuple[str, Optional[List[Any]]]]:
         config_parts = {
             "TYPE": "S3",
             "PROVIDER": "CREDENTIAL_CHAIN",
@@ -35,8 +32,11 @@ class S3IndexReader(IndexReader):
             config_parts["URL_STYLE"] = "'path'"
         if self._s3_insecure:
             config_parts["USE_SSL"] = "false"
-        command = "CREATE SECRET ({})".format(
-            ", ".join([f"{key} {value}" for key, value in config_parts.items()])
-        )
-        _logger.debug(command)
-        connection.execute(command)
+        return [
+            (
+                "CREATE SECRET ({})".format(
+                    ", ".join([f"{key} {value}" for key, value in config_parts.items()])
+                ),
+                None,
+            )
+        ]

@@ -4,8 +4,6 @@ from json import JSONEncoder
 from re import escape, match
 from typing import Any, Dict, Final, List, Optional, Type, cast
 
-from dateutil import parser as datetime_parser
-
 _datetime_field_prefix: Final[str] = "datetime::"
 
 
@@ -52,7 +50,7 @@ class QueryInfo:
             if isinstance(param, str):
                 datetime_match = match(rf"^{escape(_datetime_field_prefix)}(.+)", param)
                 if datetime_match:
-                    new_params.append(datetime_parser.parse(datetime_match.group(1)))
+                    new_params.append(datetime.fromisoformat(datetime_match.group(1)))
                     continue
             new_params.append(param)
         return QueryInfo(

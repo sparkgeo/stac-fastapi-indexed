@@ -6,20 +6,21 @@ from fastapi.middleware import Middleware
 from fastapi.responses import ORJSONResponse
 from stac_fastapi.api.app import StacApi
 from stac_fastapi.api.middleware import CORSMiddleware, ProxyHeaderMiddleware
-from stac_fastapi.api.models import create_get_request_model, create_post_request_model
-from stac_fastapi.extensions.core import (
-    FilterExtension,
-    SortExtension,
-    TokenPaginationExtension,
+from stac_fastapi.api.models import (
+    ItemCollectionUri,
+    create_get_request_model,
+    create_post_request_model,
+    create_request_model,
 )
+from stac_fastapi.extensions.core import FilterExtension, TokenPaginationExtension
 
 from stac_fastapi.indexed.core import CoreCrudClient
 from stac_fastapi.indexed.db import connect_to_db, disconnect_from_db
 from stac_fastapi.indexed.search.filter.filter_client import FiltersClient
+from stac_fastapi.indexed.search.search_get_request import SearchGetRequest
 from stac_fastapi.indexed.settings import get_settings
 
 extensions_map = {
-    "sort": SortExtension(),
     "pagination": TokenPaginationExtension(),
     "filter": FilterExtension(client=FiltersClient()),
 }
@@ -42,7 +43,14 @@ api = StacApi(
     extensions=extensions,
     client=CoreCrudClient(post_request_model=post_request_model),  # type: ignore
     response_class=ORJSONResponse,
-    search_get_request_model=create_get_request_model(extensions),
+    items_get_request_model=create_request_model(
+        "ItemCollectionURI",
+        base_model=ItemCollectionUri,
+        mixins=[TokenPaginationExtension().GET],
+    ),
+    search_get_request_model=create_get_request_model(
+        extensions, base_model=SearchGetRequest
+    ),
     search_post_request_model=post_request_model,
     middlewares=[Middleware(CORSMiddleware), Middleware(ProxyHeaderMiddleware)],
 )
@@ -53,12 +61,12 @@ app = api.app
     "startup"
 )  # deprecated event handlers because of stac-fastapi, not yet able to use lifespan approach
 async def startup_event():
-    await connect_to_db(app)
+    await connect_to_db()
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    await disconnect_from_db(app)
+    await disconnect_from_db()
 
 
 def run():
