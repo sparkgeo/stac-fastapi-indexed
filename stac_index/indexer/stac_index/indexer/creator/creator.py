@@ -134,7 +134,8 @@ class IndexCreator:
             "bbox_x_max": "?",
             "bbox_y_max": "?",
             "datetime": "?",
-            "datetime_end": "?",
+            "start_datetime": "?",
+            "end_datetime": "?",
             "stac_location": "?",
         }
         for (
@@ -159,8 +160,9 @@ class IndexCreator:
                 item.id,
                 item.collection,
                 *geometry.bounds,
-                item.properties.datetime or item.properties.start_datetime,
-                item.properties.end_datetime or item.properties.datetime,
+                item.properties.datetime,
+                item.properties.start_datetime,
+                item.properties.end_datetime,
                 item.location,
             ]
             for (

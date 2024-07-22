@@ -4,6 +4,6 @@ A stac-fastapi backend that indexes a static catalog to Parquet to make it searc
 
 This backend does not support transactions and accesses Parquet index files read-only.
 
-## CITE Compliance
+## Known Issues
 
-See [here](./CITE-TESTS.md) to execute CITE compliance tests.
+See [Known Issues](./KNOWN-ISSUES.md) for more information.

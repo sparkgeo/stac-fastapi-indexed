@@ -6,8 +6,9 @@ CREATE TABLE items (
     bbox_y_min REAL NOT NULL,
     bbox_x_max REAL NOT NULL,
     bbox_y_max REAL NOT NULL,
-    datetime TIMESTAMPTZ NOT NULL,
-    datetime_end TIMESTAMPTZ NOT NULL,
+    datetime TIMESTAMPTZ,
+    start_datetime TIMESTAMPTZ,
+    end_datetime TIMESTAMPTZ,
     stac_location VARCHAR NOT NULL,
     PRIMARY KEY (collection_id, id),
 );

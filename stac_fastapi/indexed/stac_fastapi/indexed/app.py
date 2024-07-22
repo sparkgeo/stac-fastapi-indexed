@@ -1,15 +1,23 @@
+import os
 from os import getenv
 
+from fastapi import FastAPI
 from fastapi.middleware import Middleware
 from fastapi.responses import ORJSONResponse
 from stac_fastapi.api.app import StacApi
 from stac_fastapi.api.middleware import CORSMiddleware, ProxyHeaderMiddleware
-from stac_fastapi.api.models import create_get_request_model, create_post_request_model
+from stac_fastapi.api.models import (
+    ItemCollectionUri,
+    create_get_request_model,
+    create_post_request_model,
+    create_request_model,
+)
 from stac_fastapi.extensions.core import FilterExtension, TokenPaginationExtension
 
 from stac_fastapi.indexed.core import CoreCrudClient
 from stac_fastapi.indexed.db import connect_to_db, disconnect_from_db
 from stac_fastapi.indexed.search.filter.filter_client import FiltersClient
+from stac_fastapi.indexed.search.search_get_request import SearchGetRequest
 from stac_fastapi.indexed.settings import get_settings
 
 extensions_map = {
@@ -20,12 +28,29 @@ extensions_map = {
 extensions = list(extensions_map.values())
 post_request_model = create_post_request_model(extensions)
 
+
+def fastapi_factory(stage: str) -> FastAPI:
+    if stage:
+        fast_api_app = FastAPI(root_path=f"/{stage}", docs_url="/api.html")
+    else:
+        fast_api_app = FastAPI(docs_url="/api.html")
+    return fast_api_app
+
+
 api = StacApi(
+    app=fastapi_factory(os.environ.get("API_STAGE", "")),
     settings=get_settings(),
     extensions=extensions,
     client=CoreCrudClient(post_request_model=post_request_model),  # type: ignore
     response_class=ORJSONResponse,
-    search_get_request_model=create_get_request_model(extensions),
+    items_get_request_model=create_request_model(
+        "ItemCollectionURI",
+        base_model=ItemCollectionUri,
+        mixins=[TokenPaginationExtension().GET],
+    ),
+    search_get_request_model=create_get_request_model(
+        extensions, base_model=SearchGetRequest
+    ),
     search_post_request_model=post_request_model,
     middlewares=[Middleware(CORSMiddleware), Middleware(ProxyHeaderMiddleware)],
 )
@@ -71,7 +96,15 @@ def create_handler(app):
     try:
         from mangum import Mangum
 
-        return Mangum(app)
+        return Mangum(
+            app,
+            text_mime_types=[
+                "text/",
+                "application/json",
+                "application/geo+json",
+                "application/vnd.oai.openapi",
+            ],
+        )
     except ImportError:
         return None
 

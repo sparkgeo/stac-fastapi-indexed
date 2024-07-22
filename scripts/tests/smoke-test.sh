@@ -2,10 +2,10 @@
 
 pushd $(dirname $0)/../..
 
-dco="docker compose -f docker-compose.base.yml -f docker-compose.local-s3.yml -f docker-compose.local-s3.smoke-test.yml"
+dco="docker compose -f docker-compose.base.yml -f docker-compose.local-s3.yml -f docker-compose.local-s3.test.yml"
 
 $dco build
-$dco run tester
+$dco run --rm tester python -m pytest -k smoke_tests
 exit_code=$?
 if [ $exit_code -ne 0 ] || [ ${TESTS_DEBUG:-0} -ne 0 ]; then
     $dco logs

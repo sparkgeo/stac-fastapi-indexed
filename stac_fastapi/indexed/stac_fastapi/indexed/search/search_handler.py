@@ -10,6 +10,7 @@ from pygeofilter.ast import Node
 from stac_fastapi.extensions.core.filter.filter import FilterExtensionPostRequest
 from stac_fastapi.extensions.core.pagination.token_pagination import POSTTokenPagination
 from stac_fastapi.types.errors import InvalidQueryParameter
+from stac_fastapi.types.rfc3339 import str_to_interval
 from stac_fastapi.types.search import BaseSearchPostRequest
 from stac_fastapi.types.stac import Item, ItemCollection
 
@@ -203,9 +204,15 @@ class SearchHandler:
 
     def _include_datetime(self) -> Optional[FilterClause]:
         if self.search_request.datetime:
+            self.search_request.datetime = str_to_interval(self.search_request.datetime)
             if isinstance(self.search_request.datetime, datetime):
                 return FilterClause(
-                    sql="datetime <= ? AND datetime_end >= ?",
+                    sql="""
+                    CASE
+                        WHEN datetime IS NOT NULL THEN datetime = ?
+                        ELSE start_datetime <= ? AND end_datetime >= ?
+                    END
+                    """,
                     params=[self.search_request.datetime for _ in range(3)],
                 )
             elif isinstance(self.search_request.datetime, tuple):
@@ -213,25 +220,48 @@ class SearchHandler:
                     self.search_request.datetime[0] is None
                     and self.search_request.datetime[1] is not None
                 ):
+                    # ../2000-01-02T00:00:00Z
+                    # Start is open, end is not
                     return FilterClause(
-                        sql="datetime <= ?",
-                        params=[self.search_request.datetime[1]],
+                        sql="""
+                        CASE
+                            WHEN datetime IS NOT NULL THEN datetime <= ?
+                            ELSE start_datetime <= ?
+                        END
+                        """,
+                        params=[self.search_request.datetime[1] for _ in range(2)],
                     )
                 elif (
                     self.search_request.datetime[0] is not None
                     and self.search_request.datetime[1] is None
                 ):
+                    # 2000-01-01T00:00:00Z/..
+                    # End is open, start is not
                     return FilterClause(
-                        sql="datetime >= ?",
-                        params=[self.search_request.datetime[0]],
+                        sql="""
+                        CASE
+                            WHEN datetime IS NOT NULL THEN datetime >= ?
+                            ELSE end_datetime >= ?
+                        END
+                        """,
+                        params=[self.search_request.datetime[0] for _ in range(2)],
                     )
                 elif (
                     self.search_request.datetime[0] is not None
                     and self.search_request[1] is not None
                 ):
+                    # 2000-01-01T00:00:00Z/2000-01-02T00:00:00Z
+                    # Neither start or end are open
                     return FilterClause(
-                        sql="NOT (datetime_end < ? OR datetime > ?)",
+                        sql="""
+                        CASE
+                            WHEN datetime IS NOT NULL THEN datetime >= ? AND datetime <= ?
+                            ELSE NOT (end_datetime < ? OR start_datetime > ?)
+                        END
+                        """,
                         params=[
+                            self.search_request.datetime[0],
+                            self.search_request.datetime[1],
                             self.search_request.datetime[0],
                             self.search_request.datetime[1],
                         ],

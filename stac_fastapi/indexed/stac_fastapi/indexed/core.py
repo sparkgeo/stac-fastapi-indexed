@@ -2,11 +2,11 @@ from asyncio import gather
 from json import loads
 from logging import Logger, getLogger
 from re import IGNORECASE, search
-from typing import Final, List, Optional
+from typing import Final, List, Optional, cast
 from urllib.parse import unquote_plus
 
 import attr
-from fastapi import HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import ValidationError
 from stac_fastapi.types.core import AsyncBaseCoreClient
 from stac_fastapi.types.errors import NotFoundError
@@ -38,7 +38,10 @@ class CoreCrudClient(AsyncBaseCoreClient):
         # All Collections requests (/collections) requires all data about all collections.
         # Because collection data comes from JSON stored externally that must be retrieved, we should only get all collection data when actually required.
         # If this request is to satisfy a Catalog root request, get the minimum information required to satisfy that request (collection IDs).
-        if request.url.path == "/":
+        if (
+            request.url.path.replace(cast(FastAPI, request.scope["app"]).root_path, "")
+            == "/"
+        ):
             _logger.debug(f"answering '{request.url}' as minimal collections response")
             return self._get_minimal_collections_response()
         else:
@@ -123,7 +126,7 @@ class CoreCrudClient(AsyncBaseCoreClient):
         collections: Optional[List[str]] = None,
         ids: Optional[List[str]] = None,
         bbox: Optional[BBox] = None,
-        datetime: Optional[DateTimeType] = None,
+        datetime: Optional[str] = None,
         limit: Optional[int] = None,
         query: Optional[str] = None,
         token: Optional[str] = None,
