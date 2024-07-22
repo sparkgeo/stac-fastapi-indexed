@@ -1,0 +1,57 @@
+from pathlib import Path
+from aws_cdk import Duration, RemovalPolicy, Stack
+from aws_cdk import aws_apigateway as apigw
+from aws_cdk import aws_lambda as _lambda
+from aws_cdk.aws_logs import LogGroup, RetentionDays
+from aws_cdk.aws_s3 import Bucket, BucketEncryption
+from constructs import Construct
+
+
+class CdkDeploymentStack(Stack):
+    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+        super().__init__(scope, construct_id, **kwargs)
+        build_arguments = {
+            "stac_api_indexed_parquet_index_source_uri": self.node.try_get_context(
+                "PARQUET_URI"
+            ),
+            "stac_api_indexed_token_jwt_secret": self.node.try_get_context(
+                "JWT_SECRET"
+            ),
+            "stac_api_indexed_log_level": self.node.try_get_context("LOG_LEVEL"),
+            "stac_api_indexed_permit_boto_debug": self.node.try_get_context(
+                "BOTO_DEBUG"
+            ),
+            "stac_api_indexed_duckdb_threads": self.node.try_get_context(
+                "DUCKDB_THREADS"
+            ),
+        }
+        build_path = Path("../")
+        Bucket(self, id="ServerlessStacBucket", encryption=BucketEncryption.S3_MANAGED)
+        lamda_code = _lambda.DockerImageCode.from_image_asset(
+            str(build_path.resolve()), file="iac/Dockerfile"
+        )
+        stac_serverless_lambda = _lambda.DockerImageFunction(
+            self,
+            "StacServerlessLambda",
+            code=lamda_code,
+            timeout=Duration.seconds(300),
+            environment=build_arguments,
+            memory_size=1500,
+        )
+        cors = apigw.CorsOptions(allow_origins=["*"])
+        rest_api = apigw.LambdaRestApi(
+            self,
+            "ServerlessStacAPI",
+            handler=stac_serverless_lambda,
+            default_cors_preflight_options=cors,
+            proxy=True,
+            binary_media_types=[],
+            rest_api_name="STAC-API-Serverless",
+        )
+        log_group = LogGroup(
+            self,
+            id="ServerlessStacLogs",
+            retention=RetentionDays.ONE_MONTH,
+            log_group_name="ServerlessApiStacLogGroup",
+            removal_policy=RemovalPolicy.DESTROY,
+        )

@@ -1,5 +1,7 @@
+import os
 from os import getenv
 
+from fastapi import FastAPI
 from fastapi.middleware import Middleware
 from fastapi.responses import ORJSONResponse
 from stac_fastapi.api.app import StacApi
@@ -26,7 +28,17 @@ extensions_map = {
 extensions = list(extensions_map.values())
 post_request_model = create_post_request_model(extensions)
 
+
+def fastapi_factory(stage: str) -> FastAPI:
+    if stage:
+        fast_api_app = FastAPI(root_path=f"/{stage}", docs_url="/api.html")
+    else:
+        fast_api_app = FastAPI(docs_url="/api.html")
+    return fast_api_app
+
+
 api = StacApi(
+    app=fastapi_factory(os.environ.get("API_STAGE", "")),
     settings=get_settings(),
     extensions=extensions,
     client=CoreCrudClient(post_request_model=post_request_model),  # type: ignore
@@ -84,7 +96,15 @@ def create_handler(app):
     try:
         from mangum import Mangum
 
-        return Mangum(app)
+        return Mangum(
+            app,
+            text_mime_types=[
+                "text/",
+                "application/json",
+                "application/geo+json",
+                "application/vnd.oai.openapi",
+            ],
+        )
     except ImportError:
         return None
 
