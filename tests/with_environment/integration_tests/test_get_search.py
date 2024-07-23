@@ -226,3 +226,30 @@ def test_get_search_token_immutable():
     altered_token = rebuild_token_with_altered_claims(token, altered_claims)
     response = requests.post(f"{api_base_url}/search", json={"token": altered_token})
     assert response.status_code == 400
+
+
+def test_get_search_alternate_order():
+    sortable_field_names: List[str] = [
+        entry["title"]
+        for entry in requests.get(f"{api_base_url}/sortables").json()["fields"]
+    ]
+    assert "datetime" in sortable_field_names
+    assert "id" in sortable_field_names
+
+    def sort_items(item: Dict[str, Any]) -> str:
+        item_datetime = item["properties"]["datetime"]
+        if item_datetime is None:
+            item_datetime = datetime.fromtimestamp(0)
+        return "{}_{}".format(item_datetime, item["id"])
+
+    expected_items_sorted = _all_items[:]
+    expected_items_sorted.sort(
+        key=sort_items,
+    )
+    expected_items_sorted.reverse()  # give descending order to match query
+    assert len(expected_items_sorted) == len(_all_items)
+    assert expected_items_sorted != _all_items
+    sorted_search_results = all_get_search_results({"sortby": "-datetime,-id"})
+    assert [item["id"] for item in sorted_search_results] == [
+        item["id"] for item in expected_items_sorted
+    ]

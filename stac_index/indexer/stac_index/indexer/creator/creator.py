@@ -62,7 +62,6 @@ class IndexCreator:
                 "items",
                 "queryables_by_collection",
                 "sortables_by_collection",
-                "audit",
             ]:
                 continue
             geometry_column_name = None  # assumes max 1 geometry column per table

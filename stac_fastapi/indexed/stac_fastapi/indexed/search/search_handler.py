@@ -14,7 +14,7 @@ from stac_fastapi.types.errors import InvalidQueryParameter
 from stac_fastapi.types.rfc3339 import str_to_interval
 from stac_fastapi.types.search import BaseSearchPostRequest
 from stac_fastapi.types.stac import Item, ItemCollection
-from stac_pydantic.api.extensions.sort import SortDirections
+from stac_pydantic.api.extensions.sort import SortDirections, SortExtension
 
 from stac_fastapi.indexed.constants import rel_root, rel_self
 from stac_fastapi.indexed.db import fetchall
@@ -52,6 +52,11 @@ from stac_fastapi.indexed.stac.fetcher import fetch_dict
 
 _logger: Final[Logger] = getLogger(__file__)
 _text_filter_wrap_key: Final[str] = "__text_filter"
+
+default_sorts: Final[List[SortExtension]] = [
+    SortExtension(field="collection", direction=SortDirections.asc),
+    SortExtension(field="id", direction=SortDirections.asc),
+]
 
 
 @dataclass
@@ -172,22 +177,21 @@ class SearchHandler:
         sort_fields: List[str] = []
         user_provided_sorts = cast(SortExtensionPostRequest, self.search_request).sortby
         if user_provided_sorts is not None and len(user_provided_sorts) > 0:
-            sortables = get_sortable_configs_by_field()
-            for user_provided_sort in user_provided_sorts:
-                if user_provided_sort.field not in sortables:
-                    raise InvalidQueryParameter(
-                        f"'{user_provided_sort.field}' is not sortable, see sortables endpoints"
-                    )
-                sort_fields.append(
-                    "{} {}".format(
-                        sortables[user_provided_sort.field].items_column,
-                        "ASC"
-                        if user_provided_sort.direction == SortDirections.asc
-                        else "DESC",
-                    )
-                )
+            effective_sorts = user_provided_sorts
         else:
-            sort_fields.append("collection_id ASC, id ASC")
+            effective_sorts = default_sorts
+        sortables = get_sortable_configs_by_field()
+        for effective_sort in effective_sorts:
+            if effective_sort.field not in sortables:
+                raise InvalidQueryParameter(
+                    f"'{effective_sort.field}' is not sortable, see sortables endpoints"
+                )
+            sort_fields.append(
+                "{} {}".format(
+                    sortables[effective_sort.field].items_column,
+                    "ASC" if effective_sort.direction == SortDirections.asc else "DESC",
+                )
+            )
         return sort_fields
 
     def _include_ids(self) -> Optional[FilterClause]:
