@@ -12,15 +12,21 @@ from stac_fastapi.api.models import (
     create_post_request_model,
     create_request_model,
 )
-from stac_fastapi.extensions.core import FilterExtension, TokenPaginationExtension
+from stac_fastapi.extensions.core import (
+    FilterExtension,
+    SortExtension,
+    TokenPaginationExtension,
+)
 
 from stac_fastapi.indexed.core import CoreCrudClient
 from stac_fastapi.indexed.db import connect_to_db, disconnect_from_db
 from stac_fastapi.indexed.search.filter.filter_client import FiltersClient
 from stac_fastapi.indexed.search.search_get_request import SearchGetRequest
 from stac_fastapi.indexed.settings import get_settings
+from stac_fastapi.indexed.sortables.routes import add_routes as add_sortables_routes
 
 extensions_map = {
+    "sort": SortExtension(),
     "pagination": TokenPaginationExtension(),
     "filter": FilterExtension(client=FiltersClient()),
 }
@@ -55,6 +61,7 @@ api = StacApi(
     middlewares=[Middleware(CORSMiddleware), Middleware(ProxyHeaderMiddleware)],
 )
 app = api.app
+add_sortables_routes(app)
 
 
 @app.on_event(
