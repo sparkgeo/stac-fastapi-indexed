@@ -1,23 +1,26 @@
 CREATE VIEW queryables_by_collection AS
     SELECT q.name
-         , q.collection_id
+         , qc.collection_id
          , q.description
          , q.json_path
          , q.json_schema
-         , COALESCE(q.items_column, q.name) as items_column
+         , COALESCE(q.items_column, q.name) AS items_column
          , q.is_geometry
          , q.is_temporal
       FROM queryables q
-      JOIN collections c ON c.id = q.collection_id
+      JOIN queryables_collections qc ON q.name == qc.name
      UNION
     SELECT q.name
-         , q.collection_id
+         , '*' AS collection_id
          , q.description
          , q.json_path
          , q.json_schema
-         , COALESCE(q.items_column, q.name) as items_column
+         , COALESCE(q.items_column, q.name) AS items_column
          , q.is_geometry
          , q.is_temporal
-      FROM collections c 
-CROSS JOIN queryables q
-     WHERE q.collection_id = '*';
+      FROM queryables q 
+      JOIN (
+           SELECT qac.name
+             FROM queryables_all_collections qac
+      ) qac ON qac.name = q.name
+;

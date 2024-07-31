@@ -9,16 +9,21 @@ from fastapi import Request
 from pygeofilter.ast import Node
 from stac_fastapi.extensions.core.filter.filter import FilterExtensionPostRequest
 from stac_fastapi.extensions.core.pagination.token_pagination import POSTTokenPagination
+from stac_fastapi.extensions.core.sort.sort import SortExtensionPostRequest
 from stac_fastapi.types.errors import InvalidQueryParameter
 from stac_fastapi.types.rfc3339 import str_to_interval
 from stac_fastapi.types.search import BaseSearchPostRequest
 from stac_fastapi.types.stac import Item, ItemCollection
+from stac_pydantic.api.extensions.sort import SortDirections, SortExtension
 
 from stac_fastapi.indexed.constants import rel_root, rel_self
 from stac_fastapi.indexed.db import fetchall
 from stac_fastapi.indexed.links.catalog import get_catalog_link
 from stac_fastapi.indexed.links.item import fix_item_links
 from stac_fastapi.indexed.links.search import get_search_link, get_token_link
+from stac_fastapi.indexed.queryables.queryable_field_map import (
+    get_queryable_config_by_name,
+)
 from stac_fastapi.indexed.search.filter.errors import (
     NotAGeometryField,
     NotATemporalField,
@@ -31,9 +36,6 @@ from stac_fastapi.indexed.search.filter.parser import (
     filter_to_ast,
     parse_filter_language,
 )
-from stac_fastapi.indexed.search.filter.queryable_field_map import (
-    get_queryable_config_by_name,
-)
 from stac_fastapi.indexed.search.filter_clause import FilterClause
 from stac_fastapi.indexed.search.query_info import QueryInfo
 from stac_fastapi.indexed.search.spatial import (
@@ -45,10 +47,16 @@ from stac_fastapi.indexed.search.token import (
     get_query_from_token,
 )
 from stac_fastapi.indexed.search.types import SearchDirection, SearchMethod
+from stac_fastapi.indexed.sortables.sortable_config import get_sortable_configs_by_field
 from stac_fastapi.indexed.stac.fetcher import fetch_dict
 
 _logger: Final[Logger] = getLogger(__file__)
 _text_filter_wrap_key: Final[str] = "__text_filter"
+
+default_sorts: Final[List[SortExtension]] = [
+    SortExtension(field="collection", direction=SortDirections.asc),
+    SortExtension(field="id", direction=SortDirections.asc),
+]
 
 
 @dataclass
@@ -166,7 +174,25 @@ class SearchHandler:
         )
 
     def _determine_order(self) -> List[str]:
-        return ["collection_id ASC", "id ASC"]
+        sort_fields: List[str] = []
+        user_provided_sorts = cast(SortExtensionPostRequest, self.search_request).sortby
+        if user_provided_sorts is not None and len(user_provided_sorts) > 0:
+            effective_sorts = user_provided_sorts
+        else:
+            effective_sorts = default_sorts
+        sortables = get_sortable_configs_by_field()
+        for effective_sort in effective_sorts:
+            if effective_sort.field not in sortables:
+                raise InvalidQueryParameter(
+                    f"'{effective_sort.field}' is not sortable, see sortables endpoints"
+                )
+            sort_fields.append(
+                "{} {}".format(
+                    sortables[effective_sort.field].items_column,
+                    "ASC" if effective_sort.direction == SortDirections.asc else "DESC",
+                )
+            )
+        return sort_fields
 
     def _include_ids(self) -> Optional[FilterClause]:
         if self.search_request.ids is not None:

@@ -1,18 +1,28 @@
 {
     "root_catalog_uri": "s3://stac/sample/catalog.json",
+    "indexables": {
+        "gsd": {
+            "storage_type": "DOUBLE",
+            "description": "Ground Sample Distance",
+            "json_path": "properties.gsd"
+        }
+    },
     "queryables": {
-        "collection": {
-            "joplin": {
-                "gsd": {
-                    "storage_type": "DOUBLE",
-                    "description": "Ground Sample Distance",
-                    "json_path": "properties.gsd",
-                    "json_schema":  {
-                        "type": "number",
-                        "exclusiveMinimum": 0
-                    }
-                }
-            }
+        "gsd": {
+            "json_schema":  {
+                "type": "number",
+                "exclusiveMinimum": 0
+            },
+            "collections": [
+                "joplin"
+            ]
+        }
+    },
+    "sortables": {
+        "gsd": {
+            "collections": [
+                "joplin"
+            ]
         }
     }
 }

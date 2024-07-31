@@ -1,5 +1,5 @@
-import os
 from logging import Logger, getLogger
+from os import environ
 from time import time
 from typing import Any, Final, List, Optional
 
@@ -43,7 +43,7 @@ async def connect_to_db() -> None:
     times["load httpfs extension"] = time()
     duckdb_thread_count = get_settings().duckdb_threads
     if duckdb_thread_count:
-        set_duckdb_threads(duckdb_thread_count)
+        _set_duckdb_threads(duckdb_thread_count)
     parquet_uris = await index_source.get_parquet_uris()
     if len(parquet_uris.keys()) == 0:
         raise Exception(f"no URIs found at '{index_source_uri}'")
@@ -108,10 +108,12 @@ def _sql_log_message(
     )
 
 
-def set_duckdb_threads(duckdb_thread_count: int) -> None:
+def _set_duckdb_threads(duckdb_thread_count: int) -> None:
     try:
         duckdb_max_memory = duckdb_thread_count * 125  # duckdb suggest 125mb per thread
-        lambda_memory_size = os.environ.get("AWS_LAMBDA_FUNCTION_MEMORY_SIZE", None)
+        lambda_memory_size = environ.get(
+            "AWS_LAMBDA_FUNCTION_MEMORY_SIZE", None
+        )  # this is a reserved AWS env var, not defined by this application
         if lambda_memory_size:
             if int(lambda_memory_size) < duckdb_max_memory:
                 memory_error_message = f"MemoryError: duckdb {duckdb_thread_count} threads requires:\
