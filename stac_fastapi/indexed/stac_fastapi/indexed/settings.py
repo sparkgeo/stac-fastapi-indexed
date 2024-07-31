@@ -13,6 +13,7 @@ class _Settings(ApiSettings):
     token_jwt_secret: str
     s3_endpoint: Optional[str] = None
     permit_boto_debug: bool = False
+    duckdb_threads: Optional[int] = None
 
 
 @lru_cache(maxsize=1)
