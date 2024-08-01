@@ -109,19 +109,19 @@ def _sql_log_message(
 
 
 def _set_duckdb_threads(duckdb_thread_count: int) -> None:
-    try:
-        duckdb_max_memory = duckdb_thread_count * 125  # duckdb suggest 125mb per thread
-        lambda_memory_size = environ.get(
-            "AWS_LAMBDA_FUNCTION_MEMORY_SIZE", None
-        )  # this is a reserved AWS env var, not defined by this application
-        if lambda_memory_size:
-            if int(lambda_memory_size) < duckdb_max_memory:
-                memory_error_message = f"MemoryError: duckdb {duckdb_thread_count} threads requires:\
-                    '{duckdb_max_memory}MB'. Lambda memory: '{lambda_memory_size}MB'"
-                _logger.error(memory_error_message)
-                raise MemoryError(memory_error_message)
-        execute(f"SET memory_limit = '{duckdb_max_memory}MB'")
-        execute(f"SET threads to {duckdb_thread_count}")
-    except Exception as e:
-        _logger.error(e)
-        raise e
+    duckdb_required_memory_mb = (
+        duckdb_thread_count * 125
+    )  # duckdb suggest 125mb per thread
+    lambda_memory_mb = environ.get(
+        "AWS_LAMBDA_FUNCTION_MEMORY_SIZE", None
+    )  # this is a reserved AWS env var, not defined by this application
+    if lambda_memory_mb:
+        if int(lambda_memory_mb) < duckdb_required_memory_mb:
+            raise MemoryError(
+                "duckdb {} threads requires: '{}MB'. Lambda memory: '{}MB'".format(
+                    duckdb_thread_count,
+                    duckdb_required_memory_mb,
+                    lambda_memory_mb,
+                )
+            )
+    execute(f"SET threads to {duckdb_thread_count}")
