@@ -118,7 +118,11 @@ def _set_duckdb_threads(duckdb_thread_count: int) -> None:
     if lambda_memory_mb:
         if int(lambda_memory_mb) < duckdb_required_memory_mb:
             raise MemoryError(
-                f"duckdb {duckdb_thread_count} threads requires: '{duckdb_required_memory_mb}MB'. Lambda memory: '{lambda_memory_mb}MB'"
+                "duckdb {} threads requires: '{}MB'. Lambda memory: '{}MB'".format(
+                    duckdb_thread_count,
+                    duckdb_required_memory_mb,
+                    lambda_memory_mb,
+                )
             )
     execute(f"SET memory_limit = '{duckdb_required_memory_mb}MB'")
     execute(f"SET threads to {duckdb_thread_count}")
