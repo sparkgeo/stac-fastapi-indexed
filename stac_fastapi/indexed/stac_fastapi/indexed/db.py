@@ -124,5 +124,4 @@ def _set_duckdb_threads(duckdb_thread_count: int) -> None:
                     lambda_memory_mb,
                 )
             )
-    execute(f"SET memory_limit = '{duckdb_required_memory_mb}MB'")
     execute(f"SET threads to {duckdb_thread_count}")
