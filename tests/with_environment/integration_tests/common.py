@@ -1,9 +1,9 @@
 from base64 import b64decode, b64encode
 from datetime import datetime
 from glob import glob
-from json import dumps, loads
+from json import dumps, load, loads
 from os import environ, path
-from typing import Any, Dict, Final, List, Optional
+from typing import Any, Dict, Final, List, Optional, Tuple
 
 import requests
 from with_environment.common import api_base_url
@@ -131,3 +131,24 @@ def rebuild_token_with_altered_claims(
         b64encode(dumps(altered_claims).encode("UTF-8")).decode("UTF-8"),
         token_parts[2],
     )
+
+
+def get_test_items() -> (
+    Tuple[List[Dict[str, Any]], Dict[str, List[Dict[str, Any]]], List[Dict[str, Any]]]
+):
+    all_collections: List[Dict[str, Any]] = []
+    all_items_by_collection_id: Dict[str, List[Dict[str, Any]]] = {}
+    all_items: List[Dict[str, Any]] = []
+    for collection_file_path in get_collection_file_paths():
+        with open(collection_file_path, "r") as f:
+            collection = load(f)
+            all_collections.append(collection)
+        all_items_by_collection_id[collection["id"]] = []
+        for item_file_path in get_item_file_paths_for_collection(collection["id"]):
+            with open(item_file_path, "r") as f:
+                all_items_by_collection_id[collection["id"]].append(load(f))
+    all_items.extend(
+        [item for sublist in all_items_by_collection_id.values() for item in sublist]
+    )
+    all_items.sort(key=lambda x: "{}_{}".format(x["collection"], x["id"]))
+    return (all_collections, all_items_by_collection_id, all_items)

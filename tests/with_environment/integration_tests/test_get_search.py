@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from json import dumps, load
+from json import dumps
 from re import match
 from typing import Any, Dict, List
 
@@ -11,10 +11,9 @@ from with_environment.integration_tests.common import (
     all_get_search_results,
     compare_results_to_expected,
     get_claims_from_token,
-    get_collection_file_paths,
-    get_item_file_paths_for_collection,
     get_items_with_intersecting_datetime,
     get_link_dict_by_rel,
+    get_test_items,
     rebuild_token_with_altered_claims,
 )
 from with_environment.wait import wait_for_api
@@ -26,17 +25,10 @@ _all_items: List[Dict[str, Any]] = []
 
 def setup_module():
     wait_for_api()
-    for collection_file_path in get_collection_file_paths():
-        with open(collection_file_path, "r") as f:
-            collection = load(f)
-            _all_collections.append(collection)
-        _all_items_by_collection_id[collection["id"]] = []
-        for item_file_path in get_item_file_paths_for_collection(collection["id"]):
-            with open(item_file_path, "r") as f:
-                _all_items_by_collection_id[collection["id"]].append(load(f))
-    _all_items.extend(
-        [item for sublist in _all_items_by_collection_id.values() for item in sublist]
-    )
+    global _all_collections
+    global _all_items_by_collection_id
+    global _all_items
+    _all_collections, _all_items_by_collection_id, _all_items = get_test_items()
 
 
 def test_get_search_blank():
