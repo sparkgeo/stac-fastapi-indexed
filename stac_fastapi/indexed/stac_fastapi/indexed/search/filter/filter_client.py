@@ -2,7 +2,7 @@ from json import loads
 from typing import Any, Dict, Optional
 
 from fastapi import Request
-from stac_fastapi.types.core import AsyncBaseFiltersClient
+from stac_fastapi.extensions.core.filter.client import AsyncBaseFiltersClient
 
 from stac_fastapi.indexed.constants import collection_wildcard
 from stac_fastapi.indexed.queryables.queryable_field_map import (
