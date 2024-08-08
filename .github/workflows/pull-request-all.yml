@@ -26,6 +26,14 @@ jobs:
       - uses: actions/checkout@v2
       - name: Test
         run: scripts/tests/smoke-test.sh
+  validator-test:
+    name: Execute Validation Tests
+      - smoke-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Test
+        run: scripts/tests/validator-test.sh
   integration-test:
     name: Execute Integration Tests
     needs:

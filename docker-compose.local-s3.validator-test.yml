@@ -1,0 +1,11 @@
+services:
+  validator:
+    image: sparkgeo/stac_fastapi_indexed_validator
+    build:
+      context: .
+      dockerfile: ./docker/tests/validator/Dockerfile
+    environment:
+      API_ROOT_PATH: http://api/
+      API_HEALTHCHECK: http://api/_mgmt/ping
+    depends_on:
+      - api
