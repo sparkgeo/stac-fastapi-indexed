@@ -24,7 +24,11 @@ from stac_fastapi.indexed.core import CoreCrudClient
 from stac_fastapi.indexed.db import connect_to_db, disconnect_from_db
 from stac_fastapi.indexed.middleware.request_log_middleware import RequestLogMiddleware
 from stac_fastapi.indexed.search.filter.filter_client import FiltersClient
-from stac_fastapi.indexed.search.search_get_request import SearchGetRequest
+from stac_fastapi.indexed.search.types import (
+    BBOX3DCompatible,
+    SearchGetRequest,
+    SearchPostRequest,
+)
 from stac_fastapi.indexed.settings import get_settings
 from stac_fastapi.indexed.sortables.routes import add_routes as add_sortables_routes
 
@@ -37,7 +41,7 @@ extensions_map = {
 }
 
 extensions = list(extensions_map.values())
-post_request_model = create_post_request_model(extensions)
+post_request_model = create_post_request_model(extensions, base_model=SearchPostRequest)
 
 
 def fastapi_factory() -> FastAPI:
@@ -60,10 +64,11 @@ api = StacApi(
     items_get_request_model=create_request_model(
         "ItemCollectionURI",
         base_model=ItemCollectionUri,
-        mixins=[TokenPaginationExtension().GET],
+        mixins=[TokenPaginationExtension().GET, BBOX3DCompatible],
     ),
     search_get_request_model=create_get_request_model(
-        extensions, base_model=SearchGetRequest
+        extensions,
+        base_model=SearchGetRequest,
     ),
     search_post_request_model=post_request_model,
     middlewares=[
