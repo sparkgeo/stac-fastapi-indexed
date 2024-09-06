@@ -1,5 +1,6 @@
-import os
+from logging import Logger, getLogger
 from os import getenv
+from typing import Final
 
 from fastapi import FastAPI
 from fastapi.middleware import Middleware
@@ -25,6 +26,8 @@ from stac_fastapi.indexed.search.search_get_request import SearchGetRequest
 from stac_fastapi.indexed.settings import get_settings
 from stac_fastapi.indexed.sortables.routes import add_routes as add_sortables_routes
 
+_logger: Final[Logger] = getLogger(__file__)
+
 extensions_map = {
     "sort": SortExtension(),
     "pagination": TokenPaginationExtension(),
@@ -35,16 +38,19 @@ extensions = list(extensions_map.values())
 post_request_model = create_post_request_model(extensions)
 
 
-def fastapi_factory(stage: str) -> FastAPI:
-    if stage:
-        fast_api_app = FastAPI(root_path=f"/{stage}", docs_url="/api.html")
-    else:
-        fast_api_app = FastAPI(docs_url="/api.html")
-    return fast_api_app
+def fastapi_factory() -> FastAPI:
+    fapi_args = {
+        "docs_url": "/api.html",
+    }
+    api_stage = get_settings().deployment_stage
+    if api_stage is not None:
+        fapi_args["root_path"] = f"/{api_stage}"
+    _logger.info(f"configuring FastAPI with {fapi_args}")
+    return FastAPI(**fapi_args)
 
 
 api = StacApi(
-    app=fastapi_factory(os.environ.get("API_STAGE", "")),
+    app=fastapi_factory(),
     settings=get_settings(),
     extensions=extensions,
     client=CoreCrudClient(post_request_model=post_request_model),  # type: ignore
