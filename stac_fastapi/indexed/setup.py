@@ -6,6 +6,7 @@ setup(
     python_requires=">=3.12",
     packages=find_namespace_packages(),
     install_requires=[
+        "asgi-correlation-id~=4.3.3",
         "duckdb~=1.0.0",
         "orjson",
         "pydantic-settings",  # don't specify a version, determined by stac-pydantic

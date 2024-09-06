@@ -2,6 +2,7 @@ from logging import Logger, getLogger
 from os import getenv
 from typing import Final
 
+from asgi_correlation_id import CorrelationIdMiddleware
 from fastapi import FastAPI
 from fastapi.middleware import Middleware
 from fastapi.responses import ORJSONResponse
@@ -21,6 +22,7 @@ from stac_fastapi.extensions.core import (
 
 from stac_fastapi.indexed.core import CoreCrudClient
 from stac_fastapi.indexed.db import connect_to_db, disconnect_from_db
+from stac_fastapi.indexed.middleware.request_log_middleware import RequestLogMiddleware
 from stac_fastapi.indexed.search.filter.filter_client import FiltersClient
 from stac_fastapi.indexed.search.search_get_request import SearchGetRequest
 from stac_fastapi.indexed.settings import get_settings
@@ -64,7 +66,12 @@ api = StacApi(
         extensions, base_model=SearchGetRequest
     ),
     search_post_request_model=post_request_model,
-    middlewares=[Middleware(CORSMiddleware), Middleware(ProxyHeaderMiddleware)],
+    middlewares=[
+        Middleware(CORSMiddleware),
+        Middleware(ProxyHeaderMiddleware),
+        Middleware(RequestLogMiddleware),
+        Middleware(CorrelationIdMiddleware),
+    ],
 )
 app = api.app
 add_sortables_routes(app)
