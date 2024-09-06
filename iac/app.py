@@ -1,15 +1,14 @@
-#!/usr/bin/env python3
-import os
-
 import aws_cdk as cdk
-
 from cdk_deployment.cdk_deployment_stack import CdkDeploymentStack
-
 
 app = cdk.App()
 CdkDeploymentStack(
     app,
-    "StacServerlessApiStack",
+    "STAC-API-Serverless",
+    env=cdk.Environment(
+        account=app.node.get_context("AWS_ACCOUNT"),
+        region=app.node.get_context("AWS_REGION"),
+    ),
     # If you don't specify 'env', this stack will be environment-agnostic.
     # Account/Region-dependent features and context lookups will not work,
     # but a single synthesized template can be deployed anywhere.

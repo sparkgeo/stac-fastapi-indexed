@@ -14,6 +14,7 @@ class _Settings(ApiSettings):
     s3_endpoint: Optional[str] = None
     permit_boto_debug: bool = False
     duckdb_threads: Optional[int] = None
+    deployment_stage: Optional[str] = None
 
 
 @lru_cache(maxsize=1)
