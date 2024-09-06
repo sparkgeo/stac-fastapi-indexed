@@ -8,5 +8,6 @@ pip install -e ./stac_index/common[dev]
 pip install -e ./stac_index/reader/s3[dev]
 pip install -e ./stac_index/indexer[dev]
 pip install -e ./stac_fastapi/indexed[dev,server,test]
+pip install -r ./iac/requirements.txt
 
 pre-commit install

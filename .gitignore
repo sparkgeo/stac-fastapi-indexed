@@ -5,6 +5,7 @@
 **/.venv
 data/index/**
 data/STAC/pc_partial_data/data/**
+data/STAC/sample-alt*
 stac_index/indexer/stac_index/indexer/index_data/**
 minio/mc/config/**
 !**/.gitkeep
