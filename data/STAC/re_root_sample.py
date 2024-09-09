@@ -3,12 +3,12 @@ from json import dump, load
 from os import makedirs, path
 from typing import Final
 
-replaceable_path_prefix: Final[str] = "s3://stac/sample/"
-source_root: Final[str] = path.join(path.dirname(__file__), "sample", "data")
-target_root: Final[str] = path.join(path.dirname(__file__), "sample-alt")
+replaceable_path_prefix: Final[str] = "/data/"
+source_root_default: Final[str] = path.join(path.dirname(__file__), "sample", "data")
+target_root_default: Final[str] = path.join(path.dirname(__file__), "sample-alt")
 
 
-def main(new_link_href_root: str) -> None:
+def main(new_link_href_root: str, source_root: str, target_root: str) -> None:
     with open(path.join(source_root, "catalog.json"), "r") as f:
         catalog = load(f)
 
@@ -110,5 +110,19 @@ if __name__ == "__main__":
         type=str,
         help=f"Replacement string for {replaceable_path_prefix} in STAC link hrefs",
     )
+    parser.add_argument(
+        "--source_root",
+        type=str,
+        help=f"Optional source data root path, defaults to {source_root_default}",
+        default=[source_root_default],
+        nargs=1,
+    )
+    parser.add_argument(
+        "--target_root",
+        type=str,
+        help=f"Optional target data root path, defaults to {target_root_default}",
+        default=[target_root_default],
+        nargs=1,
+    )
     args = parser.parse_args()
-    main(args.new_link_href_root)
+    main(args.new_link_href_root, args.source_root[0], args.target_root[0])

@@ -5,6 +5,14 @@ x-minio-environment: &minio-environment
   AWS_SECRET_ACCESS_KEY: miniopassword
 
 services:
+  re-rooter:
+    image: python:3.12-slim
+    volumes:
+      - "./data/STAC/re_root_sample.py:/re_root_sample.py:ro"
+      - "./data/STAC/sample/data:/input:ro"
+      - "re-rooted-stac:/output:rw"
+    command: python -m re_root_sample s3://stac/sample/ --source_root /input --target_root /output
+
   minio:
     image: minio/minio:RELEASE.2024-06-11T03-13-30Z
     command: server /data --console-address ":9001" --quiet
@@ -13,6 +21,9 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
+    depends_on:
+      re-rooter:
+        condition: service_completed_successfully
     healthcheck:
       test: timeout 10s bash -c ':> /dev/tcp/127.0.0.1/9001' || exit 1
       interval: 1s
@@ -26,7 +37,7 @@ services:
       <<: *minio-environment
     volumes:
       - "./docker/minio/mc/entrypoint.sh:/entrypoint.sh:ro"
-      - "./data/STAC/sample/data/:/stac/sample:ro"
+      - "re-rooted-stac:/stac/sample:ro"
     depends_on:
       minio:
         condition: service_healthy
@@ -41,10 +52,11 @@ services:
       <<: *minio-environment
       stac_index_indexer_output_dir: /output
       stac_index_reader_s3_endpoint: http://minio:9000
+      INDEX_CATALOG_ROOT_PATH: s3://stac/sample/catalog.json
     volumes:
       - "indexer-output:/output:rw"
       - "./data/STAC/sample/index-config.json:/index-config.json:ro"
-    command: "python -m stac_index.indexer.index /index-config.json"
+    command: /command.sh
     depends_on:
       minio-sample-loader:
         condition: service_completed_successfully
@@ -72,4 +84,5 @@ services:
         condition: service_completed_successfully
 
 volumes:
+  re-rooted-stac:
   indexer-output:

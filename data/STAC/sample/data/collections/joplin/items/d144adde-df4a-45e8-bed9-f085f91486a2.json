@@ -6,7 +6,7 @@
     {
       "rel": "self",
       "type": "application/geo+json",
-      "href": "s3://stac/sample/collections/joplin/items/d144adde-df4a-45e8-bed9-f085f91486a2.json"
+      "href": "/data/collections/joplin/items/d144adde-df4a-45e8-bed9-f085f91486a2.json"
     }
   ],
   "geometry": {
