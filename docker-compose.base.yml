@@ -9,10 +9,6 @@ services:
       # create a new secret for each environment
       stac_api_indexed_token_jwt_secret: TtAeeoQ8Vr3w9yiCuE5rrbO6uIQ3Saxqu5vJmjAENVI=
       stac_api_indexed_log_level: debug
-    volumes:
-      - "./stac_index/common/stac_index/common:/app/stac_index/common/stac_index/common:rw"
-      - "./stac_index/reader/s3/stac_index/reader/s3:/app/stac_index/reader/s3/stac_index/reader/s3:rw"
-      - "./stac_fastapi/indexed/stac_fastapi/indexed:/app/stac_fastapi/indexed/stac_fastapi/indexed:rw"
     healthcheck:
       test: curl --fail http://localhost/_mgmt/ping
       interval: 5s
