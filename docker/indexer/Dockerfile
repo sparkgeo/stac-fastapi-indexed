@@ -17,4 +17,4 @@ RUN pip install -e stac_index/reader/filesystem
 RUN pip install -e stac_index/reader/s3
 RUN pip install -e stac_index/indexer
 
-CMD ["python", "-m", "stac_index.indexer.index", "--help"]
+CMD ["/command.sh"]

@@ -56,7 +56,6 @@ services:
     volumes:
       - "indexer-output:/output:rw"
       - "./data/STAC/sample/index-config.json:/index-config.json:ro"
-    command: /command.sh
     depends_on:
       minio-sample-loader:
         condition: service_completed_successfully
