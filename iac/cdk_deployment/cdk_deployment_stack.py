@@ -8,6 +8,10 @@ from constructs import Construct
 
 
 class CdkDeploymentStack(Stack):
+    # This sample deployment uses S3 to host the STAC JSON data and Parquet index.
+    # Configured differently it could exclude S3 and host JSON and Parquet on the API container's filesystem,
+    # which would demonstrate better performance but potentially a less realistic deployment scenario.
+
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
         deploy_stage = self.node.try_get_context("DEPLOY_STAGE") or "dev"

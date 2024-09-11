@@ -5,8 +5,6 @@ RUN apt-get update --fix-missing \
   curl \
   && rm -rf /var/lib/apt/lists/*
 
-COPY data/STAC/sample/data /data
-
 WORKDIR /app
 COPY stac_index/common ./stac_index/common
 COPY stac_index/reader ./stac_index/reader

@@ -3,12 +3,10 @@
 .idea
 **/cdk.out
 **/.venv
-stac_index/indexer/stac_index/indexer/index_data/**
 minio/mc/config/**
 !**/.gitkeep
 .autoenv*.zsh
 .vscode
 **/.DS_Store
 **/._.DS_Store
-todo.md
 .env
