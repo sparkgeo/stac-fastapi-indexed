@@ -9,23 +9,23 @@
     {
       "rel": "self",
       "type": "application/json",
-      "href": "s3://stac/sample/catalog.json"
+      "href": "/data/catalog.json"
     },
     {
       "rel": "root",
       "type": "application/json",
-      "href": "s3://stac/sample/catalog.json"
+      "href": "/data/catalog.json"
     },
     {
       "rel": "data",
       "type": "application/json",
-      "href": "s3://stac/sample/collections"
+      "href": "/data/collections"
     },
     {
       "rel": "child",
       "type": "application/json",
       "title": "Joplin Collection",
-      "href": "s3://stac/sample/collections/joplin.json"
+      "href": "/data/collections/joplin.json"
     }
   ],
   "stac_extensions": []
