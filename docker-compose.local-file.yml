@@ -1,0 +1,26 @@
+services:
+
+  sample-indexer:
+    build:
+      dockerfile: docker/indexer/Dockerfile
+      context: .
+    image: sparkgeo/stac_indexer
+    environment:
+      stac_index_indexer_output_dir: /output
+    volumes:
+      - indexer-output:/output:rw
+      - ./data/STAC/sample/data:/data:ro
+      - ./data/STAC/sample/index-config.json:/index-config.json:ro
+
+  api:
+    volumes:
+      - ./data/STAC/sample/data:/data:ro
+      - indexer-output:/index:ro
+    environment:
+      stac_api_indexed_parquet_index_source_uri: /index/parquet
+    depends_on:
+      sample-indexer:
+        condition: service_completed_successfully
+
+volumes:
+  indexer-output:
