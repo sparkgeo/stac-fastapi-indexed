@@ -17,6 +17,10 @@ RUN pip install -r /requirements-reader-filesystem-generated.txt
 RUN pip install -r /requirements-reader-s3-generated.txt
 RUN pip install -r /requirements-api-generated.txt
 
+# Install DuckDB extensions in image rather than waiting for FastAPI init to install them.
+# This should result in shorter startup times.
+RUN python -c "import duckdb; duckdb.execute('install spatial'); duckdb.execute('install httpfs')"
+
 WORKDIR /app
 COPY stac_index/common ./stac_index/common
 COPY stac_index/reader ./stac_index/reader
