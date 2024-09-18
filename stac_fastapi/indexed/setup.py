@@ -18,11 +18,14 @@ setup(
         "stac-fastapi.extensions~=3.0.0",
         "stac-fastapi.types~=3.0.0",
         "stac-pydantic~=3.1.0",
-        "stac-index.common",
     ],
     extras_require={
         "dev": [
+            "pip-tools~=7.4.1",
             "pre-commit>=3.6.2,<4.0",
+        ],
+        "local-deps": [  # managed separately to support generation of pypi-only requirements.txt files for #88
+            "stac-index.common==0.1.0",
         ],
         "server": [
             "uvicorn~=0.30.1",

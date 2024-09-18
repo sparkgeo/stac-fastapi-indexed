@@ -7,6 +7,16 @@ RUN apt-get update --fix-missing \
 
 COPY docker/indexer/command.sh /command.sh
 
+# see scripts/update-requirements.sh for detail on generated requirements
+COPY docker/requirements-index-common-generated.txt /requirements-index-common-generated.txt
+COPY docker/requirements-indexer-generated.txt /requirements-indexer-generated.txt
+COPY docker/requirements-reader-filesystem-generated.txt /requirements-reader-filesystem-generated.txt
+COPY docker/requirements-reader-s3-generated.txt /requirements-reader-s3-generated.txt
+RUN pip install -r /requirements-index-common-generated.txt
+RUN pip install -r /requirements-indexer-generated.txt
+RUN pip install -r /requirements-reader-filesystem-generated.txt
+RUN pip install -r /requirements-reader-s3-generated.txt
+
 WORKDIR /app
 COPY stac_index/common ./stac_index/common
 COPY stac_index/reader ./stac_index/reader
@@ -15,6 +25,6 @@ COPY stac_index/indexer ./stac_index/indexer
 RUN pip install -e stac_index/common
 RUN pip install -e stac_index/reader/filesystem
 RUN pip install -e stac_index/reader/s3
-RUN pip install -e stac_index/indexer
+RUN pip install -e stac_index/indexer[local-deps]
 
 CMD ["/command.sh"]
