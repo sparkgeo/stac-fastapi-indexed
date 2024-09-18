@@ -11,11 +11,13 @@ setup(
         "shapely~=2.0.4",
         "stac-fastapi.types~=3.0.0a2",
         "stac-pydantic~=3.1.0",
-        "stac-index.common",
     ],
     extras_require={
         "dev": [
             "pre-commit>=3.6.2,<4.0",
+        ],
+        "local-deps": [  # managed separately to support generation of pypi-only requirements.txt files for #88
+            "stac-index.common==0.1.0",
         ],
     },
 )
