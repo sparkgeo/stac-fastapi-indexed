@@ -13,4 +13,8 @@ RUN pip install -e stac_index/reader/s3
 RUN pip install -e stac_fastapi/indexed[server]
 RUN pip install -e stac_fastapi/indexed[lambda]
 
+# Install DuckDB extensions in image rather than waiting for FastAPI init to install them.
+# This should result in shorter cold-boot times.
+RUN python -c "import duckdb; duckdb.execute('install spatial'); duckdb.execute('install httpfs')"
+
 CMD ["stac_fastapi.indexed.app.handler"]
