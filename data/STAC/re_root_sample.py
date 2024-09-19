@@ -3,12 +3,17 @@ from json import dump, load
 from os import makedirs, path
 from typing import Final
 
-replaceable_path_prefix: Final[str] = "/data/"
+replaceable_path_prefix_default: Final[str] = "/data/"
 source_root_default: Final[str] = path.join(path.dirname(__file__), "sample", "data")
 target_root_default: Final[str] = path.join(path.dirname(__file__), "sample-alt")
 
 
-def main(new_link_href_root: str, source_root: str, target_root: str) -> None:
+def main(
+    new_link_href_root: str,
+    source_root: str,
+    target_root: str,
+    replaceable_path_prefix: str,
+) -> None:
     with open(path.join(source_root, "catalog.json"), "r") as f:
         catalog = load(f)
 
@@ -111,7 +116,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "new_link_href_root",
         type=str,
-        help=f"Replacement string for {replaceable_path_prefix} in STAC link hrefs",
+        help="Replacement string for 'replaceable_path_prefix' in STAC link hrefs",
     )
     parser.add_argument(
         "--source_root",
@@ -127,5 +132,17 @@ if __name__ == "__main__":
         default=[target_root_default],
         nargs=1,
     )
+    parser.add_argument(
+        "--replaceable_path_prefix",
+        type=str,
+        help=f"Optional path prefix to replace, defaults to '{replaceable_path_prefix_default}'",
+        default=[replaceable_path_prefix_default],
+        nargs=1,
+    )
     args = parser.parse_args()
-    main(args.new_link_href_root, args.source_root[0], args.target_root[0])
+    main(
+        args.new_link_href_root,
+        args.source_root[0],
+        args.target_root[0],
+        args.replaceable_path_prefix[0],
+    )
