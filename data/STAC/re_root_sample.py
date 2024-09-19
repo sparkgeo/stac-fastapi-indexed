@@ -64,6 +64,7 @@ def main(new_link_href_root: str, source_root: str, target_root: str) -> None:
                     )
 
         collection_out_path = collection_in_path.replace(source_root, target_root)
+        makedirs(path.dirname(collection_out_path), exist_ok=True)
         with open(collection_out_path, "w") as f:
             dump(
                 {
@@ -82,7 +83,9 @@ def main(new_link_href_root: str, source_root: str, target_root: str) -> None:
                 indent=2,
             )
 
-    with open(path.join(target_root, "catalog.json"), "w") as f:
+    catalog_out_path = path.join(target_root, "catalog.json")
+    makedirs(path.dirname(catalog_out_path), exist_ok=True)
+    with open(catalog_out_path, "w") as f:
         dump(
             {
                 **catalog,
