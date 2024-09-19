@@ -28,7 +28,11 @@ def main(
         )
 
         with open(collection_in_path, "r") as f:
-            collection = load(f)
+            try:
+                collection = load(f)
+            except Exception:
+                print(f"failed to open collection '{collection_in_path}'")
+                continue
 
         for item_link_dict in [
             entry for entry in collection["links"] if entry["rel"] == "items"
@@ -45,7 +49,11 @@ def main(
                 )
             ):
                 with open(item_in_path, "r") as f:
-                    item = load(f)
+                    try:
+                        item = load(f)
+                    except Exception:
+                        print(f"failed to open item '{item_in_path}'")
+                        continue
 
                 item_out_path = item_in_path.replace(source_root, target_root)
                 makedirs(path.dirname(item_out_path), exist_ok=True)
