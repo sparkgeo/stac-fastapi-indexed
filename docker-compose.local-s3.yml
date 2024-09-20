@@ -11,7 +11,7 @@ services:
       - "./data/STAC/re_root_stac.py:/re_root_stac.py:ro"
       - "./data/STAC/sample/data:/input:ro"
       - "re-rooted-stac:/output:rw"
-    command: python -m re_root_stac s3://stac/sample/ --source_root /input --target_root /output
+    command: python -m re_root_stac /data/ s3://stac/sample/ --source_root /input --target_root /output
 
   minio:
     image: minio/minio:RELEASE.2024-06-11T03-13-30Z
