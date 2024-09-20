@@ -1,11 +1,12 @@
 from asyncio import Semaphore, gather
 from dataclasses import dataclass
 from logging import Logger, getLogger
+from re import Pattern, compile, sub
 from threading import Lock
-from typing import Any, Callable, Dict, Final, List, Tuple, cast
+from typing import Any, Callable, Dict, Final, List, Protocol, Tuple, cast
 
 from stac_pydantic import Catalog, Collection, Item
-from stac_pydantic.links import Link
+from stac_pydantic.links import Link, Links
 
 from stac_index.common import source_reader_classes
 from stac_index.common.source_reader import SourceReader
@@ -15,6 +16,11 @@ from stac_index.indexer.types.stac_data import CollectionWithLocation, ItemWithL
 _settings: Final = get_settings()
 _logger: Final[Logger] = getLogger(__file__)
 _item_processor_mutex: Final[Lock] = Lock()
+_link_strip_regex: Final[Pattern] = compile(r"[^/]+$")
+
+
+class _HasLinks(Protocol):
+    links: Links
 
 
 @dataclass
@@ -22,7 +28,7 @@ class Reader:
     root_catalog_uri: str
 
     def __post_init__(self):
-        self._source_reader: SourceReader = None
+        self._source_reader = None
 
     # currently assumes only one uri-style for the entire catalog
     def _get_source_reader_for_uri(self, uri: str) -> SourceReader:
@@ -48,11 +54,13 @@ class Reader:
                 f"Could not read or parse root catalog at '{self.root_catalog_uri}'",
                 e,
             )
-        if not self._hasMatchingSelfLink(catalog, self.root_catalog_uri):
+        if not self._has_matching_self_link(catalog, self.root_catalog_uri):
             _logger.warn(
                 f"Root catalog self link is incorrect and does not match '{self.root_catalog_uri}'"
             )
-        return Catalog(**dict_catalog)
+        catalog = Catalog(**dict_catalog)
+        self._expand_relative_links(catalog, self.root_catalog_uri)
+        return catalog
 
     async def get_collections(
         self, root_catalog: Catalog
@@ -77,19 +85,19 @@ class Reader:
                         )
                     )
                     continue
-                if not self._hasMatchingSelfLink(collection, collection_path):
+                if not self._has_matching_self_link(collection, collection_path):
                     _logger.warn(
                         "Collection '{}' self link is incorrect and does not match '{}'".format(
                             collection.id,
                             collection_path,
                         )
                     )
-                collections.append(
-                    CollectionWithLocation(
-                        **dict_collection,
-                        location=collection_path,
-                    )
+                collection = CollectionWithLocation(
+                    **dict_collection,
+                    location=collection_path,
                 )
+                self._expand_relative_links(collection, collection_path)
+                collections.append(collection)
         return (collections, errors)
 
     async def process_items(
@@ -131,8 +139,8 @@ class Reader:
                         )
                     )
                 else:
-                    if not self._hasMatchingSelfLink(item, uri):
-                        _logger.warn(
+                    if not self._has_matching_self_link(item, uri):
+                        _logger.debug(
                             "Item '{}' self link is incorrect and does not match '{}'".format(
                                 item.id,
                                 uri,
@@ -157,32 +165,57 @@ class Reader:
             )
             for item_errors in sublist
         )
-        _logger.info("completed processing {len(item_uris)} items")
+        _logger.info(f"completed processing {len(item_uris)} items")
 
         return all_errors
 
     async def _get_collection_item_uris(
         self, collection: Collection, semaphore: Semaphore
     ) -> List[str]:
-        async with semaphore:
-            for link in collection.links.link_iterator():
-                link = cast(Link, link)
-                if link.rel == "items":
-                    collection_item_uris = await self._get_source_reader_for_uri(
-                        link.href
-                    ).list_uris_by_prefix(
-                        uri_prefix=link.href,
-                        list_limit=_settings.test_collection_item_limit,
-                    )
-                    _logger.info(
-                        f"identifying items for collection '{collection.id}': {len(collection_item_uris)}"
-                    )
-                    return collection_item_uris
+        collection_item_links = [
+            link for link in collection.links.link_iterator() if link.rel == "item"
+        ]
+        _logger.info(f"getting collection item URIs: {len(collection_item_links)}")
+        if len(collection_item_links) > 0:
+            _logger.info(
+                f"identifying items for collection '{collection.id}' via item links: {len(collection_item_links)}"
+            )
+            return [link.href for link in collection_item_links][
+                : _settings.test_collection_item_limit
+            ]
+        else:
+            async with semaphore:
+                for link in collection.links.link_iterator():
+                    if link.rel == "items":
+                        collection_item_uris = await self._get_source_reader_for_uri(
+                            link.href
+                        ).list_uris_by_prefix(
+                            uri_prefix=link.href,
+                            list_limit=_settings.test_collection_item_limit,
+                        )
+                        _logger.info(
+                            f"identifying items for collection '{collection.id}' via prefix listing: {len(collection_item_uris)}"
+                        )
+                        return collection_item_uris
 
-    def _hasMatchingSelfLink(
-        self, with_links: Catalog | Collection | Item, expected_url: str
+    def _has_matching_self_link(
+        self, links_provider: _HasLinks, expected_url: str
     ) -> bool:
-        for link in with_links.links.link_iterator():
+        for link in links_provider.links.link_iterator():
             if link.rel == "self":
                 return link.href == expected_url
         return False
+
+    def _expand_relative_links(
+        self, links_provider: _HasLinks, provider_href: str
+    ) -> None:
+        for link in links_provider.links.link_iterator():
+            if link.href.startswith("."):
+                _logger.debug(
+                    f"expanding relative link '{link.href}' from '{provider_href}'"
+                )
+                link.href = "{}{}".format(
+                    sub(_link_strip_regex, "", provider_href),
+                    link.href,
+                )
+                _logger.debug(f"new link: '{link.href}'")

@@ -19,7 +19,9 @@ class SourceReader(ABC):
         list_limit: Optional[int] = None,
         uri_suffix: Optional[str] = None,
     ) -> List[str]:
-        raise NotImplementedError("Reader does not implement this function")
+        raise NotImplementedError(
+            "Reader does not implement this function. If you hit this error something is going wrong"
+        )
 
     async def load_json_from_uri(self, uri: str) -> Dict[str, Any]:
         return loads(await self.get_uri_as_string(uri))

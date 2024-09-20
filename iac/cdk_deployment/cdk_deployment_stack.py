@@ -18,7 +18,7 @@ class CdkDeploymentStack(Stack):
         bucket = Bucket(self, id="data-bucket", encryption=BucketEncryption.S3_MANAGED)
         api_env_var_prefix = "stac_api_indexed_"
         environment = {
-            f"{api_env_var_prefix}parquet_index_source_uri": "s3://{}/parquet".format(
+            f"{api_env_var_prefix}index_manifest_uri": "s3://{}/parquet/manifest.json".format(
                 bucket.bucket_name
             ),
             f"{api_env_var_prefix}token_jwt_secret": self.node.get_context(

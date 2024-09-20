@@ -19,22 +19,22 @@ class HttpsSourceReader(SourceReader):
     def __init__(self):
         super().__init__()
         _logger.info("creating HTTPS Reader")
-        self.session = ClientSession()
 
     async def get_uri_as_string(self, uri: str) -> str:
         try:
             start = time()
-            async with self.session.get(uri) as response:
-                if response.status == 200:
-                    content = await response.text()
-                    _logger.debug(
-                        "HTTPS: fetched '{}' in {}s".format(
-                            uri,
-                            round(time() - start, 3),
+            async with ClientSession() as session:
+                async with session.get(uri) as response:
+                    if response.status == 200:
+                        content = await response.text()
+                        _logger.debug(
+                            "HTTPS: fetched '{}' in {}s".format(
+                                uri,
+                                round(time() - start, 3),
+                            )
                         )
-                    )
-                    return content
-                else:
-                    return f"Unable to read '{uri}' ({response.status})"
+                        return content
+                    else:
+                        return f"Unable to read '{uri}' ({response.status})"
         except Exception as e:
             raise Exception(f"Unable to read '{uri}'", e)
