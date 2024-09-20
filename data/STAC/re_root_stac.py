@@ -3,16 +3,15 @@ from json import dump, load
 from os import makedirs, path
 from typing import Final
 
-replaceable_path_prefix_default: Final[str] = "/data/"
 source_root_default: Final[str] = path.join(path.dirname(__file__), "sample", "data")
 target_root_default: Final[str] = path.join(path.dirname(__file__), "sample-alt")
 
 
 def main(
-    new_link_href_root: str,
+    old_link_prefix: str,
+    new_link_prefix: str,
     source_root: str,
     target_root: str,
-    replaceable_path_prefix: str,
 ) -> None:
     with open(path.join(source_root, "catalog.json"), "r") as f:
         catalog = load(f)
@@ -22,9 +21,7 @@ def main(
     ]:
         collection_in_path = path.join(
             source_root,
-            *str(child_link_dict["href"])
-            .replace(replaceable_path_prefix, "")
-            .split("/"),
+            *str(child_link_dict["href"]).replace(old_link_prefix, "").split("/"),
         )
 
         with open(collection_in_path, "r") as f:
@@ -42,7 +39,7 @@ def main(
                     path.join(
                         source_root,
                         *str(item_link_dict["href"])
-                        .replace(replaceable_path_prefix, "")
+                        .replace(old_link_prefix, "")
                         .split("/"),
                     ),
                     "*.json",
@@ -66,7 +63,7 @@ def main(
                                 {
                                     **link,
                                     "href": str(link["href"]).replace(
-                                        replaceable_path_prefix, new_link_href_root
+                                        old_link_prefix, new_link_prefix
                                     ),
                                 }
                                 for link in item["links"]
@@ -86,7 +83,7 @@ def main(
                         {
                             **link,
                             "href": str(link["href"]).replace(
-                                replaceable_path_prefix, new_link_href_root
+                                old_link_prefix, new_link_prefix
                             ),
                         }
                         for link in collection["links"]
@@ -106,7 +103,7 @@ def main(
                     {
                         **link,
                         "href": str(link["href"]).replace(
-                            replaceable_path_prefix, new_link_href_root
+                            old_link_prefix, new_link_prefix
                         ),
                     }
                     for link in catalog["links"]
@@ -122,9 +119,14 @@ if __name__ == "__main__":
 
     parser = ArgumentParser()
     parser.add_argument(
-        "new_link_href_root",
+        "old_link_prefix",
         type=str,
-        help="Replacement string for 'replaceable_path_prefix' in STAC link hrefs",
+        help="STAC link path prefix to replace",
+    )
+    parser.add_argument(
+        "new_link_prefix",
+        type=str,
+        help="Replacement for STAC link path prefix",
     )
     parser.add_argument(
         "--source_root",
@@ -140,17 +142,10 @@ if __name__ == "__main__":
         default=[target_root_default],
         nargs=1,
     )
-    parser.add_argument(
-        "--replaceable_path_prefix",
-        type=str,
-        help=f"Optional path prefix to replace, defaults to '{replaceable_path_prefix_default}'",
-        default=[replaceable_path_prefix_default],
-        nargs=1,
-    )
     args = parser.parse_args()
     main(
-        args.new_link_href_root,
+        args.old_link_prefix,
+        args.new_link_prefix,
         args.source_root[0],
         args.target_root[0],
-        args.replaceable_path_prefix[0],
     )
