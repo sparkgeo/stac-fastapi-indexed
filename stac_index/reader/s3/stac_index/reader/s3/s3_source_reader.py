@@ -60,13 +60,10 @@ class S3SourceReader(SourceReader):
         )
         return response
 
-    async def list_uris_by_prefix(
-        self,
-        uri_prefix: str,
-        list_limit: Optional[int] = None,
-        uri_suffix: Optional[str] = None,
-    ) -> List[str]:
-        bucket, prefix = self._get_s3_key_parts(uri_prefix)
+    async def get_item_uris_from_items_uri(
+        self, uri: str, item_limit: Optional[int] = None
+    ) -> Tuple[List[str], List[str]]:
+        bucket, prefix = self._get_s3_key_parts(uri)
         next_token = None
         all_keys: List[str] = []
         while True:
@@ -86,12 +83,11 @@ class S3SourceReader(SourceReader):
             if "Contents" in response:
                 for object in response["Contents"]:
                     key: str = object["Key"]
-                    if uri_suffix is None or key.endswith(uri_suffix):
-                        all_keys.append(f"s3://{bucket}/{key}")
-                        if list_limit is not None and len(all_keys) == list_limit:
-                            return all_keys
+                    all_keys.append(f"s3://{bucket}/{key}")
+                    if item_limit is not None and len(all_keys) == item_limit:
+                        return (all_keys, [])
             if response.get("IsTruncated"):
                 next_token = response.get("NextContinuationToken")
             else:
                 break
-        return all_keys
+        return (all_keys, [])

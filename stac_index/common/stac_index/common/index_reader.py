@@ -28,7 +28,6 @@ class IndexReader:
         manifest = IndexManifest(
             **await self._source_reader.load_json_from_uri(self.index_manifest_uri)
         )
-        print(manifest)
         return {
             table_name: "/".join(
                 self.index_manifest_uri.split("/")[:-1] + [metadata.relative_path]

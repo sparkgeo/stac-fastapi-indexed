@@ -1,7 +1,7 @@
 from logging import Logger, getLogger
 from re import Pattern, compile, match
 from time import time
-from typing import Final
+from typing import Any, Dict, Final, List, Optional, Tuple, cast
 
 from aiohttp import ClientSession
 
@@ -38,3 +38,43 @@ class HttpsSourceReader(SourceReader):
                         return f"Unable to read '{uri}' ({response.status})"
         except Exception as e:
             raise Exception(f"Unable to read '{uri}'", e)
+
+    # This function interacts with HTTP endpoints inefficiently.
+    # See https://github.com/sparkgeo/STAC-API-Serverless/issues/98 for thoughts on this.
+    async def get_item_uris_from_items_uri(
+        self, uri: str, item_limit: Optional[int] = None
+    ) -> Tuple[List[str], List[str]]:
+        # assume this is a STAC API, otherwise no standard way to parse the response
+        item_uris: List[str] = []
+        errors: List[str] = []
+        next_items_uri: str | None = uri
+        while next_items_uri is not None:
+            items_response: Dict[str, Any] = await self.load_json_from_uri(
+                next_items_uri
+            )
+            if not isinstance(items_response, dict):
+                errors.append(f"unexpected response from '{uri}'")
+                continue
+            for item in items_response.get("features", []):
+                for link in cast(Dict[str, Any], item).get("links", []):
+                    link = cast(Dict[str, str], link)
+                    if link.get("rel", "") == "self":
+                        if "href" in link:
+                            item_uris.append(link["href"])
+                            break
+            if item_limit is not None and len(item_uris) == item_limit:
+                break
+            next_links = [
+                link
+                for link in items_response.get("links", [])
+                if link.get("rel", "") == "next"
+                and link.get("method", "GET").upper() == "GET"
+            ]
+            if len(next_links) == 1:
+                if "href" in next_links[0]:
+                    next_items_uri = next_links[0]["href"]
+                else:
+                    next_items_uri = None
+            else:
+                next_items_uri = None
+        return (item_uris, errors)

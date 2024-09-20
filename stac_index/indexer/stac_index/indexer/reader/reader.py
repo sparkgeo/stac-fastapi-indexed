@@ -31,18 +31,20 @@ class Reader:
         self._source_reader = None
 
     # currently assumes only one uri-style for the entire catalog
-    def _get_source_reader_for_uri(self, uri: str) -> SourceReader:
+    def _get_source_reader_for_uri(self) -> SourceReader:
         if self._source_reader is None:
             for reader_class in source_reader_classes:
-                if reader_class.can_handle_uri(uri):
+                if reader_class.can_handle_uri(self.root_catalog_uri):
                     self._source_reader = reader_class()
                     break
         if self._source_reader is None:
-            raise Exception(f"unable to locate reader capable of reading '{uri}'")
+            raise Exception(
+                f"unable to locate reader capable of reading '{self.root_catalog_uri}'"
+            )
         return self._source_reader
 
     async def _get_json_content_from_uri(self, uri: str) -> Dict[str, Any]:
-        return await self._get_source_reader_for_uri(uri).load_json_from_uri(uri)
+        return await self._get_source_reader_for_uri().load_json_from_uri(uri)
 
     async def get_root_catalog(self) -> Catalog:
         _logger.info("reading root catalog")
@@ -110,19 +112,17 @@ class Reader:
         item_uris: List[str] = []
         if _settings.test_collection_limit is not None:
             collections = collections[: _settings.test_collection_limit]
-        collection_items_semaphore = Semaphore(get_settings().max_concurrency)
-        item_uris.extend(
-            item_uris
-            for sublist in await gather(
-                *[
-                    self._get_collection_item_uris(
-                        collection, collection_items_semaphore
-                    )
-                    for collection in collections
-                ]
-            )
-            for item_uris in sublist
+        results = await gather(
+            *[
+                self._get_collection_item_uris(
+                    collection, Semaphore(get_settings().max_concurrency)
+                )
+                for collection in collections
+            ]
         )
+        for result in results:
+            item_uris.extend(result[0])
+            all_errors.extend(result[1])
 
         async def fetch_and_ingest(uri: str, semaphore: Semaphore) -> List[str]:
             async with semaphore:
@@ -171,32 +171,41 @@ class Reader:
 
     async def _get_collection_item_uris(
         self, collection: Collection, semaphore: Semaphore
-    ) -> List[str]:
-        collection_item_links = [
-            link for link in collection.links.link_iterator() if link.rel == "item"
+    ) -> Tuple[List[str], List[str]]:
+        item_uris: List[str] = []
+        errors: List[str] = []
+        item_single_uris = [
+            link.href for link in collection.links.link_iterator() if link.rel == "item"
         ]
-        _logger.info(f"getting collection item URIs: {len(collection_item_links)}")
-        if len(collection_item_links) > 0:
-            _logger.info(
-                f"identifying items for collection '{collection.id}' via item links: {len(collection_item_links)}"
-            )
-            return [link.href for link in collection_item_links][
-                : _settings.test_collection_item_limit
-            ]
-        else:
-            async with semaphore:
-                for link in collection.links.link_iterator():
-                    if link.rel == "items":
-                        collection_item_uris = await self._get_source_reader_for_uri(
-                            link.href
-                        ).list_uris_by_prefix(
-                            uri_prefix=link.href,
-                            list_limit=_settings.test_collection_item_limit,
-                        )
-                        _logger.info(
-                            f"identifying items for collection '{collection.id}' via prefix listing: {len(collection_item_uris)}"
-                        )
-                        return collection_item_uris
+        item_uris.extend(
+            [href for href in item_single_uris][: _settings.test_collection_item_limit]
+        )
+        remaining_allowed_links = (
+            None
+            if _settings.test_collection_item_limit is None
+            else _settings.test_collection_item_limit - len(item_uris)
+        )
+        for items_multiple_uri in [
+            link.href
+            for link in collection.links.link_iterator()
+            if link.rel == "items"
+        ]:
+            if remaining_allowed_links is None or remaining_allowed_links > 0:
+                async with semaphore:
+                    (
+                        collection_item_uris,
+                        collection_item_errors,
+                    ) = await self._get_source_reader_for_uri().get_item_uris_from_items_uri(
+                        items_multiple_uri, remaining_allowed_links
+                    )
+                remaining_allowed_links = (
+                    None
+                    if remaining_allowed_links is None
+                    else remaining_allowed_links - len(collection_item_uris)
+                )
+                item_uris.extend(collection_item_uris)
+                errors.extend(collection_item_errors)
+        return (item_uris, errors)
 
     def _has_matching_self_link(
         self, links_provider: _HasLinks, expected_url: str

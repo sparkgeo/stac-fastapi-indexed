@@ -1,11 +1,14 @@
 from asyncio import run
 from json import load
+from logging import Logger, getLogger
 from os import linesep
-from typing import Coroutine
+from typing import Coroutine, Final
 
 from stac_index.indexer.creator.creator import IndexCreator
 from stac_index.indexer.reader.reader import Reader
 from stac_index.indexer.types.index_config import IndexConfig
+
+_logger: Final[Logger] = getLogger(__file__)
 
 
 def execute(
@@ -16,7 +19,8 @@ def execute(
     index_config = IndexConfig(**index_config_dict)
     errors = run(_call_process(index_config))
     if len(errors) > 0:
-        print(linesep.join(errors) + linesep)
+        _logger.debug(f"Indexing encountered {len(errors)} error(s)")
+        _logger.debug(linesep.join(errors) + linesep)
 
 
 async def _call_process(index_config: IndexConfig) -> Coroutine:
