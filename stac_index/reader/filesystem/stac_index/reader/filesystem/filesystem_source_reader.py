@@ -2,7 +2,7 @@ from glob import glob
 from logging import Logger, getLogger
 from os import path
 from time import time
-from typing import Final, List, Optional
+from typing import Final, List, Optional, Tuple
 
 from stac_index.common.source_reader import SourceReader
 
@@ -37,18 +37,10 @@ class FilesystemSourceReader(SourceReader):
         else:
             raise ValueError(f"'{uri}' does not exist")
 
-    async def list_uris_by_prefix(
-        self,
-        uri_prefix: str,
-        list_limit: Optional[int] = None,
-        uri_suffix: Optional[str] = None,
-    ) -> List[str]:
+    async def get_item_uris_from_items_uri(
+        self, uri: str, item_limit: Optional[int] = None
+    ) -> Tuple[List[str], List[str]]:
         all_uris = glob(
-            "{prefix}*{suffix}".format(
-                prefix=uri_prefix if uri_prefix.endswith("/") else f"{uri_prefix}/",
-                suffix="" if uri_suffix is None else uri_suffix,
-            )
+            "{prefix}*".format(prefix=uri if uri.endswith("/") else f"{uri}/")
         )
-        if list_limit is not None:
-            return all_uris[:list_limit]
-        return all_uris
+        return (all_uris[:item_limit], [])

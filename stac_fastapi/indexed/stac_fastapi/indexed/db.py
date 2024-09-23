@@ -15,15 +15,15 @@ _root_db_connection: DuckDBPyConnection = None
 
 
 async def connect_to_db() -> None:
-    index_source_uri = get_settings().parquet_index_source_uri
+    index_manifest_uri = get_settings().index_manifest_uri
     compatible_index_readers = [
         index_reader
         for index_reader in index_reader_classes
-        if index_reader.can_handle_source_uri(index_source_uri)
+        if index_reader.can_handle_source_uri(index_manifest_uri)
     ]
     if len(compatible_index_readers) == 0:
-        raise Exception(f"no index readers support source URI '{index_source_uri}'")
-    index_source = compatible_index_readers[0](index_source_uri)
+        raise Exception(f"no index readers support manifest URI '{index_manifest_uri}'")
+    index_source = compatible_index_readers[0](index_manifest_uri)
     times = {}
     start = time()
     global _root_db_connection
@@ -46,7 +46,7 @@ async def connect_to_db() -> None:
         _set_duckdb_threads(duckdb_thread_count)
     parquet_uris = await index_source.get_parquet_uris()
     if len(parquet_uris.keys()) == 0:
-        raise Exception(f"no URIs found at '{index_source_uri}'")
+        raise Exception(f"no URIs found from '{index_manifest_uri}'")
     for view_name, source_uri in parquet_uris.items():
         execute(f"CREATE VIEW {view_name} AS SELECT * FROM '{source_uri}'")
     times["create views from parquet"] = time()

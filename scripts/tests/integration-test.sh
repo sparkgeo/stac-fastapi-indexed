@@ -5,6 +5,7 @@ pushd $(dirname $0)/../..
 stack_commands=(
     "docker compose -f docker-compose.base.yml -f docker-compose.local-s3.yml -f docker-compose.tester.yml"
     "docker compose -f docker-compose.base.yml -f docker-compose.local-file.yml -f docker-compose.tester.yml"
+    "docker compose -f docker-compose.base.yml -f docker-compose.local-http.yml -f docker-compose.tester.yml"
 )
 
 exit_code=0

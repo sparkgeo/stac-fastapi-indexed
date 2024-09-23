@@ -77,7 +77,7 @@
             <mxPoint x="400" y="400" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="bInU-jQ1hVcps70KsuqV-50" value="(parquet_index_source_uri)" style="text;whiteSpace=wrap;fontFamily=Courier New;fontSize=10;" parent="1" vertex="1">
+        <mxCell id="bInU-jQ1hVcps70KsuqV-50" value="(index_manifest_uri)" style="text;whiteSpace=wrap;fontFamily=Courier New;fontSize=10;" parent="1" vertex="1">
           <mxGeometry x="20" y="260" width="170" height="40" as="geometry" />
         </mxCell>
         <mxCell id="bInU-jQ1hVcps70KsuqV-51" value="Create DuckDB Views" style="rounded=0;whiteSpace=wrap;html=1;fontSize=11;" parent="1" vertex="1">

@@ -1,6 +1,6 @@
 services:
 
-  sample-indexer:
+  indexer:
     build:
       dockerfile: docker/indexer/Dockerfile
       context: .
@@ -17,9 +17,9 @@ services:
       - ./data/STAC/sample/data:/data:ro
       - indexer-output:/index:ro
     environment:
-      stac_api_indexed_parquet_index_source_uri: /index/parquet
+      stac_api_indexed_index_manifest_uri: /index/parquet/manifest.json
     depends_on:
-      sample-indexer:
+      indexer:
         condition: service_completed_successfully
 
 volumes:
