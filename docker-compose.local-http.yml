@@ -1,11 +1,22 @@
 services:
+  http-iser:
+    image: python:3.12-slim
+    volumes:
+      - "./data/STAC/http/sample_to_http_static.py:/sample_to_http_static.py:ro"
+      - "./data/STAC/sample/data:/data:ro"
+      - "httpised-stac:/output:rw"
+    command: python -m sample_to_http_static --source_root /data --target_root /output
+
   re-rooter:
     image: python:3.12-slim
     volumes:
       - "./data/STAC/re_root_stac.py:/re_root_stac.py:ro"
-      - "./data/STAC/sample/data:/input:ro"
+      - "httpised-stac:/input:ro"
       - "re-rooted-stac:/output:rw"
     command: python -m re_root_stac /data/ http://fileserver:8001/stac/ --source_root /input --target_root /output
+    depends_on:
+      http-iser:
+        condition: service_completed_successfully
 
   fileserver:
     image: python:3.12-slim
@@ -49,5 +60,6 @@ services:
         condition: service_completed_successfully
 
 volumes:
+  httpised-stac:
   re-rooted-stac:
   indexer-output:
