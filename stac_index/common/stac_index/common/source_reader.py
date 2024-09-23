@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from json import loads
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 
 class SourceReader(ABC):
@@ -14,12 +14,9 @@ class SourceReader(ABC):
         pass
 
     @abstractmethod
-    async def list_uris_by_prefix(
-        self,
-        uri_prefix: str,
-        list_limit: Optional[int] = None,
-        uri_suffix: Optional[str] = None,
-    ) -> List[str]:
+    async def get_item_uris_from_items_uri(
+        self, uri: str, item_limit: Optional[int] = None
+    ) -> Tuple[List[str], List[str]]:
         pass
 
     async def load_json_from_uri(self, uri: str) -> Dict[str, Any]:

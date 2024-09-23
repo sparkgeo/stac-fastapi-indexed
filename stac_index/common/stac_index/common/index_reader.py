@@ -1,6 +1,7 @@
 from logging import Logger, getLogger
-from re import escape, match
 from typing import Any, Dict, Final, List, Optional, Tuple
+
+from stac_index.common.index_manifest import IndexManifest
 
 _logger: Final[Logger] = getLogger(__file__)
 
@@ -10,30 +11,29 @@ class IndexReader:
     def can_handle_source_uri(_: str) -> bool:
         return True
 
-    def __init__(self, index_source_uri):
-        self._index_source_uri = index_source_uri
+    def __init__(self, index_manifest_uri: str):
+        self.index_manifest_uri = index_manifest_uri
         from stac_index.common import source_reader_classes
 
         for reader_class in source_reader_classes:
-            if reader_class.can_handle_uri(index_source_uri):
+            if reader_class.can_handle_uri(index_manifest_uri):
                 self._source_reader = reader_class()
                 break
         if self._source_reader is None:
             raise Exception(
-                f"unable to locate reader capable of reading '{index_source_uri}'"
+                f"unable to locate reader capable of reading '{index_manifest_uri}'"
             )
 
     async def get_parquet_uris(self) -> Dict[str, str]:
-        uri_dict: Dict[str, str] = {}
-        uri_suffix = ".parquet"
-        uris = await self._source_reader.list_uris_by_prefix(
-            self._index_source_uri, uri_suffix=uri_suffix
+        manifest = IndexManifest(
+            **await self._source_reader.load_json_from_uri(self.index_manifest_uri)
         )
-        for uri in uris:
-            match_result = match(rf".*/([^/]+)({escape(uri_suffix)})$", uri)
-            if match_result:
-                uri_dict[match_result.group(1)] = uri
-        return uri_dict
+        return {
+            table_name: "/".join(
+                self.index_manifest_uri.split("/")[:-1] + [metadata.relative_path]
+            )
+            for table_name, metadata in manifest.tables.items()
+        }
 
     def get_duckdb_configuration_statements(
         self,

@@ -10,6 +10,7 @@ from shapely import Geometry
 from shapely.wkt import loads as wkt_loads
 from stac_fastapi.types.stac import Collection
 
+from stac_index.common.index_manifest import IndexManifest, TableMetadata
 from stac_index.indexer.creator.configurer import (
     add_items_columns,
     configure_indexables,
@@ -46,6 +47,9 @@ class IndexCreator:
         configure_indexables(self._index_config, self._conn)
         self._insert_metadata()
         output_dir = path.join(get_settings().output_dir, "parquet")
+        manifest = IndexManifest(
+            created=self._creation_time,
+        )
         try:
             makedirs(output_dir, exist_ok=True)
         except Exception as e:
@@ -78,17 +82,19 @@ class IndexCreator:
                 export_select = "* EXCLUDE ({col}), ST_AsWKB({col}) as {col}".format(
                     col=geometry_column_name
                 )
+            output_filename = f"{table_name}.parquet"
             self._conn.execute(f"""
                 COPY (SELECT {export_select} FROM {table_name}) 
-                  TO '{output_dir}/{table_name}.parquet'
+                  TO '{output_dir}/{output_filename}'
                   (FORMAT PARQUET)
                 ;
             """)
+            manifest.tables[table_name] = TableMetadata(
+                relative_path=output_filename,
+            )
         with open(path.join(output_dir, "manifest.json"), "w") as f:
             dump(
-                {
-                    "created": self._creation_time.isoformat(),
-                },
+                manifest.model_dump(),
                 f,
                 indent=2,
             )

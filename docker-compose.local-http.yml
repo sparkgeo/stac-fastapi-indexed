@@ -1,0 +1,65 @@
+services:
+  http-iser:
+    image: python:3.12-slim
+    volumes:
+      - "./data/STAC/http/sample_to_http_static.py:/sample_to_http_static.py:ro"
+      - "./data/STAC/sample/data:/data:ro"
+      - "httpised-stac:/output:rw"
+    command: python -m sample_to_http_static --source_root /data --target_root /output
+
+  re-rooter:
+    image: python:3.12-slim
+    volumes:
+      - "./data/STAC/re_root_stac.py:/re_root_stac.py:ro"
+      - "httpised-stac:/input:ro"
+      - "re-rooted-stac:/output:rw"
+    command: python -m re_root_stac /data/ http://fileserver:8001/stac/ --source_root /input --target_root /output
+    depends_on:
+      http-iser:
+        condition: service_completed_successfully
+
+  fileserver:
+    image: python:3.12-slim
+    volumes:
+      - "re-rooted-stac:/data/stac:ro"
+    working_dir: /data
+    ports:
+      - "8001:8001"
+    command: python -m http.server 8001
+    depends_on:
+      re-rooter:
+        condition: service_completed_successfully
+    healthcheck:
+      test: timeout 10s bash -c ':> /dev/tcp/127.0.0.1/8001' || exit 1
+      interval: 1s
+      timeout: 1s
+      retries: 3
+
+  indexer:
+    build:
+      dockerfile: docker/indexer/Dockerfile
+      context: .
+    image: sparkgeo/stac_indexer
+    environment:
+      stac_index_indexer_output_dir: /output
+      INDEX_CATALOG_ROOT_PATH: http://fileserver:8001/stac/catalog.json
+    volumes:
+      - "indexer-output:/output:rw"
+      - "./data/STAC/sample/index-config.json:/index-config.json:ro"
+    depends_on:
+      fileserver:
+        condition: service_healthy
+
+  api:
+    volumes:
+      - indexer-output:/index:ro
+    environment:
+      stac_api_indexed_index_manifest_uri: /index/parquet/manifest.json
+    depends_on:
+      indexer:
+        condition: service_completed_successfully
+
+volumes:
+  httpised-stac:
+  re-rooted-stac:
+  indexer-output:

@@ -35,8 +35,12 @@ pid4=$!
 pip-compile -q --no-annotate --no-strip-extras --output-file docker/requirements-reader-filesystem-generated.txt stac_index/reader/filesystem/setup.py &
 pid5=$!
 
+pip-compile -q --no-annotate --no-strip-extras --output-file docker/requirements-reader-https-generated.txt stac_index/reader/https/setup.py &
+pid6=$!
+
 wait $pid1
 wait $pid2
 wait $pid3
 wait $pid4
 wait $pid5
+wait $pid6
