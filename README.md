@@ -14,6 +14,17 @@ See [Known Issues](./docs/known-issues.md) for more information.
 
 See [Development](./docs/development.md) for guidance on how to work on this project.
 
+## Quickstart
+
+To get a quick demo up and running execute any of the following scripts and navigate to http://localhost:8123/api.html
+
+```sh
+scripts/run-with-local-s3.sh    # loads a sample dataset into minio, indexes it, loads the index into minio, and runs the API
+scripts/run-with-local-file.sh  # indexes a sample dataset on the filesystem and runs the API
+scripts/run-with-local-http.sh  # loads a sample dataset into a HTTP fileserver, indexes it, and runs the API
+scripts/run-with-remote-http.sh https://capella-open-data.s3.us-west-2.amazonaws.com/stac/catalog.json # indexes a public static STAC catalog over HTTPS and runs the API
+```
+
 ## Overview
 
 This repository supports two related but distinct behaviours. The `stac-index.*` packages defined in [./stac_index/](./stac_index/) manage indexing of a STAC catalog. The `stac-fastapi.indexed` package defined in [./stac_fastapi/](./stac_fastapi/) implements a stac-fastapi backend that works with the index created by `stac-index.*` packages.
