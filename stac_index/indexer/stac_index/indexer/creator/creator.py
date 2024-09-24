@@ -114,6 +114,7 @@ class IndexCreator:
         collections, errors = await reader.get_collections(
             await reader.get_root_catalog()
         )
+        _logger.info(f"discovered {len(collections)} collection(s)")
         for collection in collections:
             insert_sql = """
                 INSERT INTO collections (

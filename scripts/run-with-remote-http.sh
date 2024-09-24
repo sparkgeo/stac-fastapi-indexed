@@ -11,7 +11,7 @@ fi
 
 root_catalog_uri="$1"
 
-export tmp_index_config_path=$(mktemp /tmp/index-config-$(uuidgen).json)
+export tmp_index_config_path=$(mktemp)
 echo "{\"root_catalog_uri\": \"$root_catalog_uri\", \"indexables\": {}, \"queryables\": {}, \"sortables\": {}}" > $tmp_index_config_path
 
 dco="docker compose -f docker-compose.base.yml -f docker-compose.remote-http.yml"

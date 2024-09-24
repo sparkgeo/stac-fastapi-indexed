@@ -151,6 +151,7 @@ class Reader:
         item_uris: List[str] = []
         if _settings.test_collection_limit is not None:
             collections = collections[: _settings.test_collection_limit]
+        _logger.info("collecting item URIs for collections")
         results = await gather(
             *[
                 self._get_collection_item_uris(
