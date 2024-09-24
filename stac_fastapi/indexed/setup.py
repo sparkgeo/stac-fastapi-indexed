@@ -33,10 +33,5 @@ setup(
         "lambda": [
             "mangum~=0.17.0",
         ],
-        "test": [
-            "pytest~=8.2.2",
-            "requests~=2.32.3",
-            "shapely~=2.0.4",
-        ],
     },
 )
