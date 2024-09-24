@@ -5,6 +5,8 @@ from fastapi import Request
 from stac_fastapi.types.stac import Collection
 
 from stac_fastapi.indexed.constants import (
+    rel_child,
+    rel_item,
     rel_items,
     rel_parent,
     rel_root,
@@ -47,7 +49,9 @@ def fix_collection_links(collection: Collection, request: Request) -> Collection
         if link["rel"]
         not in [
             rel_parent,
+            rel_child,
             rel_items,
+            rel_item,
             rel_self,
             rel_root,
         ]
