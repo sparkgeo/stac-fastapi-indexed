@@ -5,7 +5,7 @@ from logging import Logger, getLogger
 from os import makedirs, path
 from typing import Dict, Final, List, Tuple, cast
 
-from duckdb import connect
+from duckdb import ConstraintException, connect
 from shapely import Geometry
 from shapely.wkt import loads as wkt_loads
 from stac_fastapi.types.stac import Collection
@@ -114,6 +114,7 @@ class IndexCreator:
         collections, errors = await reader.get_collections(
             await reader.get_root_catalog()
         )
+        _logger.info(f"discovered {len(collections)} collection(s)")
         for collection in collections:
             insert_sql = """
                 INSERT INTO collections (
@@ -123,7 +124,10 @@ class IndexCreator:
                     ?, ?
                 );
             """
-            self._conn.execute(insert_sql, (collection.id, collection.location))
+            try:
+                self._conn.execute(insert_sql, (collection.id, collection.location))
+            except Exception as e:
+                errors.append(f"failed to insert collection '{collection.id}': {e}")
         return (collections, errors)
 
     # Processing items is more complex than collections due to scale.
@@ -138,6 +142,7 @@ class IndexCreator:
             "inserted": 0,
             "invalid": 0,
             "failed": 0,
+            "duplicates": 0,
         }
         insert_fields_and_values_template = {
             "id": "?",
@@ -219,6 +224,12 @@ class IndexCreator:
                     insert_params,
                 )
                 counts["inserted"] += 1
+            except ConstraintException as e:
+                if "duplicate key" in str(e).lower():
+                    errors.append(f"duplicate in '{item.collection}'/'{item.id}'")
+                    counts["duplicates"] += 1
+                else:
+                    raise  # defer to generic handler
             except Exception as e:
                 errors.append(
                     f"failed to insert into '{item.collection}'/'{item.id}': {e}"

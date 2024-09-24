@@ -3,24 +3,29 @@ from dataclasses import dataclass
 from logging import Logger, getLogger
 from re import Pattern, compile, sub
 from threading import Lock
-from typing import Any, Callable, Dict, Final, List, Protocol, Tuple, cast
+from typing import Any, Callable, Dict, Final, List, Protocol, Tuple, Type, cast
 
 from stac_pydantic import Catalog, Collection, Item
-from stac_pydantic.links import Link, Links
+from stac_pydantic.links import Links
 
 from stac_index.common import source_reader_classes
 from stac_index.common.source_reader import SourceReader
 from stac_index.indexer.settings import get_settings
 from stac_index.indexer.types.stac_data import CollectionWithLocation, ItemWithLocation
 
+
+class _HasLinks(Protocol):
+    links: Links
+
+
 _settings: Final = get_settings()
 _logger: Final[Logger] = getLogger(__file__)
 _item_processor_mutex: Final[Lock] = Lock()
 _link_strip_regex: Final[Pattern] = compile(r"[^/]+$")
-
-
-class _HasLinks(Protocol):
-    links: Links
+_child_types_by_lower_type: Final[Dict[str, Type[_HasLinks]]] = {
+    "catalog": Catalog,
+    "collection": Collection,
+}
 
 
 @dataclass
@@ -56,12 +61,12 @@ class Reader:
                 f"Could not read or parse root catalog at '{self.root_catalog_uri}'",
                 e,
             )
-        if not self._has_matching_self_link(catalog, self.root_catalog_uri):
+        if not _has_matching_self_link(catalog, self.root_catalog_uri):
             _logger.warn(
                 f"Root catalog self link is incorrect and does not match '{self.root_catalog_uri}'"
             )
         catalog = Catalog(**dict_catalog)
-        self._expand_relative_links(catalog, self.root_catalog_uri)
+        _expand_relative_links(catalog, self.root_catalog_uri)
         return catalog
 
     async def get_collections(
@@ -70,36 +75,70 @@ class Reader:
         _logger.info("reading collections")
         collections: List[CollectionWithLocation] = []
         errors: List[str] = []
-        for link in root_catalog.links.link_iterator():
-            link = cast(Link, link)
-            if link.rel == "child":
-                collection_path = link.href
-                _logger.debug(f"reading collection '{collection_path}'")
+
+        child_links_all: List[str] = [
+            link.href
+            for link in root_catalog.links.link_iterator()
+            if link.rel == "child"
+        ]
+        child_links_followed: List[str] = []
+
+        # child_links_all can grow as nested catalogs or collections are discovered.
+        # Repeatedly process the list until no more links are added.
+        while len(set(child_links_all).difference(set(child_links_followed))) > 0:
+            for child_link in set(child_links_all).difference(
+                set(child_links_followed)
+            ):
+                child_links_followed.append(child_link)
                 try:
-                    dict_collection = await self._get_json_content_from_uri(
-                        collection_path
-                    )
-                    collection = Collection(**dict_collection)
+                    child_dict = await self._get_json_content_from_uri(child_link)
                 except Exception as e:
                     errors.append(
-                        "Could not read or parse collection at '{}': {}".format(
-                            collection_path, e
+                        "Could not read or parse child JSON at '{}': {}".format(
+                            child_link, e
                         )
                     )
                     continue
-                if not self._has_matching_self_link(collection, collection_path):
-                    _logger.warn(
-                        "Collection '{}' self link is incorrect and does not match '{}'".format(
-                            collection.id,
-                            collection_path,
+                child_type = str(child_dict.get("type", "_unknown_")).lower()
+                if child_type not in _child_types_by_lower_type:
+                    errors.append(
+                        "Did not recognise child type at '{}': {}".format(
+                            child_link, child_type
                         )
                     )
-                collection = CollectionWithLocation(
-                    **dict_collection,
-                    location=collection_path,
-                )
-                self._expand_relative_links(collection, collection_path)
-                collections.append(collection)
+                    continue
+                try:
+                    child = _child_types_by_lower_type[child_type](**child_dict)
+                except Exception as e:
+                    errors.append(
+                        "Could not parse child dictionary as '{}' at '{}': {}".format(
+                            child_type, child_link, e
+                        )
+                    )
+                    continue
+                _expand_relative_links(child, child_link)
+                childs_child_links = [
+                    link.href
+                    for link in cast(_HasLinks, child).links.link_iterator()
+                    if link.rel == "child"
+                ]
+                if len(childs_child_links) > 0:
+                    _logger.info(
+                        f"Child of type '{child_type}' at '{child_link}' adds {len(childs_child_links)} child(ren)"
+                    )
+                    child_links_all.extend(childs_child_links)
+                if isinstance(child, Collection):
+                    collection = cast(Collection, child)
+                    if not _has_matching_self_link(collection, child_link):
+                        _logger.debug(
+                            "Collection '{}' self link is incorrect and does not match '{}'".format(
+                                collection.id,
+                                child_link,
+                            )
+                        )
+                    collections.append(
+                        collection.model_copy(update={"location": child_link})
+                    )
         return (collections, errors)
 
     async def process_items(
@@ -112,6 +151,7 @@ class Reader:
         item_uris: List[str] = []
         if _settings.test_collection_limit is not None:
             collections = collections[: _settings.test_collection_limit]
+        _logger.info("collecting item URIs for collections")
         results = await gather(
             *[
                 self._get_collection_item_uris(
@@ -124,6 +164,15 @@ class Reader:
             item_uris.extend(result[0])
             all_errors.extend(result[1])
 
+        collected_item_count = len(item_uris)
+        item_uris = list(set(item_uris))
+        if len(item_uris) < collected_item_count:
+            _logger.info(
+                "removed {} duplicate item URIs".format(
+                    collected_item_count - len(item_uris)
+                )
+            )
+
         async def fetch_and_ingest(uri: str, semaphore: Semaphore) -> List[str]:
             async with semaphore:
                 _logger.debug(f"fetch_and_ingest {uri}")
@@ -133,13 +182,13 @@ class Reader:
                     item = Item(**dict_item)
                 except Exception as e:
                     item_errors.append(
-                        "Could not read or parse item at '{}': {}".format(
+                        "Could not read or parse content at '{}': {}".format(
                             uri,
                             e,
                         )
                     )
                 else:
-                    if not self._has_matching_self_link(item, uri):
+                    if not _has_matching_self_link(item, uri):
                         _logger.debug(
                             "Item '{}' self link is incorrect and does not match '{}'".format(
                                 item.id,
@@ -157,15 +206,16 @@ class Reader:
         _logger.info(
             f"starting processing {len(item_uris)} items with max concurrency {get_settings().max_concurrency}"
         )
-        items_semaphore = Semaphore(get_settings().max_concurrency)
         all_errors.extend(
             item_errors
             for sublist in await gather(
-                *[fetch_and_ingest(uri, items_semaphore) for uri in item_uris]
+                *[
+                    fetch_and_ingest(uri, Semaphore(get_settings().max_concurrency))
+                    for uri in item_uris
+                ]
             )
             for item_errors in sublist
         )
-        _logger.info(f"completed processing {len(item_uris)} items")
 
         return all_errors
 
@@ -207,24 +257,31 @@ class Reader:
                 errors.extend(collection_item_errors)
         return (item_uris, errors)
 
-    def _has_matching_self_link(
-        self, links_provider: _HasLinks, expected_url: str
-    ) -> bool:
-        for link in links_provider.links.link_iterator():
-            if link.rel == "self":
-                return link.href == expected_url
-        return False
 
-    def _expand_relative_links(
-        self, links_provider: _HasLinks, provider_href: str
-    ) -> None:
-        for link in links_provider.links.link_iterator():
-            if link.href.startswith("."):
-                _logger.debug(
-                    f"expanding relative link '{link.href}' from '{provider_href}'"
-                )
-                link.href = "{}{}".format(
-                    sub(_link_strip_regex, "", provider_href),
-                    link.href,
-                )
-                _logger.debug(f"new link: '{link.href}'")
+def _has_matching_self_link(links_provider: _HasLinks, expected_url: str) -> bool:
+    for link in links_provider.links.link_iterator():
+        if link.rel == "self":
+            return link.href == expected_url
+    return False
+
+
+def _expand_relative_links(links_provider: _HasLinks, provider_href: str) -> None:
+    for link in links_provider.links.link_iterator():
+        if link.href.startswith("."):
+            original_relative_link = link.href
+            base_link = sub(_link_strip_regex, "", provider_href)
+            naive_link = "{}{}".format(
+                base_link,
+                link.href,
+            )
+            naive_link_parts = naive_link.split("/")
+            new_link_parts: List[str] = []
+            for part in naive_link_parts:
+                if part == ".":
+                    continue
+                elif part == "..":
+                    new_link_parts.pop()
+                else:
+                    new_link_parts.append(part)
+            link.href = "/".join(new_link_parts)
+            _logger.debug(f"expanded '{original_relative_link}' to '{link.href}'")
