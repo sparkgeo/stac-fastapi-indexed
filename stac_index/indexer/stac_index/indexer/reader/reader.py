@@ -164,6 +164,15 @@ class Reader:
             item_uris.extend(result[0])
             all_errors.extend(result[1])
 
+        collected_item_count = len(item_uris)
+        item_uris = list(set(item_uris))
+        if len(item_uris) < collected_item_count:
+            _logger.info(
+                "removed {} duplicate item URIs".format(
+                    collected_item_count - len(item_uris)
+                )
+            )
+
         async def fetch_and_ingest(uri: str, semaphore: Semaphore) -> List[str]:
             async with semaphore:
                 _logger.debug(f"fetch_and_ingest {uri}")
@@ -207,7 +216,6 @@ class Reader:
             )
             for item_errors in sublist
         )
-        _logger.info(f"completed processing {len(item_uris)} items")
 
         return all_errors
 
