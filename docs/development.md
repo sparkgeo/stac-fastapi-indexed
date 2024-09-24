@@ -25,6 +25,7 @@ Any new functionality should extend integration tests as a first priority. Unit 
 ### Execute Tests
 
 ```sh
+scripts/tests/unit-test.sh
 scripts/tests/smoke-test.sh
 scripts/tests/integration-test.sh
 ```

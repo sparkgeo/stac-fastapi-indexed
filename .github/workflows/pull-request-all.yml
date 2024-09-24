@@ -6,6 +6,19 @@ on:
       - '**'
 
 jobs:
+  unit-test:
+    name: Execute Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Python 3.12
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.12'
+      - name: Install Dependencies
+        run: scripts/dev-init.sh
+      - name: Test
+        run: scripts/tests/unit-test.sh
   smoke-test:
     name: Execute Smoke Tests
     runs-on: ubuntu-latest

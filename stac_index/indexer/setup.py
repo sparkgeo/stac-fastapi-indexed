@@ -16,6 +16,9 @@ setup(
         "dev": [
             "pre-commit>=3.6.2,<4.0",
         ],
+        "test": [
+            "pytest~=8.2.2",
+        ],
         "local-deps": [  # managed separately to support generation of pypi-only requirements.txt files for #88
             "stac-index.common==0.1.0",
         ],

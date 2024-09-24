@@ -1,0 +1,23 @@
+services:
+  indexer:
+    build:
+      dockerfile: docker/indexer/Dockerfile
+      context: .
+    image: sparkgeo/stac_indexer
+    environment:
+      stac_index_indexer_output_dir: /output
+    volumes:
+      - "indexer-output:/output:rw"
+      - "${tmp_index_config_path}:/index-config.json:ro"
+
+  api:
+    volumes:
+      - indexer-output:/index:ro
+    environment:
+      stac_api_indexed_index_manifest_uri: /index/parquet/manifest.json
+    depends_on:
+      indexer:
+        condition: service_completed_successfully
+
+volumes:
+  indexer-output:
