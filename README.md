@@ -29,14 +29,17 @@ There is no requirement for the API to run in a serverless environment - in some
 Source and Index Readers support extensibility in the design and determine where and how this design can be used.
 
 STAC objects (catalog, collections, items) are identified by a unique URI. Each URI's format determines which reader must be used to read its content.
+- The [S3 Reader](./stac_index/reader/s3/) is used to read any content identified by a URI with a `s3://` prefix.
+- The [Filesystem Reader](./stac_index/reader/filesystem/) is used to read any content identified by a URI with a `/` prefix.
+- The [HTTPS Reader](./stac_index/reader/https/) is used to read any content identified by a URI with a `http(s)://` prefix.
 
-The [S3 Reader](./stac_index/reader/s3/) is used to read any content identified by a URI with a `s3://` prefix. The [Filesystem Reader](./stac_index/reader/filesystem/) is used to read any content identified by a URI with a `/` prefix. An error will be thrown if an unsupported URI prefix is encountered.
+An error will be thrown if an unsupported URI prefix is encountered.
 
 ### Indexer 
 
-The indexer is configured with a root catalog URI (see [Limitations / Root Catalog](#root-catalog) for concerns related to nested catalogs). From the root catalog the indexer traverses the catalog's collections and items, relying on STAC's `links` objects to provide their URIs.
+The indexer is configured with a root catalog URI. From the root catalog the indexer traverses the catalog's sub-catalogs (if present), collections and items, relying on STAC's `links` objects to provide their URIs.
 
-The indexer selects a suitable reader for each URI as described in [Readers](#readers). In this way the indexer can index a local STAC catalog, a remote S3-hosted STAC catalog (assuming any auth concerns are addressed), and potentially any number of other STAC storage methods. Given an appropriate reader the indexer could index STAC data in a zip archive, in an Azure blob store, or provided by another STAC API (though this use-case is questionable).
+The indexer selects a suitable reader for each URI as described in [Readers](#readers). In this way the indexer can index a local STAC catalog, a remote S3-hosted STAC catalog (assuming any auth concerns are addressed), a HTTP(S)-hosted STAC catalog, and potentially any number of other STAC storage methods.
 
 The indexer creates an index entry for every STAC collection and item in the catalog. By default each item's index entry includes the item's ID and collection, which together form its unique identifier, and values of the minimum set of properties required to support the API's base requirements. This minimum set of properties includes datetimes, BBOX, and the URI of the item's full content.
 
@@ -69,14 +72,3 @@ For STAC catalogs with infrequent and atomic updates, and a reasonably-sized cat
 New development work will be required to support STAC catalogs with frequent, incremental, or unpredictable updates. In principle there is no reason that the indexer could not support change detection and the ability to add, update, or remove only affected data. This process would likely be complicated by the addition or removal of queryable or sortable fields after the initial indexer run.
 
 There is an open question regarding how the API should handle data updates during normal operation. There is no limit on how much time can pass between a client receiving a multi-page response with a `next` or `previous` paging link and when it accesses those links. It is possible for the set matching the initial request to change during a client's paging. The size of the set or its order could change between pages, creating inconsistency. If a request includes queryable or sortable properties it is possible that one or more fields are no longer queryable or sortable following an update, likely resulting in an error. The STAC API specification does not define expected behaviour in data update scenarios and [this question](https://github.com/radiantearth/stac-api-spec/issues/453) on the subject is unanswered at the time of writing.
-
-### Root Catalog
-
-The STAC specification supports the possibility of nested catalogs. However, popular STAC API implementations assume a single root catalog with a simple hierarchical arrangement:
-- Catalog
-    - Collection
-        - Items
-    - Collection
-        - Items
-
-This approach is pragmatic and is believed to address the majority of STAC API client needs. In the pursuit of rapid progress and limited complexity this project has so far made no effort to support nested catalog. In principle it is believed to be possible. Development of this capability may be expensive and should ideally be driven by a clear and reasonable need.
