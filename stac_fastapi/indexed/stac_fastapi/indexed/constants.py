@@ -2,7 +2,9 @@ from typing import Final
 
 rel_collection: Final[str] = "collection"
 rel_parent: Final[str] = "parent"
+rel_child: Final[str] = "child"
 rel_items: Final[str] = "items"
+rel_item: Final[str] = "item"
 rel_self: Final[str] = "self"
 rel_root: Final[str] = "root"
 rel_next: Final[str] = "next"
