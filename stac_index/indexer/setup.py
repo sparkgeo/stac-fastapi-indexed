@@ -6,7 +6,7 @@ setup(
     python_requires=">=3.12",
     packages=find_namespace_packages(),
     install_requires=[
-        "duckdb~=1.0.0",
+        "duckdb~=1.1.0",
         "pydantic-settings",  # don't specify a version, determined by stac-pydantic
         "shapely~=2.0.4",
         "stac-fastapi.types~=3.0.0a2",
