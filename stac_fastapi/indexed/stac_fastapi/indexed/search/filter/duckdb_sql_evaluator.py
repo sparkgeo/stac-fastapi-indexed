@@ -248,7 +248,7 @@ class DubkDBSQLEvaluator(Evaluator):
     @handle(ast.Attribute)
     def attribute(self, node: ast.Attribute) -> str | _GeometrySql:
         if node.name in self.geometry_attributes:
-            return _GeometrySql(sql_part=f"ST_GeomFromWKB({node.name})")
+            return _GeometrySql(sql_part=f"{node.name}")
         try:
             return f'"{self.attribute_map[node.name]}"'
         except KeyError as e:

@@ -31,7 +31,7 @@ def _get_intersects_clause_for_wrapped_geometry(
                     OR bbox_y_min > ?
                 )
             AND ST_Intersects(
-                    ST_GeomFromWKB(geometry),
+                    geometry,
                     {sql_wrapped_geometry}
                 )
         """,
