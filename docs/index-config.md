@@ -22,8 +22,6 @@ Each queryable and sortable property must include a list of collections for whic
 
 Queryables require a `json_schema` property containing a schema that could be used to validate values of this property. This JSON schema is not used directly by the API but is provided to API clients via the `/queryables` endpoints such that a client can validate any value it intends to send as query value for this property.
 
-The API requires special handling of geometry and temporal fields during SQL query construction. If a queryable property contains geometry it must include `is_geometry: true`. If a queryable property contains temporal data it must include `is_temporal: true`. These values default to `false`.
-
 ## Example 1
 
 ```json
