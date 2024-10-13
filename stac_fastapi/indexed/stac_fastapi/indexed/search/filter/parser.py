@@ -4,6 +4,7 @@ from typing import Any, Dict, List
 from pygeofilter.ast import Node
 from stac_fastapi.types.errors import InvalidQueryParameter
 
+from stac_fastapi.indexed.search.filter.attribute_config import AttributeConfig
 from stac_fastapi.indexed.search.filter.duckdb_sql_evaluator import to_filter_clause
 from stac_fastapi.indexed.search.filter_clause import FilterClause
 
@@ -37,8 +38,6 @@ def filter_to_ast(filter: Dict[str, Any] | str, filter_lang: str) -> Node:
 
 def ast_to_filter_clause(
     ast: Node,
-    geometry_fields: List[str],
-    temporal_fields: List[str],
-    field_mapping: Dict[str, str],
+    attribute_configs: List[AttributeConfig],
 ) -> FilterClause:
-    return to_filter_clause(ast, geometry_fields, temporal_fields, field_mapping)
+    return to_filter_clause(ast, attribute_configs)

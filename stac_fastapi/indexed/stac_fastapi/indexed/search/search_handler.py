@@ -24,6 +24,7 @@ from stac_fastapi.indexed.links.search import get_search_link, get_token_link
 from stac_fastapi.indexed.queryables.queryable_field_map import (
     get_queryable_config_by_name,
 )
+from stac_fastapi.indexed.search.filter.attribute_config import AttributeConfig
 from stac_fastapi.indexed.search.filter.errors import (
     NotAGeometryField,
     NotATemporalField,
@@ -306,20 +307,16 @@ class SearchHandler:
             try:
                 return ast_to_filter_clause(
                     ast=ast,
-                    geometry_fields=[
-                        key
-                        for key, value in queryable_config.items()
-                        if value.is_geometry
+                    attribute_configs=[
+                        AttributeConfig(
+                            name=entry.name,
+                            items_column=entry.items_column,
+                            items_column_type=entry.items_column_type,
+                            is_geometry=entry.is_geometry,
+                            is_temporal=entry.is_temporal,
+                        )
+                        for entry in queryable_config.values()
                     ],
-                    temporal_fields=[
-                        key
-                        for key, value in queryable_config.items()
-                        if value.is_temporal
-                    ],
-                    field_mapping={
-                        key: value.items_column
-                        for key, value in queryable_config.items()
-                    },
                 )
             except UnknownField as e:
                 raise InvalidQueryParameter(e.field_name)

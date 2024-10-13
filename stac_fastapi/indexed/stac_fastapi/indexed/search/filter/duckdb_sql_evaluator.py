@@ -31,12 +31,13 @@
 # Non-parameterised SQL is a security concern that this evaluator is intended to address.
 
 from dataclasses import dataclass
-from typing import Any, Dict, Final, List, Tuple, cast
+from typing import Any, Dict, Final, List, Optional, Tuple, cast
 
 from pygeofilter import ast, values
 from pygeofilter.backends.evaluator import Evaluator, handle
 from shapely import geometry
 
+from stac_fastapi.indexed.search.filter.attribute_config import AttributeConfig
 from stac_fastapi.indexed.search.filter.errors import (
     NotAGeometryField,
     NotATemporalField,
@@ -102,14 +103,26 @@ class _GeometrySql:
 class DubkDBSQLEvaluator(Evaluator):
     def __init__(
         self,
-        geometry_attributes: List[str],
-        temporal_attributes: List[str],
-        attribute_map: Dict[str, str],
+        attribute_configs: List[AttributeConfig],
         function_map: Dict[str, str],
     ):
-        self.geometry_attributes = geometry_attributes
-        self.temporal_attributes = temporal_attributes
-        self.attribute_map = attribute_map
+        self.geometry_attributes = {
+            attribute.name: attribute.items_column
+            for attribute in attribute_configs
+            if attribute.is_geometry is True
+        }
+        self.temporal_attributes = {
+            attribute.name: attribute.items_column
+            for attribute in attribute_configs
+            if attribute.is_temporal is True
+        }
+        self.attribute_column_map = {
+            attribute.name: attribute.items_column for attribute in attribute_configs
+        }
+        self.attribute_type_map = {
+            attribute.name: attribute.items_column_type
+            for attribute in attribute_configs
+        }
         self.function_map = function_map
 
     @handle(ast.Not)
@@ -130,18 +143,37 @@ class DubkDBSQLEvaluator(Evaluator):
 
     @handle(ast.Comparison, subclasses=True)
     def comparison(self, node: ast.Comparison, lhs, rhs) -> FilterClause:
-        lhs_identifier, lhs_params = self._parameterise_node_part(node.lhs, lhs)
-        rhs_identifier, rhs_params = self._parameterise_node_part(node.rhs, rhs)
+        lhs_identifier, lhs_params, lhs_type = self._parameterise_node_part(
+            node.lhs, lhs
+        )
+        rhs_identifier, rhs_params, rhs_type = self._parameterise_node_part(
+            node.rhs, rhs
+        )
+        comparison_type = lhs_type or rhs_type
+        lhs_part = (
+            f"CAST({lhs_identifier} AS {comparison_type})"
+            if comparison_type is not None and type(node.lhs) != ast.Attribute
+            else lhs_identifier
+        )
+        rhs_part = (
+            f"CAST({rhs_identifier} AS {comparison_type})"
+            if comparison_type is not None and type(node.rhs) != ast.Attribute
+            else rhs_identifier
+        )
         return FilterClause(
-            sql=f"({lhs_identifier} {_COMPARISON_OP_MAP[node.op]} {rhs_identifier})",
+            sql=f"({lhs_part} {_COMPARISON_OP_MAP[node.op]} {rhs_part})",
             params=lhs_params + rhs_params,
         )
 
     @handle(ast.Between)
     def between(self, node: ast.Between, lhs, low, high) -> FilterClause:
-        lhs_identifier, lhs_params = self._parameterise_node_part(node.lhs, lhs)
+        lhs_identifier, lhs_params, lhs_type = self._parameterise_node_part(
+            node.lhs, lhs
+        )
         return FilterClause(
-            sql=f"({lhs_identifier} {'NOT ' if node.not_ else ''}BETWEEN ? AND ?)",
+            sql=f"({lhs_identifier} {'NOT ' if node.not_ else ''}BETWEEN CAST(? AS {lhs_type}) AND CAST(? AS {lhs_type}))"
+            if lhs_type is not None
+            else f"({lhs_identifier} {'NOT ' if node.not_ else ''}BETWEEN ? AND ?)",
             params=lhs_params + [low, high],
         )
 
@@ -154,7 +186,7 @@ class DubkDBSQLEvaluator(Evaluator):
         if node.singlechar != "_":
             # TODO: not preceded by escapechar
             pattern = pattern.replace(node.singlechar, "_")
-        lhs_identifier, lhs_params = self._parameterise_node_part(node.lhs, lhs)
+        lhs_identifier, lhs_params, _ = self._parameterise_node_part(node.lhs, lhs)
         return FilterClause(
             # TODO: handle node.nocase
             sql=f"{lhs_identifier} {'NOT ' if node.not_ else ''}LIKE "
@@ -164,27 +196,34 @@ class DubkDBSQLEvaluator(Evaluator):
 
     @handle(ast.In)
     def in_(self, node: ast.In, lhs, *options: Tuple[Any]) -> FilterClause:
-        lhs_identifier, lhs_params = self._parameterise_node_part(node.lhs, lhs)
+        lhs_identifier, lhs_params, lhs_type = self._parameterise_node_part(
+            node.lhs, lhs
+        )
         return FilterClause(
             sql="{lhs_identifier} {not_logic}IN ({options})".format(
                 lhs_identifier=lhs_identifier,
                 not_logic="NOT " if node.not_ else "",
-                options=", ".join(["?" for _ in options]),
+                options=", ".join(
+                    [
+                        f"CAST(? AS {lhs_type})" if lhs_type is not None else "?"
+                        for _ in options
+                    ]
+                ),
             ),
             params=lhs_params + list(options),
         )
 
     @handle(ast.IsNull)
     def null(self, node: ast.IsNull, lhs) -> FilterClause:
-        lhs_identifier, _ = self._parameterise_node_part(node.lhs, lhs)
+        lhs_identifier, _, _ = self._parameterise_node_part(node.lhs, lhs)
         return FilterClause(
             sql=f"{lhs_identifier} IS {'NOT ' if node.not_ else ''}NULL"
         )
 
     @handle(*_TEMPORAL_POINT_COMPARISON_TYPES)
     def temporal_overlaps(self, node: ast.TemporalPredicate, lhs, rhs):
-        lhs_identifier, lhs_params = self._parameterise_node_part(node.lhs, lhs)
-        rhs_identifier, rhs_params = self._parameterise_node_part(node.rhs, rhs)
+        lhs_identifier, lhs_params, _ = self._parameterise_node_part(node.lhs, lhs)
+        rhs_identifier, rhs_params, _ = self._parameterise_node_part(node.rhs, rhs)
         if (
             isinstance(node.lhs, ast.Attribute)
             and node.lhs.name not in self.temporal_attributes
@@ -250,17 +289,31 @@ class DubkDBSQLEvaluator(Evaluator):
         if node.name in self.geometry_attributes:
             return _GeometrySql(sql_part=f"{node.name}")
         try:
-            return f'"{self.attribute_map[node.name]}"'
+            return f'"{self.attribute_column_map[node.name]}"'
         except KeyError as e:
             raise UnknownField(field_name=str(e))
 
     @handle(ast.Arithmetic, subclasses=True)
     def arithmetic(self, node: ast.Arithmetic, lhs, rhs):
         op = _ARITHMETIC_OP_MAP[node.op]
-        lhs_identifier, lhs_params = self._parameterise_node_part(node.lhs, lhs)
-        rhs_identifier, rhs_params = self._parameterise_node_part(node.rhs, rhs)
+        lhs_identifier, lhs_params, lhs_type = self._parameterise_node_part(
+            node.lhs, lhs
+        )
+        rhs_identifier, rhs_params, rhs_type = self._parameterise_node_part(
+            node.rhs, rhs
+        )
+        lhs_part = (
+            f"CAST({lhs_identifier} AS {lhs_type})"
+            if lhs_type is not None
+            else lhs_identifier
+        )
+        rhs_part = (
+            f"CAST({rhs_identifier} AS {rhs_type})"
+            if rhs_type is not None
+            else rhs_identifier
+        )
         return FilterClause(
-            sql=f"({lhs_identifier} {op} {rhs_identifier})",
+            sql=f"({lhs_part} {op} {rhs_part})",
             params=lhs_params + rhs_params,
         )
 
@@ -311,26 +364,24 @@ class DubkDBSQLEvaluator(Evaluator):
 
     def _parameterise_node_part(
         self, node_part: ast.Node, part_value: Any
-    ) -> Tuple[Any, List[Any]]:
+    ) -> Tuple[Any, List[Any], Optional[str]]:
         part_params = []
         part_identifier = _param_placeholder
+        part_type = None
         if type(node_part) == ast.Attribute:
             # not an issue here that the field name remains quoted
             part_identifier = part_value
+            part_type = self.attribute_type_map[node_part.name]
         else:
             part_params.append(part_value)
-        return (part_identifier, part_params)
+        return (part_identifier, part_params, part_type)
 
 
 def to_filter_clause(
     root: ast.Node,
-    geometry_fields: List[str],
-    temporal_fields: List[str],
-    field_mapping: Dict[str, str],
+    attribute_configs: List[AttributeConfig],
 ) -> FilterClause:
     return DubkDBSQLEvaluator(
-        geometry_fields,
-        temporal_fields,
-        cast(Dict[str, str], field_mapping),
+        attribute_configs,
         cast(Dict[str, str], {}),
     ).evaluate(root)
