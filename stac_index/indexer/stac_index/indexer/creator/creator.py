@@ -134,10 +134,6 @@ class IndexCreator:
             "id": "?",
             "collection_id": "?",
             "geometry": "ST_GeomFromText('{geometry_wkt}')",
-            "bbox_x_min": "?",
-            "bbox_y_min": "?",
-            "bbox_x_max": "?",
-            "bbox_y_max": "?",
             "datetime": "?",
             "start_datetime": "?",
             "end_datetime": "?",
@@ -159,7 +155,6 @@ class IndexCreator:
             insert_params = [
                 item.id,
                 item.collection,
-                *geometry.bounds,
                 item.properties.datetime,
                 item.properties.start_datetime,
                 item.properties.end_datetime,
