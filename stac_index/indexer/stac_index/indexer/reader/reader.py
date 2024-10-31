@@ -1,3 +1,4 @@
+import copy
 from asyncio import Semaphore, gather
 from dataclasses import dataclass
 from logging import Logger, getLogger
@@ -5,6 +6,7 @@ from re import Pattern, compile, sub
 from threading import Lock
 from typing import Any, Callable, Dict, Final, List, Protocol, Tuple, Type, cast
 
+from pydantic import ValidationError
 from stac_pydantic import Catalog, Collection, Item
 from stac_pydantic.links import Links
 
@@ -26,6 +28,51 @@ _child_types_by_lower_type: Final[Dict[str, Type[_HasLinks]]] = {
     "catalog": Catalog,
     "collection": Collection,
 }
+
+
+def _remove_item(data, path) -> bool:
+    """Remove item at `path` from `data`.
+
+    `data` must a subscriptable collection, such as a dict or list, and may
+     contain other subscriptable collections.
+
+    `path` must be a tuple describing a path through `data`. That is, `path[0]`
+    should be a valid index into `data`, `path[1]` should be a valid index into
+    `data[path[0]]`, etc.
+
+    The item pointed to by `path` will be removed from `data`.
+    """
+    try:
+        path_head = path[0]
+        path_rest = path[1:]
+        if len(path_rest) > 0:
+            return _remove_item(data[path_head], path_rest)
+        else:
+            del data[path_head]
+            return True
+    except IndexError:
+        return False
+
+
+def _read_item(fields: dict[str, Any]) -> tuple[Item, dict[str, Any]]:
+    """Atempt to convert `field` into `Item` in a fault-tolerant way.
+
+    Attempts to construct an `Item` from `fields`. If there is a
+    `ValidationError`, then remove the sources of the errors from `fields`
+    and attempt the conversion again.
+    """
+    try:
+        return (Item(**fields), fields)
+    except ValidationError as e:
+        reduced_fields = copy.deepcopy(fields)
+        items_removed = False
+        for error in e.errors():
+            if _remove_item(reduced_fields, error["loc"]):
+                items_removed = True
+        if items_removed:
+            return _read_item(reduced_fields)
+        else:
+            raise
 
 
 @dataclass
@@ -181,7 +228,7 @@ class Reader:
                 item_errors = []
                 try:
                     dict_item = await self._get_json_content_from_uri(uri)
-                    item = Item(**dict_item)
+                    (item, dict_item) = _read_item(dict_item)
                 except Exception as e:
                     item_errors.append(
                         "Could not read or parse content at '{}': {}".format(
