@@ -12,3 +12,5 @@
 .autoenv*.zsh
 
 !**/.gitkeep
+
+*~
