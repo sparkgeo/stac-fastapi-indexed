@@ -43,22 +43,28 @@ class S3SourceReader(SourceReader):
             Bucket=bucket,
             Key=key,
         )
-        start = time()
-        response = (
-            (await get_callable_event_loop().run_in_executor(None, get_object_partial))[
-                "Body"
-            ]
-            .read()
-            .decode("UTF-8")
-        )
-        _logger.debug(
-            "S3: fetched '{}/{}' in {}s".format(
-                bucket,
-                key,
-                round(time() - start, 3),
+        try:
+            start = time()
+            response = (
+                (
+                    await get_callable_event_loop().run_in_executor(
+                        None, get_object_partial
+                    )
+                )["Body"]
+                .read()
+                .decode("UTF-8")
             )
-        )
-        return response
+            _logger.debug(
+                "S3: fetched '{}/{}' in {}s".format(
+                    bucket,
+                    key,
+                    round(time() - start, 3),
+                )
+            )
+            return response
+        except Exception:
+            _logger.exception(f"S3: failed to fetch {uri}")
+            raise
 
     async def get_item_uris_from_items_uri(
         self, uri: str, item_limit: Optional[int] = None
