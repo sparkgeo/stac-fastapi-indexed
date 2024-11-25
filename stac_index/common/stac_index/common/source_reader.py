@@ -4,6 +4,15 @@ from typing import Any, Dict, List, Optional, Tuple
 
 
 class SourceReader(ABC):
+    def __init__(self, *args, **kwargs):
+        concurrency = None
+        concurrency_key = "concurrency"
+        if concurrency_key in kwargs and isinstance(kwargs[concurrency_key], int):
+            concurrency = kwargs["concurrency"]
+            if concurrency <= 0:
+                concurrency = None
+        self.reader_concurrency = concurrency
+
     @staticmethod
     @abstractmethod
     def can_handle_uri(uri: str) -> bool:
