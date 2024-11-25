@@ -28,8 +28,6 @@ class Indexable(BaseModel):
 
 class Queryable(BaseModel):
     json_schema: Dict[str, Any]
-    is_geometry: Optional[bool] = False
-    is_temporal: Optional[bool] = False
     collections: List[str]
 
 

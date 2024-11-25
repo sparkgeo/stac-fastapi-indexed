@@ -15,6 +15,7 @@ class QueryableConfig:
     description: str
     json_schema: str
     items_column: str
+    items_column_type: str
     is_geometry: bool
     is_temporal: bool
 
@@ -26,13 +27,15 @@ def get_queryable_config_by_name() -> Dict[str, QueryableConfig]:
     for row in fetchall(
         """
         SELECT name
-             , collection_id
-             , description
-             , json_schema
-             , items_column
-             , is_geometry
-             , is_temporal
-          FROM queryables_by_collection
+             , qbc.collection_id
+             , qbc.description
+             , qbc.json_schema
+             , qbc.items_column
+             , icols.column_type as items_column_type
+             , icols.column_type = 'GEOMETRY' as is_geometry
+             , icols.column_type IN ('TIMESTAMP WITH TIME ZONE') as is_temporal
+          FROM queryables_by_collection qbc
+    INNER JOIN (DESCRIBE items) icols ON qbc.items_column = icols.column_name
     """,
     ):
         field_config[row[0]] = QueryableConfig(
@@ -41,7 +44,8 @@ def get_queryable_config_by_name() -> Dict[str, QueryableConfig]:
             description=row[2],
             json_schema=row[3],
             items_column=row[4],
-            is_geometry=row[5],
-            is_temporal=row[6],
+            items_column_type=row[5],
+            is_geometry=row[6],
+            is_temporal=row[7],
         )
     return field_config

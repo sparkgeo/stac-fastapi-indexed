@@ -29,8 +29,8 @@ def _configure_queryables(config: IndexConfig, connection: DuckDBPyConnection) -
             queryables_collections.append((collection_id, name))
         connection.execute(
             """
-            INSERT INTO queryables (name, description, json_path, json_schema, items_column, is_geometry, is_temporal)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO queryables (name, description, json_path, json_schema, items_column)
+                VALUES (?, ?, ?, ?, ?)
         """,
             [
                 name,
@@ -38,8 +38,6 @@ def _configure_queryables(config: IndexConfig, connection: DuckDBPyConnection) -
                 indexable.json_path,
                 dumps(queryable.json_schema),
                 indexable.table_column_name,
-                queryable.is_geometry,
-                queryable.is_temporal,
             ],
         )
     for collection_id, name in queryables_collections:

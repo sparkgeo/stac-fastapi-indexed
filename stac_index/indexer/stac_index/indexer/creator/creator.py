@@ -3,7 +3,7 @@ from glob import glob
 from json import dump
 from logging import Logger, getLogger
 from os import makedirs, path
-from typing import Dict, Final, List, Tuple, cast
+from typing import Dict, Final, List, Tuple
 
 from duckdb import ConstraintException, connect
 from shapely import Geometry
@@ -68,23 +68,9 @@ class IndexCreator:
                 "sortables_by_collection",
             ]:
                 continue
-            geometry_column_name = None  # assumes max 1 geometry column per table
-            for row in self._conn.execute(
-                f"SELECT column_name, column_type FROM (DESCRIBE {table_name})"
-            ).fetchall():
-                column_name, column_type = row
-                if cast(str, column_type).upper() == "GEOMETRY":
-                    geometry_column_name = column_name
-                    break
-            if geometry_column_name is None:
-                export_select = "*"
-            else:
-                export_select = "* EXCLUDE ({col}), ST_AsWKB({col}) as {col}".format(
-                    col=geometry_column_name
-                )
             output_filename = f"{table_name}.parquet"
             self._conn.execute(f"""
-                COPY (SELECT {export_select} FROM {table_name}) 
+                COPY (SELECT * FROM {table_name}) 
                   TO '{output_dir}/{output_filename}'
                   (FORMAT PARQUET)
                 ;
@@ -148,10 +134,6 @@ class IndexCreator:
             "id": "?",
             "collection_id": "?",
             "geometry": "ST_GeomFromText('{geometry_wkt}')",
-            "bbox_x_min": "?",
-            "bbox_y_min": "?",
-            "bbox_x_max": "?",
-            "bbox_y_max": "?",
             "datetime": "?",
             "start_datetime": "?",
             "end_datetime": "?",
@@ -173,7 +155,6 @@ class IndexCreator:
             insert_params = [
                 item.id,
                 item.collection,
-                *geometry.bounds,
                 item.properties.datetime,
                 item.properties.start_datetime,
                 item.properties.end_datetime,
