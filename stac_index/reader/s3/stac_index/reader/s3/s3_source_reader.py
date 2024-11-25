@@ -5,6 +5,7 @@ from time import time
 from typing import Final, List, Optional, Tuple, cast
 
 from boto3 import client
+from botocore.config import Config as BotoConfig
 
 from stac_index.common.async_util import get_callable_event_loop
 from stac_index.common.source_reader import SourceReader
@@ -19,8 +20,8 @@ class S3SourceReader(SourceReader):
     def can_handle_uri(uri: str) -> bool:
         return not not match(_uri_prefix_regex, uri)
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         _logger.info("creating S3 Reader")
         client_args = {}
         s3_endpoint = get_settings().endpoint
@@ -28,6 +29,10 @@ class S3SourceReader(SourceReader):
             client_args["endpoint_url"] = s3_endpoint
             if s3_endpoint.startswith("http://"):
                 client_args["use_ssl"] = False
+        if self.reader_concurrency is not None:
+            pool_size = self.reader_concurrency * 10
+            _logger.info(f"adjusting S3 pool size to {pool_size}")
+            client_args["config"] = BotoConfig(max_pool_connections=pool_size)
         self._s3 = client("s3", **client_args)
 
     def _get_s3_key_parts(self, key: str) -> Tuple[str, str]:
@@ -43,22 +48,29 @@ class S3SourceReader(SourceReader):
             Bucket=bucket,
             Key=key,
         )
-        start = time()
-        response = (
-            (await get_callable_event_loop().run_in_executor(None, get_object_partial))[
-                "Body"
-            ]
-            .read()
-            .decode("UTF-8")
-        )
-        _logger.debug(
-            "S3: fetched '{}/{}' in {}s".format(
-                bucket,
-                key,
-                round(time() - start, 3),
+        try:
+            start = time()
+            response = (
+                (
+                    await get_callable_event_loop().run_in_executor(
+                        None, get_object_partial
+                    )
+                )["Body"]
+                .read()
+                .decode("UTF-8")
             )
-        )
-        return response
+        except Exception:
+            _logger.exception(f"S3: failed to fetch {uri}")
+            raise
+        else:
+            _logger.debug(
+                "S3: fetched '{}/{}' in {}s".format(
+                    bucket,
+                    key,
+                    round(time() - start, 3),
+                )
+            )
+            return response
 
     async def get_item_uris_from_items_uri(
         self, uri: str, item_limit: Optional[int] = None

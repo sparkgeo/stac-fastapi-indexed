@@ -16,8 +16,8 @@ class HttpsSourceReader(SourceReader):
     def can_handle_uri(uri: str) -> bool:
         return not not match(_uri_start_regex, uri)
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         _logger.info("creating HTTPS Reader")
 
     async def get_uri_as_string(self, uri: str) -> str:
