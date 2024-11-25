@@ -40,7 +40,9 @@ class Reader:
         if self._source_reader is None:
             for reader_class in source_reader_classes:
                 if reader_class.can_handle_uri(self.root_catalog_uri):
-                    self._source_reader = reader_class()
+                    self._source_reader = reader_class(
+                        concurrency=get_settings().max_concurrency
+                    )
                     break
         if self._source_reader is None:
             raise Exception(

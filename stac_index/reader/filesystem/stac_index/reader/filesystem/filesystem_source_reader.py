@@ -15,8 +15,8 @@ class FilesystemSourceReader(SourceReader):
     def can_handle_uri(uri: str) -> bool:
         return uri.startswith(_uri_start_str)
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         _logger.info("creating Filesystem Reader")
 
     async def get_uri_as_string(self, uri: str) -> str:
