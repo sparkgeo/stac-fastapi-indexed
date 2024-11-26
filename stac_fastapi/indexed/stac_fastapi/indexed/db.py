@@ -1,3 +1,5 @@
+import logging
+import os
 from logging import Logger, getLogger
 from time import time
 from typing import Any, Final, List, Optional
@@ -20,9 +22,9 @@ async def connect_to_db() -> None:
         for index_reader in index_reader_classes
         if index_reader.can_handle_source_uri(index_source_uri)
     ]
-    if len(compatible_index_readers) == 0:
-        raise Exception(f"no index readers support source URI '{index_source_uri}'")
-    index_source = compatible_index_readers[0](index_source_uri)
+    if len(compatible_index_sources) == 0:
+        raise Exception(f"no index sources support source URL '{index_source_url}'")
+    index_source = cast(IndexSource, compatible_index_sources[0])
     times = {}
     start = time()
     global _root_db_connection

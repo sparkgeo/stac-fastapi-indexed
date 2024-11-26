@@ -39,12 +39,16 @@ services:
     image: sparkgeo/stac_indexer
     environment:
       <<: *minio-environment
-      stac_index_indexer_output_dir: /output
-      stac_index_reader_s3_endpoint: http://minio:9000
+      stac_index_index_output_dir: /output
+      stac_index_s3_endpoint: http://minio:9000
+      AWS_PROFILE: ${AWS_PROFILE:-not-set}
     volumes:
+      - "~/.aws:/root/.aws:ro"
       - "indexer-output:/output:rw"
-      - "./data/STAC/sample/index-config.json:/index-config.json:ro"
-    command: "python -m stac_index.indexer.index /index-config.json"
+      - "./stac_index_common:/app/stac_index_common:rw"
+      - "./stac_indexer:/app/stac_indexer:rw"
+    working_dir: /app/stac_indexer/src
+    command: "python -m stac_indexer.index s3://stac/sample/catalog.json"
     depends_on:
       minio-sample-loader:
         condition: service_completed_successfully
