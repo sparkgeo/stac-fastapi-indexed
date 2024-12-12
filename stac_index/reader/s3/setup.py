@@ -12,6 +12,7 @@ setup(
     extras_require={
         "dev": [
             "pre-commit>=3.6.2,<4.0",
+            "types-boto3~=1.35.79",
         ],
     },
 )

@@ -15,6 +15,7 @@ setup(
     extras_require={
         "dev": [
             "pre-commit>=3.6.2,<4.0",
+            "types-shapely~=2.0.0",
         ],
         "test": [
             "pytest~=8.2.2",
