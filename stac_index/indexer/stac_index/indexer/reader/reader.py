@@ -5,11 +5,13 @@ from re import Pattern, compile, sub
 from threading import Lock
 from typing import Any, Callable, Dict, Final, List, Protocol, Tuple, Type, cast
 
-from stac_pydantic import Catalog, Collection, Item
+from stac_pydantic import Catalog, Collection
 from stac_pydantic.links import Links
 
 from stac_index.common import source_reader_classes
+from stac_index.common.indexing_error import IndexingError, IndexingErrorType, new_error
 from stac_index.common.source_reader import SourceReader
+from stac_index.common.stac_parser import StacParser, StacParserException
 from stac_index.indexer.settings import get_settings
 from stac_index.indexer.types.stac_data import CollectionWithLocation, ItemWithLocation
 
@@ -34,6 +36,7 @@ class Reader:
 
     def __post_init__(self):
         self._source_reader = None
+        self._stac_parser = StacParser([])
 
     # currently assumes only one uri-style for the entire catalog
     def _get_source_reader_for_uri(self) -> SourceReader:
@@ -73,10 +76,10 @@ class Reader:
 
     async def get_collections(
         self, root_catalog: Catalog
-    ) -> Tuple[List[CollectionWithLocation], List[str]]:
+    ) -> Tuple[List[CollectionWithLocation], List[IndexingError]]:
         _logger.info("reading collections")
         collections: List[CollectionWithLocation] = []
-        errors: List[str] = []
+        errors: List[IndexingError] = []
 
         child_links_all: List[str] = [
             link.href
@@ -96,16 +99,22 @@ class Reader:
                     child_dict = await self._get_json_content_from_uri(child_link)
                 except Exception as e:
                     errors.append(
-                        "Could not read or parse child JSON at '{}': {}".format(
-                            child_link, e
+                        new_error(
+                            IndexingErrorType.collection_parsing,
+                            "Could not read or parse child JSON at '{}': {}".format(
+                                child_link, e
+                            ),
                         )
                     )
                     continue
                 child_type = str(child_dict.get("type", "_unknown_")).lower()
                 if child_type not in _child_types_by_lower_type:
                     errors.append(
-                        "Did not recognise child type at '{}': {}".format(
-                            child_link, child_type
+                        new_error(
+                            IndexingErrorType.collection_parsing,
+                            "Did not recognise child type at '{}': {}".format(
+                                child_link, child_type
+                            ),
                         )
                     )
                     continue
@@ -113,8 +122,11 @@ class Reader:
                     child = _child_types_by_lower_type[child_type](**child_dict)
                 except Exception as e:
                     errors.append(
-                        "Could not parse child dictionary as '{}' at '{}': {}".format(
-                            child_type, child_link, e
+                        new_error(
+                            IndexingErrorType.collection_parsing,
+                            "Could not parse child dictionary as '{}' at '{}': {}".format(
+                                child_type, child_link, e
+                            ),
                         )
                     )
                     continue
@@ -146,10 +158,10 @@ class Reader:
     async def process_items(
         self,
         collections: List[Collection],
-        item_ingestor: Callable[[ItemWithLocation], List[str]],
-    ) -> List[str]:
+        item_ingestor: Callable[[ItemWithLocation], List[IndexingError]],
+    ) -> List[IndexingError]:
         _logger.info("reading items for collections")
-        all_errors: List[str] = []
+        all_errors: List[IndexingError] = []
         item_uris: List[str] = []
         if _settings.test_collection_limit is not None:
             collections = collections[: _settings.test_collection_limit]
@@ -175,20 +187,17 @@ class Reader:
                 )
             )
 
-        async def fetch_and_ingest(uri: str, semaphore: Semaphore) -> List[str]:
+        async def fetch_and_ingest(
+            uri: str, semaphore: Semaphore
+        ) -> List[IndexingError]:
             async with semaphore:
                 _logger.debug(f"fetch_and_ingest {uri}")
-                item_errors = []
+                item_errors: List[IndexingError] = []
                 try:
                     dict_item = await self._get_json_content_from_uri(uri)
-                    item = Item(**dict_item)
-                except Exception as e:
-                    item_errors.append(
-                        "Could not read or parse content at '{}': {}".format(
-                            uri,
-                            e,
-                        )
-                    )
+                    item = self._stac_parser.parse_stac_item(dict_item)
+                except StacParserException as e:
+                    item_errors.append(e.indexing_error)
                 else:
                     if not _has_matching_self_link(item, uri):
                         _logger.debug(
@@ -223,9 +232,9 @@ class Reader:
 
     async def _get_collection_item_uris(
         self, collection: Collection, semaphore: Semaphore
-    ) -> Tuple[List[str], List[str]]:
+    ) -> Tuple[List[str], List[IndexingError]]:
         item_uris: List[str] = []
-        errors: List[str] = []
+        errors: List[IndexingError] = []
         item_single_uris = [
             link.href for link in collection.links.link_iterator() if link.rel == "item"
         ]
@@ -256,7 +265,12 @@ class Reader:
                     else remaining_allowed_links - len(collection_item_uris)
                 )
                 item_uris.extend(collection_item_uris)
-                errors.extend(collection_item_errors)
+                errors.extend(
+                    [
+                        new_error(IndexingErrorType.item_fetching, error)
+                        for error in collection_item_errors
+                    ]
+                )
         return (item_uris, errors)
 
 
