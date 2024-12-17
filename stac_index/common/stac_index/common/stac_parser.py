@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, List
 
+from pydantic import ValidationError
 from stac_pydantic import Item
 
 from stac_index.common.indexing_error import IndexingError, IndexingErrorType
@@ -14,22 +15,8 @@ class Fixer(ABC):
 
 
 class StacParserException(Exception):
-    def __init__(self, type_: IndexingErrorType, description: str):
-        self.indexing_error = IndexingError(
-            timestamp=datetime.now(tz=timezone.utc),
-            type_=type_,
-            description=description,
-        )
-
-
-class StacItemParserException(StacParserException):
-    def __init__(self, description: str):
-        super().__init__(IndexingErrorType.item_parsing, description)
-
-
-class StacCollectionParserException(StacParserException):
-    def __init__(self, description: str):
-        super().__init__(IndexingErrorType.collection_parsing, description)
+    def __init__(self, indexing_errors: List[IndexingError]):
+        self.indexing_errors = indexing_errors
 
 
 class StacParser:
@@ -41,5 +28,28 @@ class StacParser:
             fields = fix.apply(fields)
         try:
             return Item(**fields)
+        except ValidationError as e:
+            raise StacParserException(
+                [
+                    IndexingError(
+                        timestamp=datetime.now(tz=timezone.utc),
+                        type=IndexingErrorType.item_parsing,
+                        subtype=error["type"],
+                        input_location=", ".join(map(str, error["loc"])),
+                        description=error["msg"],
+                    )
+                    for error in e.errors()
+                ]
+            )
         except Exception as e:
-            raise StacItemParserException("Error parsing item:'{}'".format(e))
+            raise StacParserException(
+                [
+                    IndexingError(
+                        timestamp=datetime.now(tz=timezone.utc),
+                        type=IndexingErrorType.item_parsing,
+                        subtype="",
+                        input_location="",
+                        description=str(e),
+                    )
+                ]
+            )

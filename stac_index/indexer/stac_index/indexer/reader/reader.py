@@ -197,7 +197,7 @@ class Reader:
                     dict_item = await self._get_json_content_from_uri(uri)
                     item = self._stac_parser.parse_stac_item(dict_item)
                 except StacParserException as e:
-                    item_errors.append(e.indexing_error)
+                    item_errors.extend(e.indexing_errors)
                 else:
                     if not _has_matching_self_link(item, uri):
                         _logger.debug(
