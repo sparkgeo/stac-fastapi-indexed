@@ -6,5 +6,6 @@ CREATE TABLE errors (
     error_type     VARCHAR,
     subtype        VARCHAR,
     input_location VARCHAR,
-    description    VARCHAR
+    description    VARCHAR,
+    possible_fixes VARCHAR
 );

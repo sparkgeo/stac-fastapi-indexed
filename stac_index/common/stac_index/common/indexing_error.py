@@ -19,6 +19,7 @@ class IndexingError(BaseModel):
     subtype: str
     input_location: str
     description: str
+    possible_fixes: str
 
 
 def new_error(
@@ -27,6 +28,7 @@ def new_error(
     *,
     subtype: str = "",
     input_location: str = "",
+    possible_fixes: str = "",
 ) -> IndexingError:
     return IndexingError(
         timestamp=datetime.now(tz=timezone.utc),
@@ -34,12 +36,13 @@ def new_error(
         subtype=subtype,
         input_location=input_location,
         description=description,
+        possible_fixes=possible_fixes,
     )
 
 
 def get_all_errors(db_conn: DuckDBPyConnection) -> list[IndexingError]:
     query = db_conn.sql(
-        "SELECT time, error_type, subtype, input_location, description FROM errors ORDER BY id;"
+        "SELECT time, error_type, subtype, input_location, description, possible_fixes FROM errors ORDER BY id;"
     )
     return [
         IndexingError(
@@ -48,6 +51,7 @@ def get_all_errors(db_conn: DuckDBPyConnection) -> list[IndexingError]:
             subtype=row[2],
             input_location=row[3],
             description=row[4],
+            possible_fixes=row[5],
         )
         for row in query.fetchall()
     ]
@@ -55,12 +59,13 @@ def get_all_errors(db_conn: DuckDBPyConnection) -> list[IndexingError]:
 
 def save_error(db_conn: DuckDBPyConnection, error: IndexingError):
     db_conn.execute(
-        "INSERT INTO errors (time, error_type, subtype, input_location, description) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO errors (time, error_type, subtype, input_location, description, possible_fixes) VALUES (?, ?, ?, ?, ?, ?)",
         (
             error.timestamp,
             error.type,
             error.subtype,
             error.input_location,
             error.description,
+            error.possible_fixes,
         ),
     )

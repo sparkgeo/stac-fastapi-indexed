@@ -33,10 +33,11 @@ _child_types_by_lower_type: Final[Dict[str, Type[_HasLinks]]] = {
 @dataclass
 class Reader:
     root_catalog_uri: str
+    fixes_to_apply: List[str]
 
     def __post_init__(self):
         self._source_reader = None
-        self._stac_parser = StacParser([])
+        self._stac_parser = StacParser(self.fixes_to_apply)
 
     # currently assumes only one uri-style for the entire catalog
     def _get_source_reader_for_uri(self) -> SourceReader:
@@ -195,7 +196,7 @@ class Reader:
                 item_errors: List[IndexingError] = []
                 try:
                     dict_item = await self._get_json_content_from_uri(uri)
-                    item = self._stac_parser.parse_stac_item(dict_item)
+                    (item, dict_item) = self._stac_parser.parse_stac_item(dict_item)
                 except StacParserException as e:
                     item_errors.extend(e.indexing_errors)
                 else:

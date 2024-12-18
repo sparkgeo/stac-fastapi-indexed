@@ -1,7 +1,6 @@
 from asyncio import run
 from json import load
 from logging import Logger, getLogger
-from os import linesep
 from typing import Final, List
 
 from stac_index.common.indexing_error import IndexingError
@@ -25,7 +24,10 @@ def execute(
 
 async def _call_process(index_config: IndexConfig) -> List[IndexingError]:
     return await IndexCreator(index_config=index_config).process(
-        Reader(root_catalog_uri=index_config.root_catalog_uri)
+        Reader(
+            root_catalog_uri=index_config.root_catalog_uri,
+            fixes_to_apply=index_config.fixes_to_apply,
+        )
     )
 
 
