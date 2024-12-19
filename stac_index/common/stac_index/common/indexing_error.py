@@ -9,7 +9,7 @@ class IndexingErrorType(str, Enum):
     unknown = "unknown"
     item_fetching = "item_fetching"
     item_parsing = "item_parsing"
-    item_validation = "item_parsing"
+    item_validation = "item_validation"
     collection_parsing = "collection_parsing"
 
 
