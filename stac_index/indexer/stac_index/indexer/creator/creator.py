@@ -6,7 +6,7 @@ from os import makedirs, path
 from typing import Dict, Final, List, Tuple
 
 from duckdb import ConstraintException, connect
-from shapely import Geometry
+from shapely import Geometry, is_valid_reason
 from shapely.wkt import loads as wkt_loads
 from stac_fastapi.types.stac import Collection
 
@@ -161,7 +161,8 @@ class IndexCreator:
                 errors.append(
                     new_error(
                         IndexingErrorType.item_validation,
-                        f"skipping invalid geometry '{item.collection}'/'{item.id}'",
+                        f"Invalid geometry for '{item.collection}'/'{item.id}': {is_valid_reason(geometry)}",
+                        subtype="invalid_geometry",
                     )
                 )
                 counts["invalid"] += 1
