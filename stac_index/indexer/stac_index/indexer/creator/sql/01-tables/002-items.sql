@@ -6,5 +6,6 @@ CREATE TABLE items (
     start_datetime TIMESTAMPTZ,
     end_datetime TIMESTAMPTZ,
     stac_location VARCHAR NOT NULL,
+    applied_fixes VARCHAR,
     PRIMARY KEY (collection_id, id),
 );

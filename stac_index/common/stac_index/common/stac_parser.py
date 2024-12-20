@@ -40,6 +40,9 @@ class ExtensionUriFixer(Fixer):
                 result["stac_extensions"][i] = (
                     "https://stac-extensions.github.io/eo/v1.0.0/schema.json"
                 )
+                applied_fixes = result.get("applied_fixes", set())
+                applied_fixes.add(self.name())
+                result["applied_fixes"] = applied_fixes
         return result
 
 

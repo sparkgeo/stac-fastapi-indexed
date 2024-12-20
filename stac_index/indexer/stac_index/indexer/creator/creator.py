@@ -150,6 +150,7 @@ class IndexCreator:
             "start_datetime": "?",
             "end_datetime": "?",
             "stac_location": "?",
+            "applied_fixes": "?",
         }
         for indexable in self._index_config.indexables.values():
             insert_fields_and_values_template[indexable.table_column_name] = "?"
@@ -175,6 +176,9 @@ class IndexCreator:
                 item.properties.start_datetime,
                 item.properties.end_datetime,
                 item.location,
+                ",".join(item.applied_fixes)
+                if item.applied_fixes is not None
+                else "NONE",
             ]
             for (
                 collection_id,
