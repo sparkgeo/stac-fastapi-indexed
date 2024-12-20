@@ -17,7 +17,11 @@ _logger = getLogger(__file__)
 class Fixer(ABC):
     def name(self) -> str:
         # Get class name and convert it to snake case
-        return re.sub(r"(?<!^)(?=[A-Z])", "-", type(self).__name__).lower()
+        return (
+            re.sub(r"(?<!^)(?=[A-Z])", "-", type(self).__name__)
+            .lower()
+            .removesuffix("-fixer")
+        )
 
     @abstractmethod
     def check(self, error: ErrorDetails) -> bool:
@@ -57,7 +61,7 @@ class StacParser:
         self._active_fixers = []
         for fixer_name in fixers:
             for fixer in self._all_fixers:
-                if fixer.name() == fixer_name + "-fixer":
+                if fixer.name() == fixer_name:
                     self._active_fixers.append(fixer)
                     _logger.info("Enabling fixer: {}".format(fixer_name))
                     break
