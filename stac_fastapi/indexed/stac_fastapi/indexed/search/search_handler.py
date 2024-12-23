@@ -50,6 +50,7 @@ from stac_fastapi.indexed.search.token import (
 from stac_fastapi.indexed.search.types import SearchDirection, SearchMethod
 from stac_fastapi.indexed.sortables.sortable_config import get_sortable_configs_by_field
 from stac_fastapi.indexed.stac.fetcher import fetch_dict
+from stac_index.common.stac_parser import StacParser
 
 _logger: Final[Logger] = getLogger(__file__)
 _text_filter_wrap_key: Final[str] = "__text_filter"
@@ -102,12 +103,18 @@ class SearchHandler:
         fetch_tasks = [
             fetch_dict(url) for url in [row[0] for row in rows[0 : query_info.limit]]
         ]
+        fixes_to_apply = [
+            fix_list.split(",")
+            for fix_list in [row[1] for row in rows[0 : query_info.limit]]
+        ]
+        fetched_dicts = await gather(*fetch_tasks)
+
         items = [
             fix_item_links(
-                Item(**item_dict),
+                Item(**StacParser(fixers).parse_stac_item(item_dict)[1]),
                 self.request,
             )
-            for item_dict in await gather(*fetch_tasks)
+            for (item_dict, fixers) in zip(fetched_dicts, fixes_to_apply)
         ]
         links = [
             get_catalog_link(self.request, rel_root),
@@ -157,7 +164,7 @@ class SearchHandler:
             clauses.append(addition.sql)
             params.extend(addition.params)
         query = """
-            SELECT stac_location
+            SELECT stac_location, applied_fixes
             FROM items
               {where}
               {order}
