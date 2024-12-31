@@ -14,6 +14,12 @@ class IndexingErrorType(str, Enum):
 
 
 class IndexingError(BaseModel):
+    """Represents an error that occured during indexing.
+
+    This error type is stored in the index and returned by the API.
+
+    """
+
     timestamp: datetime
     type: IndexingErrorType
     subtype: str
@@ -30,6 +36,7 @@ def new_error(
     input_location: str = "",
     possible_fixes: str = "",
 ) -> IndexingError:
+    """Convenience method for constructing an IndexingError."""
     return IndexingError(
         timestamp=datetime.now(tz=timezone.utc),
         type=type,
@@ -41,6 +48,7 @@ def new_error(
 
 
 def get_all_errors(db_conn: DuckDBPyConnection) -> list[IndexingError]:
+    """Query the database for the list of errors that occured during indexing."""
     query = db_conn.sql(
         "SELECT time, error_type, subtype, input_location, description, possible_fixes FROM errors ORDER BY id;"
     )
@@ -58,6 +66,7 @@ def get_all_errors(db_conn: DuckDBPyConnection) -> list[IndexingError]:
 
 
 def save_error(db_conn: DuckDBPyConnection, error: IndexingError):
+    """Write an error to the database."""
     db_conn.execute(
         "INSERT INTO errors (time, error_type, subtype, input_location, description, possible_fixes) VALUES (?, ?, ?, ?, ?, ?)",
         (

@@ -16,7 +16,12 @@ _logger = getLogger(__file__)
 
 class Fixer(ABC):
     def name(self) -> str:
-        # Get class name and convert it to snake case
+        """Generate user-visible name for this fixer.
+
+        Converts the class name to kebob case and then strips "-fixer" off the
+        end. E.g. "ExampleNameFixer" becomes "example-name".
+
+        """
         return (
             re.sub(r"(?<!^)(?=[A-Z])", "-", type(self).__name__)
             .lower()
@@ -30,10 +35,29 @@ class Fixer(ABC):
 
     @abstractmethod
     def fix(self, fields: dict[str, Any]) -> dict[str, Any]:
+        """Apply the fix to a dictionary.
+
+        Given a dictionary that should represent am Item, return a new
+        dictionary with the fix applied.
+
+        If the fix does not apply to the input dict, just return the dict
+        unchanged.
+
+        If the fix is applied, an "applied_fixes" field is added or updated,
+        containing a list of the names of applied fixes.
+
+        """
         pass
 
 
 class ExtensionUriFixer(Fixer):
+    """Fixes the common problem where an extension is given by name instead or URI.
+
+    Currently only works with the Earth Observation extension, replacing "eo"
+    with "https://stac-extensions.github.io/eo/v1.0.0/schema.json".
+
+    """
+
     def check(self, error: ErrorDetails) -> bool:
         return error["type"] == "url_parsing" and error["loc"][0] == "stac_extensions"
 
@@ -51,11 +75,23 @@ class ExtensionUriFixer(Fixer):
 
 
 class StacParserException(Exception):
+    """Exception class that wraps an IndexingError."""
+
     def __init__(self, indexing_errors: List[IndexingError]):
         self.indexing_errors = indexing_errors
 
 
 class StacParser:
+    """Constructs STAC Items from a dictionary of fields, optionally applying fixes.
+
+    Stores a list of all fixers and a list of active filters. Active filters are
+    specified in __init__() and are applied to all item dictionaries before
+    conversion. If constructing a Item fails, the raised error will list and
+    fixers (taken from the _all_fixers list) that could have possibly been used
+    to repair the Item.
+
+    """
+
     def __init__(self, fixers: list[str]):
         self._all_fixers = [ExtensionUriFixer()]
         self._active_fixers = []
