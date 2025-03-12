@@ -1,4 +1,3 @@
-import re
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -15,18 +14,10 @@ _logger = getLogger(__file__)
 
 
 class Fixer(ABC):
-    def name(self) -> str:
-        """Generate user-visible name for this fixer.
-
-        Converts the class name to kebob case and then strips "-fixer" off the
-        end. E.g. "ExampleNameFixer" becomes "example-name".
-
-        """
-        return (
-            re.sub(r"(?<!^)(?=[A-Z])", "-", type(self).__name__)
-            .lower()
-            .removesuffix("-fixer")
-        )
+    @staticmethod
+    @abstractmethod
+    def name() -> str:
+        pass
 
     @abstractmethod
     def check(self, error: ErrorDetails) -> bool:
@@ -50,7 +41,7 @@ class Fixer(ABC):
         pass
 
 
-class ExtensionUriFixer(Fixer):
+class EOExtensionUriFixer(Fixer):
     """Fixes the common problem where an extension is given by name instead or URI.
 
     Currently only works with the Earth Observation extension, replacing "eo"
@@ -58,13 +49,17 @@ class ExtensionUriFixer(Fixer):
 
     """
 
+    @staticmethod
+    def name() -> str:
+        return "eo-extension-uri"
+
     def check(self, error: ErrorDetails) -> bool:
         return error["type"] == "url_parsing" and error["loc"][0] == "stac_extensions"
 
     def fix(self, fields: dict[str, Any]) -> dict[str, Any]:
         result = deepcopy(fields)
         for i, elem in enumerate(result.get("stac_extensions", [])):
-            if elem == "eo":
+            if str(elem).lower() == "eo":
                 result["stac_extensions"][i] = (
                     "https://stac-extensions.github.io/eo/v1.0.0/schema.json"
                 )
@@ -93,7 +88,7 @@ class StacParser:
     """
 
     def __init__(self, fixers: list[str]):
-        self._all_fixers = [ExtensionUriFixer()]
+        self._all_fixers = [EOExtensionUriFixer()]
         self._active_fixers = []
         for fixer_name in fixers:
             for fixer in self._all_fixers:

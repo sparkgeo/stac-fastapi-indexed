@@ -5,7 +5,11 @@ from pydantic_core import Url, ValidationError
 from stac_pydantic import Item
 
 from stac_index.common.indexing_error import IndexingErrorType
-from stac_index.common.stac_parser import StacParser, StacParserException
+from stac_index.common.stac_parser import (
+    EOExtensionUriFixer,
+    StacParser,
+    StacParserException,
+)
 
 
 class StacParserTest(unittest.TestCase):
@@ -41,9 +45,9 @@ class StacParserTest(unittest.TestCase):
         assert len(raised_exception.indexing_errors) == 1
         indexing_error = raised_exception.indexing_errors[0]
         assert indexing_error.type == IndexingErrorType.item_parsing
-        assert indexing_error.possible_fixes == "extension-uri"
+        assert indexing_error.possible_fixes == EOExtensionUriFixer.name()
 
-        target = StacParser(["extension-uri"])
+        target = StacParser([EOExtensionUriFixer.name()])
         (item, fields) = target.parse_stac_item(
             json.loads(item_with_invalid_extension_json)
         )
