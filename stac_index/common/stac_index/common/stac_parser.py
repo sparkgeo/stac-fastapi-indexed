@@ -54,7 +54,15 @@ class EOExtensionUriFixer(Fixer):
         return "eo-extension-uri"
 
     def check(self, error: ErrorDetails) -> bool:
-        return error["type"] == "url_parsing" and error["loc"][0] == "stac_extensions"
+        type_key = "type"
+        location_key = "loc"
+        if type_key in error and location_key in error:
+            return (
+                error[type_key] == "url_parsing"
+                and error[location_key][0] == "stac_extensions"
+            )
+        else:
+            raise Exception("some expected keys missing from error")
 
     def fix(self, fields: dict[str, Any]) -> dict[str, Any]:
         result = deepcopy(fields)
