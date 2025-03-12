@@ -1,7 +1,7 @@
-CREATE SEQUENCE seq_collections_id START 1;
+CREATE SEQUENCE seq_errors_id START 1;
 
 CREATE TABLE errors (
-    id             INTEGER PRIMARY KEY DEFAULT NEXTVAL('seq_collections_id'),
+    id             INTEGER PRIMARY KEY DEFAULT NEXTVAL('seq_errors_id'),
     time           TIMESTAMPTZ,
     error_type     VARCHAR,
     subtype        VARCHAR,
