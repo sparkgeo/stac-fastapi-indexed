@@ -33,7 +33,7 @@ class StacParserTest(unittest.TestCase):
             in item.stac_extensions
         )
 
-    def test_read_item_with_invalid_extension(self):
+    def test_read_item_with_invalid_extension_with_fixer(self):
         self.assertRaises(
             ValidationError,
             lambda: Item(**json.loads(item_with_invalid_extension_json)),
@@ -67,6 +67,20 @@ class StacParserTest(unittest.TestCase):
             Url("https://stac-extensions.github.io/eo/v1.0.0/schema.json")
             in item.stac_extensions
         )
+
+    def test_read_item_with_invalid_extension_without_fixer(self):
+        self.assertRaises(
+            ValidationError,
+            lambda: Item(**json.loads(item_with_invalid_extension_json)),
+        )
+        target = StacParser([])
+        with self.assertRaises(StacParserException) as context_manager:
+            target.parse_stac_item(json.loads(item_with_invalid_extension_json))
+        raised_exception = context_manager.exception
+        assert len(raised_exception.indexing_errors) == 1
+        indexing_error = raised_exception.indexing_errors[0]
+        assert indexing_error.type == IndexingErrorType.item_parsing
+        assert indexing_error.possible_fixes == EOExtensionUriFixer.name()
 
 
 basic_item_json = """{
