@@ -19,7 +19,9 @@ def execute(
     index_config = IndexConfig(**index_config_dict)
     errors = run(_call_process(index_config))
     if len(errors) > 0:
-        _logger.info(f"Indexing encountered {len(errors)} error(s)")
+        _logger.info(
+            f"Indexing encountered {len(errors)} error(s). Review errors via API at GET /status/errors"
+        )
 
 
 async def _call_process(index_config: IndexConfig) -> List[IndexingError]:
