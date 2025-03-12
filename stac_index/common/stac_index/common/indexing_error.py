@@ -47,24 +47,6 @@ def new_error(
     )
 
 
-def get_all_errors(db_conn: DuckDBPyConnection) -> list[IndexingError]:
-    """Query the database for the list of errors that occured during indexing."""
-    query = db_conn.sql(
-        "SELECT time, error_type, subtype, input_location, description, possible_fixes FROM errors ORDER BY id;"
-    )
-    return [
-        IndexingError(
-            timestamp=row[0],
-            type=row[1],
-            subtype=row[2],
-            input_location=row[3],
-            description=row[4],
-            possible_fixes=row[5],
-        )
-        for row in query.fetchall()
-    ]
-
-
 def save_error(db_conn: DuckDBPyConnection, error: IndexingError):
     """Write an error to the database."""
     db_conn.execute(
