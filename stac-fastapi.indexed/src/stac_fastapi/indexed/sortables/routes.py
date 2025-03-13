@@ -1,7 +1,6 @@
 from typing import Final
 
 from fastapi import FastAPI
-
 from stac_fastapi.indexed.constants import collection_wildcard
 from stac_fastapi.indexed.sortables.models import SortableField, SortablesResponse
 from stac_fastapi.indexed.sortables.sortable_config import get_sortable_configs

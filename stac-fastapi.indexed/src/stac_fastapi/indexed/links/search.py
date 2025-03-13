@@ -2,7 +2,6 @@ from typing import Any, Dict
 from urllib.parse import urljoin
 
 from fastapi import Request
-
 from stac_fastapi.indexed.constants import rel_next, rel_previous, type_json
 from stac_fastapi.indexed.links.util import get_base_href
 from stac_fastapi.indexed.search.types import SearchDirection, SearchMethod

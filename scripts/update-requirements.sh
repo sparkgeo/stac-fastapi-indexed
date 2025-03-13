@@ -20,7 +20,7 @@ set -e
 
 pushd $(dirname $0)/..
 
-pip-compile -q --no-annotate --no-strip-extras --output-file docker/requirements-api-generated.txt stac_fastapi/indexed/setup.py &
+pip-compile -q --no-annotate --no-strip-extras --output-file docker/requirements-api-generated.txt stac-fastapi.indexed/setup.py &
 pid1=$!
 
 pip-compile -q --no-annotate --no-strip-extras --output-file docker/requirements-index-common-generated.txt stac_index/common/setup.py &

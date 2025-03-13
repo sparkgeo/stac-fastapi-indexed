@@ -2,10 +2,9 @@ from logging import Logger, getLogger
 from typing import Final
 
 from jwt import decode, encode
-from stac_fastapi.types.errors import InvalidQueryParameter
-
 from stac_fastapi.indexed.search.query_info import QueryInfo
 from stac_fastapi.indexed.settings import get_settings
+from stac_fastapi.types.errors import InvalidQueryParameter
 
 _hashing_algorithm: Final[str] = "HS256"
 _logger: Final[Logger] = getLogger(__file__)

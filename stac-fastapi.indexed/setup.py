@@ -4,7 +4,8 @@ setup(
     name="stac-fastapi.indexed",
     version="0.1.0",
     python_requires=">=3.12",
-    packages=find_namespace_packages(),
+    packages=find_namespace_packages(where="src/", include=["stac_fastapi.indexed"]),
+    package_dir={"": "src"},
     install_requires=[
         "asgi-correlation-id~=4.3.3",
         "duckdb~=1.1.3",

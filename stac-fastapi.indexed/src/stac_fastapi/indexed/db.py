@@ -5,8 +5,8 @@ from typing import Any, Final, List, Optional
 
 from duckdb import DuckDBPyConnection
 from duckdb import connect as duckdb_connect
-
 from stac_fastapi.indexed.settings import get_settings
+
 from stac_index.common import index_reader_classes
 
 _logger: Final[Logger] = getLogger(__file__)

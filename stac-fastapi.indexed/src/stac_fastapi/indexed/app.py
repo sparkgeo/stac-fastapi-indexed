@@ -19,7 +19,6 @@ from stac_fastapi.extensions.core import (
     SortExtension,
     TokenPaginationExtension,
 )
-
 from stac_fastapi.indexed.core import CoreCrudClient
 from stac_fastapi.indexed.db import connect_to_db, disconnect_from_db
 from stac_fastapi.indexed.errors import get_all_errors
@@ -28,6 +27,7 @@ from stac_fastapi.indexed.search.filter.filter_client import FiltersClient
 from stac_fastapi.indexed.search.search_get_request import SearchGetRequest
 from stac_fastapi.indexed.settings import get_settings
 from stac_fastapi.indexed.sortables.routes import add_routes as add_sortables_routes
+
 from stac_index.common.indexing_error import IndexingError
 
 _logger: Final[Logger] = getLogger(__file__)
