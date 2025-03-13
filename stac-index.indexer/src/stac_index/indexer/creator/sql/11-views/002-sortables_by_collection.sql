@@ -12,7 +12,7 @@ CREATE VIEW sortables_by_collection AS
          , s.description
          , s.json_path
          , COALESCE(s.items_column, s.name) AS items_column
-      FROM sortables s 
+      FROM sortables s
       JOIN (
            SELECT sac.name
              FROM sortables_all_collections sac

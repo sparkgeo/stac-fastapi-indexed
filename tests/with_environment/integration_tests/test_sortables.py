@@ -19,7 +19,7 @@ def setup_module():
     wait_for_api()
 
 
-def test_sortables_all_collections():
+def test_sortables_all_collections() -> None:
     sortable_property_titles = [
         entry["title"]
         for entry in requests.get(f"{api_base_url}/sortables").json()["fields"]
@@ -29,7 +29,7 @@ def test_sortables_all_collections():
     )
 
 
-def test_sortables_by_collection():
+def test_sortables_by_collection() -> None:
     with open(get_index_config_path(), "r") as f:
         index_config = load(f)
     sortables_by_collection: Dict[str, List[str]] = {}

@@ -22,7 +22,7 @@ def setup_module():
     _all_collections, _all_items_by_collection_id, _all_items = get_test_items()
 
 
-def test_post_search_filter_numeric_between_include():
+def test_post_search_filter_numeric_between_include() -> None:
     unique_gsd = sorted(list(set([item["properties"]["gsd"] for item in _all_items])))
     gsd_min = unique_gsd[0] - 0.1
     gsd_max = unique_gsd[-1] + 0.1
@@ -50,7 +50,7 @@ def test_post_search_filter_numeric_between_include():
     )
 
 
-def test_post_search_filter_numeric_between_exclude():
+def test_post_search_filter_numeric_between_exclude() -> None:
     unique_gsd = sorted(list(set([item["properties"]["gsd"] for item in _all_items])))
     assert len(unique_gsd) > 1
     gsd_min = unique_gsd[-1] + 0.1
@@ -79,7 +79,7 @@ def test_post_search_filter_numeric_between_exclude():
     )
 
 
-def test_post_search_filter_numeric_gt():
+def test_post_search_filter_numeric_gt() -> None:
     unique_gsd = sorted(list(set([item["properties"]["gsd"] for item in _all_items])))
     assert len(unique_gsd) > 2
     gsd_range = unique_gsd[-1] - unique_gsd[0]
@@ -107,7 +107,7 @@ def test_post_search_filter_numeric_gt():
     )
 
 
-def test_post_search_filter_numeric_lt():
+def test_post_search_filter_numeric_lt() -> None:
     unique_gsd = sorted(list(set([item["properties"]["gsd"] for item in _all_items])))
     assert len(unique_gsd) > 2
     gsd_range = unique_gsd[-1] - unique_gsd[0]
@@ -135,7 +135,7 @@ def test_post_search_filter_numeric_lt():
     )
 
 
-def test_post_search_filter_string_equals():
+def test_post_search_filter_string_equals() -> None:
     test_item = _all_items[0]
     compare_results_to_expected(
         [test_item],
@@ -159,7 +159,7 @@ def test_post_search_filter_string_equals():
     )
 
 
-def test_post_search_filter_not():
+def test_post_search_filter_not() -> None:
     exclude_item = _all_items[0]
     expected_items = [
         item
@@ -200,7 +200,7 @@ def test_post_search_filter_not():
     )
 
 
-def test_post_search_filter_or():
+def test_post_search_filter_or() -> None:
     or_list_length = 3
     assert len(_all_items) > or_list_length
     or_list = _all_items[:or_list_length]
@@ -235,7 +235,7 @@ def test_post_search_filter_or():
     )
 
 
-def test_post_search_filter_string_like():
+def test_post_search_filter_string_like() -> None:
     partial_id_length = 4
     first_item = _all_items[0]
     partial_id = first_item["id"][:partial_id_length]
@@ -268,7 +268,7 @@ def test_post_search_filter_string_like():
     )
 
 
-def test_post_search_filter_string_in():
+def test_post_search_filter_string_in() -> None:
     in_list_length = 3
     assert len(_all_items) >= in_list_length
     in_list_items = _all_items[:in_list_length]
@@ -291,7 +291,7 @@ def test_post_search_filter_string_in():
     )
 
 
-def test_post_search_filter_point_intersect():
+def test_post_search_filter_point_intersect() -> None:
     test_collection = _all_collections[0]
     test_item = _all_items_by_collection_id[test_collection["id"]][0]
     test_point = Polygon(test_item["geometry"]["coordinates"][0]).centroid
@@ -316,7 +316,7 @@ def test_post_search_filter_point_intersect():
     compare_results_to_expected(expected_items, search_results)
 
 
-def test_post_search_filter_temporal_point_intersect():
+def test_post_search_filter_temporal_point_intersect() -> None:
     unique_point_datetimes = set(
         [
             item
@@ -359,7 +359,7 @@ def test_post_search_filter_temporal_point_intersect():
     )
 
 
-def test_post_search_filter_temporal_range_intersect():
+def test_post_search_filter_temporal_range_intersect() -> None:
     unique_start_datetimes = set(
         [
             item

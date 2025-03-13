@@ -31,11 +31,11 @@ def setup_module():
     _all_collections, _all_items_by_collection_id, _all_items = get_test_items()
 
 
-def test_get_search_blank():
+def test_get_search_blank() -> None:
     compare_results_to_expected(_all_items, all_get_search_results({}))
 
 
-def test_get_search_collection():
+def test_get_search_collection() -> None:
     collection_id = list(_all_items_by_collection_id.keys())[0]
     compare_results_to_expected(
         _all_items_by_collection_id[collection_id],
@@ -43,7 +43,7 @@ def test_get_search_collection():
     )
 
 
-def test_get_search_ids():
+def test_get_search_ids() -> None:
     # assumes more than 3 items in test dataset
     test_items = _all_items[:3]
     compare_results_to_expected(
@@ -52,7 +52,7 @@ def test_get_search_ids():
     )
 
 
-def test_get_search_bbox():
+def test_get_search_bbox() -> None:
     test_collection = _all_collections[0]
     test_items = _all_items[:2]
     test_polygon: Polygon = None
@@ -82,7 +82,7 @@ def test_get_search_bbox():
     compare_results_to_expected(expected_items, search_results)
 
 
-def test_get_search_intersects():
+def test_get_search_intersects() -> None:
     test_collection = _all_collections[0]
     test_items = _all_items[:2]
     test_polygon: Polygon = None
@@ -109,7 +109,7 @@ def test_get_search_intersects():
     compare_results_to_expected(expected_items, search_results)
 
 
-def test_get_search_datetime_include():
+def test_get_search_datetime_include() -> None:
     unique_datetimes = set(
         [
             item["properties"]["datetime"] or item["properties"]["start_datetime"]
@@ -124,7 +124,7 @@ def test_get_search_datetime_include():
     )
 
 
-def test_get_search_datetime_exclude():
+def test_get_search_datetime_exclude() -> None:
     unique_datetimes = set(
         [
             item["properties"]["datetime"] or item["properties"]["start_datetime"]
@@ -139,7 +139,7 @@ def test_get_search_datetime_exclude():
     assert len(all_get_search_results({"datetime": test_datetime})) == 0
 
 
-def test_get_search_datetime_open_start():
+def test_get_search_datetime_open_start() -> None:
     unique_datetimes = set(
         [
             item["properties"]["datetime"] or item["properties"]["end_datetime"]
@@ -155,7 +155,7 @@ def test_get_search_datetime_open_start():
     )
 
 
-def test_get_search_datetime_open_end():
+def test_get_search_datetime_open_end() -> None:
     unique_datetimes = set(
         [
             item["properties"]["datetime"] or item["properties"]["start_datetime"]
@@ -171,7 +171,7 @@ def test_get_search_datetime_open_end():
     )
 
 
-def test_get_search_limit():
+def test_get_search_limit() -> None:
     limit = 1
     assert len(_all_items) > limit
     search_result = requests.post(
@@ -181,7 +181,7 @@ def test_get_search_limit():
     assert len(get_link_dict_by_rel(search_result, "next")) == 1
 
 
-def test_get_search_token():
+def test_get_search_token() -> None:
     limit = 1
     assert len(_all_items) > limit
     search_result = requests.post(
@@ -198,7 +198,7 @@ def test_get_search_token():
     assert dumps(previous_item) == dumps(first_item)
 
 
-def test_get_search_token_immutable():
+def test_get_search_token_immutable() -> None:
     limit = 1
     assert len(_all_items) > limit
     search_result = requests.get(
@@ -220,7 +220,7 @@ def test_get_search_token_immutable():
     assert response.status_code == 400
 
 
-def test_get_search_alternate_order():
+def test_get_search_alternate_order() -> None:
     sortable_field_names: List[str] = [
         entry["title"]
         for entry in requests.get(f"{api_base_url}/sortables").json()["fields"]

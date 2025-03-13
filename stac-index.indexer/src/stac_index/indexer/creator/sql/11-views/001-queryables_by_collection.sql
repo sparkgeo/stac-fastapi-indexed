@@ -14,7 +14,7 @@ CREATE VIEW queryables_by_collection AS
          , q.json_path
          , q.json_schema
          , COALESCE(q.items_column, q.name) AS items_column
-      FROM queryables q 
+      FROM queryables q
       JOIN (
            SELECT qac.name
              FROM queryables_all_collections qac

@@ -13,7 +13,7 @@ def setup_module():
     wait_for_api()
 
 
-def test_queryables_enabled():
+def test_queryables_enabled() -> None:
     queryables_links = get_link_hrefs_by_rel(
         requests.get(api_base_url).json(),
         "http://www.opengis.net/def/rel/ogc/1.0/queryables",
@@ -21,7 +21,7 @@ def test_queryables_enabled():
     assert len(queryables_links) == 1
 
 
-def test_catalog_collections_match():
+def test_catalog_collections_match() -> None:
     catalog_collection_hrefs = get_link_hrefs_by_rel(
         requests.get(api_base_url).json(), "child"
     )

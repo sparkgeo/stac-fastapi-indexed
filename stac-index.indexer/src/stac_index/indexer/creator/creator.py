@@ -76,7 +76,7 @@ class IndexCreator:
                 continue
             output_filename = f"{table_name}.parquet"
             self._conn.execute(f"""
-                COPY (SELECT * FROM {table_name}) 
+                COPY (SELECT * FROM {table_name})
                   TO '{output_dir}/{output_filename}'
                   (FORMAT PARQUET)
                 ;

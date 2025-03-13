@@ -30,7 +30,7 @@ def _get_request_protocol(request: Request) -> str:
 
 def _get_header_value_by_name(
     request: Request, header_name: str, default_value: Optional[str] = None
-) -> str:
+) -> Optional[str]:
     headers = request.scope["headers"]
     candidates = [
         value.decode() for key, value in headers if key.decode() == header_name

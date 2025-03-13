@@ -151,12 +151,12 @@ class DubkDBSQLEvaluator(Evaluator):
         comparison_type = lhs_type or rhs_type
         lhs_part = (
             f"CAST({lhs_identifier} AS {comparison_type})"
-            if comparison_type is not None and type(node.lhs) != ast.Attribute
+            if comparison_type is not None and type(node.lhs) is not ast.Attribute
             else lhs_identifier
         )
         rhs_part = (
             f"CAST({rhs_identifier} AS {comparison_type})"
-            if comparison_type is not None and type(node.rhs) != ast.Attribute
+            if comparison_type is not None and type(node.rhs) is not ast.Attribute
             else rhs_identifier
         )
         return FilterClause(
@@ -263,7 +263,7 @@ class DubkDBSQLEvaluator(Evaluator):
         self, node: ast.SpatialComparisonPredicate, lhs, rhs
     ) -> FilterClause:
         func = _SPATIAL_COMPARISON_OP_MAP[node.op]
-        if type(lhs) is _GeometrySql and type(rhs) == _GeometrySql:
+        if type(lhs) is _GeometrySql and type(rhs) is _GeometrySql:
             return FilterClause(sql=f"{func}({lhs.sql_part},{rhs.sql_part})")
         if type(lhs) is not _GeometrySql:
             raise NotAGeometryField(lhs)
@@ -367,7 +367,7 @@ class DubkDBSQLEvaluator(Evaluator):
         part_params = []
         part_identifier = _param_placeholder
         part_type = None
-        if type(node_part) == ast.Attribute:
+        if type(node_part) is ast.Attribute:
             # not an issue here that the field name remains quoted
             part_identifier = part_value
             part_type = self.attribute_type_map[node_part.name]
