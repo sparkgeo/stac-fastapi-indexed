@@ -26,7 +26,7 @@ pid1=$!
 pip-compile -q --no-annotate --no-strip-extras --output-file docker/requirements-index-common-generated.txt stac-index.common/setup.py &
 pid2=$!
 
-pip-compile -q --no-annotate --no-strip-extras --output-file docker/requirements-indexer-generated.txt stac_index/indexer/setup.py &
+pip-compile -q --no-annotate --no-strip-extras --output-file docker/requirements-indexer-generated.txt stac-index.indexer/setup.py &
 pid3=$!
 
 pip-compile -q --no-annotate --no-strip-extras --output-file docker/requirements-reader-s3-generated.txt stac_index/reader/s3/setup.py &

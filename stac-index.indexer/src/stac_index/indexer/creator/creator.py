@@ -9,7 +9,6 @@ from duckdb import ConstraintException, connect
 from shapely import Geometry, is_valid_reason
 from shapely.wkt import loads as wkt_loads
 from stac_fastapi.types.stac import Collection
-
 from stac_index.common.index_manifest import IndexManifest, TableMetadata
 from stac_index.common.indexing_error import (
     IndexingError,

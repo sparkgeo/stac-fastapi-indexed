@@ -2,7 +2,6 @@ from json import dumps
 from typing import List, Tuple
 
 from duckdb import DuckDBPyConnection
-
 from stac_index.indexer.types.index_config import IndexConfig
 
 

@@ -22,12 +22,12 @@ RUN pip install -r /requirements-reader-s3-generated.txt
 WORKDIR /app
 COPY stac-index.common ./stac-index.common
 COPY stac_index/reader ./stac_index/reader
-COPY stac_index/indexer ./stac_index/indexer
+COPY stac-index.indexer ./stac-index.indexer
 
 RUN pip install -e stac-index.common
 RUN pip install -e stac_index/reader/filesystem
 RUN pip install -e stac_index/reader/https
 RUN pip install -e stac_index/reader/s3
-RUN pip install -e stac_index/indexer[local-deps]
+RUN pip install -e stac-index.indexer[local-deps]
 
 CMD ["/command.sh"]

@@ -4,7 +4,8 @@ setup(
     name="stac-index.indexer",
     version="0.1.0",
     python_requires=">=3.12",
-    packages=find_namespace_packages(),
+    packages=find_namespace_packages(where="src/", include=["stac_index.indexer"]),
+    package_dir={"": "src"},
     install_requires=[
         "duckdb~=1.1.3",
         "pydantic-settings",  # don't specify a version, determined by stac-pydantic
