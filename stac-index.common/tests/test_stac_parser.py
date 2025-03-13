@@ -2,14 +2,13 @@ import json
 import unittest
 
 from pydantic_core import ValidationError
-from stac_pydantic import Item
-
 from stac_index.common.indexing_error import IndexingErrorType
 from stac_index.common.stac_parser import (
     EOExtensionUriFixer,
     StacParser,
     StacParserException,
 )
+from stac_pydantic import Item
 
 
 class StacParserTest(unittest.TestCase):

@@ -20,11 +20,11 @@ RUN pip install -r /requirements-reader-https-generated.txt
 RUN pip install -r /requirements-reader-s3-generated.txt
 
 WORKDIR /app
-COPY stac_index/common ./stac_index/common
+COPY stac-index.common ./stac-index.common
 COPY stac_index/reader ./stac_index/reader
 COPY stac_index/indexer ./stac_index/indexer
 
-RUN pip install -e stac_index/common
+RUN pip install -e stac-index.common
 RUN pip install -e stac_index/reader/filesystem
 RUN pip install -e stac_index/reader/https
 RUN pip install -e stac_index/reader/s3

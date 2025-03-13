@@ -6,9 +6,8 @@ from typing import Any, Dict, List, Tuple
 
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
-from stac_pydantic import Item
-
 from stac_index.common.indexing_error import IndexingError, IndexingErrorType
+from stac_pydantic import Item
 
 _logger = getLogger(__file__)
 

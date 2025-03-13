@@ -24,11 +24,11 @@ RUN pip install -r /requirements-api-generated.txt
 RUN python -c "import duckdb; duckdb.execute('install spatial'); duckdb.execute('install httpfs')"
 
 WORKDIR /app
-COPY stac_index/common ./stac_index/common
+COPY stac-index.common ./stac-index.common
 COPY stac_index/reader ./stac_index/reader
 COPY stac-fastapi.indexed ./stac-fastapi.indexed
 
-RUN pip install -e stac_index/common
+RUN pip install -e stac-index.common
 RUN pip install -e stac_index/reader/filesystem
 RUN pip install -e stac_index/reader/https
 RUN pip install -e stac_index/reader/s3
