@@ -25,13 +25,15 @@ RUN python -c "import duckdb; duckdb.execute('install spatial'); duckdb.execute(
 
 WORKDIR /app
 COPY stac-index.common ./stac-index.common
-COPY stac_index/reader ./stac_index/reader
+COPY stac-index.reader.filesystem ./stac-index.reader.filesystem
+COPY stac-index.reader.https ./stac-index.reader.https
+COPY stac-index.reader.s3 ./stac-index.reader.s3
 COPY stac-fastapi.indexed ./stac-fastapi.indexed
 
 RUN pip install -e stac-index.common
-RUN pip install -e stac_index/reader/filesystem
-RUN pip install -e stac_index/reader/https
-RUN pip install -e stac_index/reader/s3
+RUN pip install -e stac-index.reader.filesystem
+RUN pip install -e stac-index.reader.https
+RUN pip install -e stac-index.reader.s3
 RUN pip install -e stac-fastapi.indexed[server,local-deps]
 
 CMD ["uvicorn", "stac_fastapi.indexed.app:app", "--host", "0.0.0.0", "--port", "80"]

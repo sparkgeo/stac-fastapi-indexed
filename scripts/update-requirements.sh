@@ -29,13 +29,13 @@ pid2=$!
 pip-compile -q --no-annotate --no-strip-extras --output-file docker/requirements-indexer-generated.txt stac-index.indexer/setup.py &
 pid3=$!
 
-pip-compile -q --no-annotate --no-strip-extras --output-file docker/requirements-reader-s3-generated.txt stac_index/reader/s3/setup.py &
+pip-compile -q --no-annotate --no-strip-extras --output-file docker/requirements-reader-s3-generated.txt stac-index.reader.s3/setup.py &
 pid4=$!
 
-pip-compile -q --no-annotate --no-strip-extras --output-file docker/requirements-reader-filesystem-generated.txt stac_index/reader/filesystem/setup.py &
+pip-compile -q --no-annotate --no-strip-extras --output-file docker/requirements-reader-filesystem-generated.txt stac-index.reader.filesystem/setup.py &
 pid5=$!
 
-pip-compile -q --no-annotate --no-strip-extras --output-file docker/requirements-reader-https-generated.txt stac_index/reader/https/setup.py &
+pip-compile -q --no-annotate --no-strip-extras --output-file docker/requirements-reader-https-generated.txt stac-index.reader.https/setup.py &
 pid6=$!
 
 wait $pid1

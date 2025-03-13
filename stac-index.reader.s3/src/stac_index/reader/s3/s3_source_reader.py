@@ -6,7 +6,6 @@ from typing import Final, List, Optional, Tuple, cast
 
 from boto3 import client
 from botocore.config import Config as BotoConfig
-
 from stac_index.common.async_util import get_callable_event_loop
 from stac_index.common.source_reader import SourceReader
 from stac_index.reader.s3.settings import get_settings
