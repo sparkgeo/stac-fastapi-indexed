@@ -4,4 +4,4 @@ set -e
 
 pushd $(dirname $0)/../..
 
-python -m pytest stac_*
+python -m pytest stac*

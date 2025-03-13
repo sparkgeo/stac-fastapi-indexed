@@ -15,6 +15,10 @@ for dco in "${stack_commands[@]}"; do
         break
     fi
     $dco build
+    build_result=$?
+    if [ $build_result -ne 0 ]; then
+        exit $build_result
+    fi
     $dco run --rm tester python -m pytest -k integration_tests
     exit_code=$?
     if [ $exit_code -ne 0 ] || [ ${TESTS_DEBUG:-0} -ne 0 ]; then

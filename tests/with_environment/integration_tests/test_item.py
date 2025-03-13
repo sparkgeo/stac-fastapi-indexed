@@ -10,7 +10,7 @@ def setup_module():
     wait_for_api()
 
 
-def test_item():
+def test_item() -> None:
     collection_hrefs = get_link_hrefs_by_rel(requests.get(api_base_url).json(), "child")
     assert len(collection_hrefs) > 0
     for collection_href in collection_hrefs:

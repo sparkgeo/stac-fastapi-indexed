@@ -3,7 +3,7 @@ from json import dump
 from os import makedirs, path
 from re import sub
 from time import sleep
-from typing import Final, List
+from typing import Final, List, Optional
 
 import requests
 
@@ -98,7 +98,9 @@ def process_collection(collection_id: str) -> None:
             indent=2,
         )
 
-    next_items_url = f"{base_source_url}collections/{collection_id}/items"
+    next_items_url: Optional[str] = (
+        f"{base_source_url}collections/{collection_id}/items"
+    )
     page_count = 0
     item_fetch_retry_count = 0
     while next_items_url is not None:
@@ -139,6 +141,8 @@ def process_collection(collection_id: str) -> None:
         next_items_url = (
             next_link_entries[0]["href"] if len(next_link_entries) == 1 else None
         )
+        if next_items_url is None:
+            continue
         # Microsoft Planetary Computer STAC API is currently broken and returning broken next links - fix:
         next_items_url = sub(
             "^.+/(collections/.+)", rf"{base_source_url}\1", next_items_url

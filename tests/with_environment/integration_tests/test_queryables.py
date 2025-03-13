@@ -20,7 +20,7 @@ def setup_module():
     wait_for_api()
 
 
-def test_queryables_all_collections():
+def test_queryables_all_collections() -> None:
     queryable_properties = requests.get(f"{api_base_url}/queryables").json()[
         "properties"
     ]
@@ -29,7 +29,7 @@ def test_queryables_all_collections():
         assert expected_property_name in queryable_properties
 
 
-def test_queryables_by_collection():
+def test_queryables_by_collection() -> None:
     with open(get_index_config_path(), "r") as f:
         index_config = load(f)
     queryables_by_collection: Dict[str, List[str]] = {}

@@ -10,7 +10,7 @@ def setup_module():
     wait_for_api()
 
 
-def test_all_collections_match():
+def test_all_collections_match() -> None:
     api_collections = requests.get(f"{api_base_url}/collections").json()["collections"]
     assert len(api_collections) > 0
     for collection_file_path in get_collection_file_paths():

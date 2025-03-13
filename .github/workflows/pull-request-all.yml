@@ -10,9 +10,9 @@ jobs:
     name: Execute Unit Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Python 3.12
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Install Dependencies
@@ -23,7 +23,7 @@ jobs:
     name: Execute Smoke Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Test
         run: scripts/tests/smoke-test.sh
   integration-test:
@@ -32,6 +32,6 @@ jobs:
       - smoke-test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Test
         run: scripts/tests/integration-test.sh

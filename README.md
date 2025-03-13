@@ -46,7 +46,7 @@ STAC objects (catalog, collections, items) are identified by a unique URI. Each 
 
 An error will be thrown if an unsupported URI prefix is encountered.
 
-### Indexer 
+### Indexer
 
 The indexer is configured with a root catalog URI. From the root catalog the indexer traverses the catalog's sub-catalogs (if present), collections and items, relying on STAC's `links` objects to provide their URIs.
 
