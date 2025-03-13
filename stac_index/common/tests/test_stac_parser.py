@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from pydantic_core import Url, ValidationError
+from pydantic_core import ValidationError
 from stac_pydantic import Item
 
 from stac_index.common.indexing_error import IndexingErrorType
@@ -24,14 +24,12 @@ class StacParserTest(unittest.TestCase):
             == "/data/collections/joplin/items/386dfa13-c2b4-4ce6-8e6f-fcac73f4e64e.json"
         )
         assert len(item.stac_extensions) == 2
-        assert (
-            Url("https://stac-extensions.github.io/eo/v1.0.0/schema.json")
-            in item.stac_extensions
-        )
-        assert (
-            Url("https://stac-extensions.github.io/projection/v1.0.0/schema.json")
-            in item.stac_extensions
-        )
+        assert "https://stac-extensions.github.io/eo/v1.0.0/schema.json" in [
+            str(url) for url in item.stac_extensions
+        ]
+        assert "https://stac-extensions.github.io/projection/v1.0.0/schema.json" in [
+            str(url) for url in item.stac_extensions
+        ]
 
     def test_read_item_with_invalid_extension_with_fixer(self):
         self.assertRaises(
@@ -59,14 +57,12 @@ class StacParserTest(unittest.TestCase):
             == "/data/collections/joplin/items/386dfa13-c2b4-4ce6-8e6f-fcac73f4e64e.json"
         )
         assert len(item.stac_extensions) == 2
-        assert (
-            Url("https://stac-extensions.github.io/projection/v1.0.0/schema.json")
-            in item.stac_extensions
-        )
-        assert (
-            Url("https://stac-extensions.github.io/eo/v1.0.0/schema.json")
-            in item.stac_extensions
-        )
+        assert "https://stac-extensions.github.io/projection/v1.0.0/schema.json" in [
+            str(url) for url in item.stac_extensions
+        ]
+        assert "https://stac-extensions.github.io/eo/v1.0.0/schema.json" in [
+            str(url) for url in item.stac_extensions
+        ]
 
     def test_read_item_with_invalid_extension_without_fixer(self):
         self.assertRaises(
