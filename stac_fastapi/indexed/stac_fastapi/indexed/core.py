@@ -26,6 +26,7 @@ from stac_fastapi.indexed.links.item import fix_item_links
 from stac_fastapi.indexed.search.filter.parser import FilterLanguage
 from stac_fastapi.indexed.search.search_handler import SearchHandler
 from stac_fastapi.indexed.stac.fetcher import fetch_dict
+from stac_index.common.stac_parser import StacParser
 
 _logger: Final[Logger] = getLogger(__file__)
 
@@ -101,12 +102,16 @@ class CoreCrudClient(AsyncBaseCoreClient):
             collection_id, request=request
         )  # will error if collection does not exist
         row = fetchone(
-            "SELECT stac_location FROM items WHERE collection_id = ? and id = ?",
+            "SELECT stac_location, applied_fixes FROM items WHERE collection_id = ? and id = ?",
             [collection_id, item_id],
         )
         if row is not None:
             return fix_item_links(
-                Item(**await fetch_dict(row[0])),
+                Item(
+                    StacParser(row[1].split(",")).parse_stac_item(
+                        await fetch_dict(row[0])
+                    )[1]
+                ),
                 request,
             )
         raise NotFoundError(

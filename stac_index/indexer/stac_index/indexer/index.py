@@ -1,9 +1,9 @@
 from asyncio import run
 from json import load
 from logging import Logger, getLogger
-from os import linesep
 from typing import Final, List
 
+from stac_index.common.indexing_error import IndexingError
 from stac_index.indexer.creator.creator import IndexCreator
 from stac_index.indexer.reader.reader import Reader
 from stac_index.indexer.types.index_config import IndexConfig
@@ -19,13 +19,17 @@ def execute(
     index_config = IndexConfig(**index_config_dict)
     errors = run(_call_process(index_config))
     if len(errors) > 0:
-        _logger.info(f"Indexing encountered {len(errors)} error(s)")
-        _logger.info(linesep.join(errors) + linesep)
+        _logger.info(
+            f"Indexing encountered {len(errors)} error(s). Review errors via API at GET /status/errors"
+        )
 
 
-async def _call_process(index_config: IndexConfig) -> List[str]:
+async def _call_process(index_config: IndexConfig) -> List[IndexingError]:
     return await IndexCreator(index_config=index_config).process(
-        Reader(root_catalog_uri=index_config.root_catalog_uri)
+        Reader(
+            root_catalog_uri=index_config.root_catalog_uri,
+            fixes_to_apply=index_config.fixes_to_apply,
+        )
     )
 
 

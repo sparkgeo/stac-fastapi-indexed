@@ -46,6 +46,7 @@ class IndexConfig(BaseModel):
     indexables: IndexableByFieldName
     queryables: QueryableByFieldName
     sortables: SortablesByFieldName
+    fixes_to_apply: List[str] = []
 
     def __init__(self, **data):
         super().__init__(**data)

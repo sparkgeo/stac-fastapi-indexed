@@ -6,11 +6,17 @@ from os import makedirs, path
 from typing import Dict, Final, List, Tuple
 
 from duckdb import ConstraintException, connect
-from shapely import Geometry
+from shapely import Geometry, is_valid_reason
 from shapely.wkt import loads as wkt_loads
 from stac_fastapi.types.stac import Collection
 
 from stac_index.common.index_manifest import IndexManifest, TableMetadata
+from stac_index.common.indexing_error import (
+    IndexingError,
+    IndexingErrorType,
+    new_error,
+    save_error,
+)
 from stac_index.indexer.creator.configurer import (
     add_items_columns,
     configure_indexables,
@@ -37,7 +43,7 @@ class IndexCreator:
         except Exception:
             pass
 
-    async def process(self, reader: Reader) -> List[str]:
+    async def process(self, reader: Reader) -> List[IndexingError]:
         _logger.info("creating parquet index")
         # may eventually want some logic here to find an update an existing index, for not just creating from scratch each time
         self._create_db_objects()
@@ -66,6 +72,7 @@ class IndexCreator:
                 "items",
                 "queryables_by_collection",
                 "sortables_by_collection",
+                "errors",
             ]:
                 continue
             output_filename = f"{table_name}.parquet"
@@ -96,7 +103,7 @@ class IndexCreator:
 
     async def _request_collections(
         self, reader: Reader
-    ) -> Tuple[List[Collection], List[str]]:
+    ) -> Tuple[List[Collection], List[IndexingError]]:
         collections, errors = await reader.get_collections(
             await reader.get_root_catalog()
         )
@@ -113,7 +120,13 @@ class IndexCreator:
             try:
                 self._conn.execute(insert_sql, (collection.id, collection.location))
             except Exception as e:
-                errors.append(f"failed to insert collection '{collection.id}': {e}")
+                errors.append(
+                    new_error(
+                        IndexingErrorType.unknown,
+                        f"failed to insert collection '{collection.id}': {e}",
+                        collection=collection.id,
+                    )
+                )
         return (collections, errors)
 
     # Processing items is more complex than collections due to scale.
@@ -123,7 +136,7 @@ class IndexCreator:
     # as it is retrieved.
     async def _request_items(
         self, reader: Reader, collections: List[Collection]
-    ) -> List[str]:
+    ) -> List[IndexingError]:
         counts: Dict[str, int] = {
             "inserted": 0,
             "invalid": 0,
@@ -138,16 +151,23 @@ class IndexCreator:
             "start_datetime": "?",
             "end_datetime": "?",
             "stac_location": "?",
+            "applied_fixes": "?",
         }
         for indexable in self._index_config.indexables.values():
             insert_fields_and_values_template[indexable.table_column_name] = "?"
 
-        def processor(item: ItemWithLocation) -> List[str]:
-            errors: List[str] = []
+        def processor(item: ItemWithLocation) -> List[IndexingError]:
+            errors: List[IndexingError] = []
             geometry: Geometry = wkt_loads(item.geometry.wkt)
             if not geometry.is_valid:
                 errors.append(
-                    f"skipping invalid geometry '{item.collection}'/'{item.id}'"
+                    new_error(
+                        IndexingErrorType.item_validation,
+                        f"Invalid geometry for '{item.collection}'/'{item.id}': {is_valid_reason(geometry)}",
+                        subtype="invalid_geometry",
+                        collection=item.collection,
+                        item=item.id,
+                    )
                 )
                 counts["invalid"] += 1
                 return errors
@@ -159,6 +179,9 @@ class IndexCreator:
                 item.properties.start_datetime,
                 item.properties.end_datetime,
                 item.location,
+                ",".join(item.applied_fixes)
+                if item.applied_fixes is not None
+                else "NONE",
             ]
             for (
                 collection_id,
@@ -187,11 +210,16 @@ class IndexCreator:
                                 pass
                         if insert_param is None:
                             errors.append(
-                                "could not locate path '{}' for field '{}' in '{}'/'{}'".format(
-                                    indexable.json_path,
-                                    field_name,
-                                    item.collection,
-                                    item.id,
+                                new_error(
+                                    IndexingErrorType.item_validation,
+                                    "could not locate path '{}' for field '{}' in '{}'/'{}'".format(
+                                        indexable.json_path,
+                                        field_name,
+                                        item.collection,
+                                        item.id,
+                                    ),
+                                    collection=item.collection,
+                                    item=item.id,
                                 )
                             )
                         else:
@@ -207,18 +235,31 @@ class IndexCreator:
                 counts["inserted"] += 1
             except ConstraintException as e:
                 if "duplicate key" in str(e).lower():
-                    errors.append(f"duplicate in '{item.collection}'/'{item.id}'")
+                    errors.append(
+                        new_error(
+                            IndexingErrorType.item_validation,
+                            f"duplicate in '{item.collection}'/'{item.id}'",
+                            collection=item.collection,
+                            item=item.id,
+                        )
+                    )
                     counts["duplicates"] += 1
                 else:
                     raise  # defer to generic handler
             except Exception as e:
                 errors.append(
-                    f"failed to insert into '{item.collection}'/'{item.id}': {e}"
+                    new_error(
+                        IndexingErrorType.unknown,
+                        f"failed to insert into '{item.collection}'/'{item.id}': {e}",
+                        collection=item.collection,
+                        item=item.id,
+                    )
                 )
                 counts["failed"] += 1
             return errors
 
         errors = await reader.process_items(collections, processor)
+        self._insert_errors(errors)
         _logger.info(counts)
         return errors
 
@@ -231,3 +272,7 @@ class IndexCreator:
                 None,
             ),
         )
+
+    def _insert_errors(self, errors: list[IndexingError]) -> None:
+        for error in errors:
+            save_error(self._conn, error)

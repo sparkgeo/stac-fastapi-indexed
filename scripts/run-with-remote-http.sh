@@ -9,11 +9,18 @@ if [ "$#" -ne 1 ]; then
     exit 1
 fi
 
+if [ -z "${FIXES_TO_APPLY}" ]; then
+    fixes_json=""
+else
+    fixes_json=$(echo "${FIXES_TO_APPLY}" | sed "s/,/\", \"/g")
+    fixes_json=", \"fixes_to_apply\": [\"${fixes_json}\"]"
+fi
+
+
 root_catalog_uri="$1"
 
 export tmp_index_config_path=$(mktemp)
-echo "{\"root_catalog_uri\": \"$root_catalog_uri\", \"indexables\": {}, \"queryables\": {}, \"sortables\": {}}" > $tmp_index_config_path
-
+echo "{\"root_catalog_uri\": \"$root_catalog_uri\", \"indexables\": {}, \"queryables\": {}, \"sortables\": {} $fixes_json }" > $tmp_index_config_path
 dco="docker compose -f docker-compose.base.yml -f docker-compose.remote-http.yml"
 
 $dco build
