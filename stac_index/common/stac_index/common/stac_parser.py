@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 from datetime import datetime, timezone
 from logging import getLogger
-from typing import Any, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
@@ -25,7 +25,7 @@ class Fixer(ABC):
         pass
 
     @abstractmethod
-    def fix(self, fields: dict[str, Any]) -> dict[str, Any]:
+    def fix(self, fields: Dict[str, Any]) -> Dict[str, Any]:
         """Apply the fix to a dictionary.
 
         Given a dictionary that should represent am Item, return a new
@@ -64,7 +64,7 @@ class EOExtensionUriFixer(Fixer):
         else:
             raise Exception("some expected keys missing from error")
 
-    def fix(self, fields: dict[str, Any]) -> dict[str, Any]:
+    def fix(self, fields: Dict[str, Any]) -> Dict[str, Any]:
         result = deepcopy(fields)
         for i, elem in enumerate(result.get("stac_extensions", [])):
             if str(elem).lower() == "eo":
@@ -95,7 +95,7 @@ class StacParser:
 
     """
 
-    def __init__(self, fixers: list[str]):
+    def __init__(self, fixers: List[str]):
         self._all_fixers = [EOExtensionUriFixer()]
         self._active_fixers = []
         for fixer_name in fixers:
@@ -105,7 +105,7 @@ class StacParser:
                     _logger.info("Enabling fixer: {}".format(fixer_name))
                     break
 
-    def parse_stac_item(self, fields: dict[str, Any]) -> Tuple[Item, dict[str, Any]]:
+    def parse_stac_item(self, fields: Dict[str, Any]) -> Tuple[Item, Dict[str, Any]]:
         for fixer in self._active_fixers:
             fields = fixer.fix(fields)
         try:
@@ -126,6 +126,8 @@ class StacParser:
                                 if fixer.check(error)
                             ]
                         ),
+                        collection=fields.get("collection"),
+                        item=fields.get("id"),
                     )
                     for error in e.errors()
                 ]
@@ -136,10 +138,9 @@ class StacParser:
                     IndexingError(
                         timestamp=datetime.now(tz=timezone.utc),
                         type=IndexingErrorType.item_parsing,
-                        subtype="",
-                        input_location="",
                         description=str(e),
-                        possible_fixes="",
+                        collection=fields.get("collection"),
+                        item=fields.get("id"),
                     )
                 ]
             )

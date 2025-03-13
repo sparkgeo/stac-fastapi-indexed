@@ -14,6 +14,8 @@ def get_all_errors() -> List[IndexingError]:
             input_location=row[3],
             description=row[4],
             possible_fixes=row[5],
+            collection=row[6],
+            item=row[7],
         )
         for row in fetchall("""
         SELECT time
@@ -22,6 +24,8 @@ def get_all_errors() -> List[IndexingError]:
              , input_location
              , description
              , possible_fixes
+             , collection
+             , item
          FROM errors
      ORDER BY id
         """)

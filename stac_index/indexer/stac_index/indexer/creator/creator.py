@@ -124,6 +124,7 @@ class IndexCreator:
                     new_error(
                         IndexingErrorType.unknown,
                         f"failed to insert collection '{collection.id}': {e}",
+                        collection=collection.id,
                     )
                 )
         return (collections, errors)
@@ -164,6 +165,8 @@ class IndexCreator:
                         IndexingErrorType.item_validation,
                         f"Invalid geometry for '{item.collection}'/'{item.id}': {is_valid_reason(geometry)}",
                         subtype="invalid_geometry",
+                        collection=item.collection,
+                        item=item.id,
                     )
                 )
                 counts["invalid"] += 1
@@ -215,6 +218,8 @@ class IndexCreator:
                                         item.collection,
                                         item.id,
                                     ),
+                                    collection=item.collection,
+                                    item=item.id,
                                 )
                             )
                         else:
@@ -234,6 +239,8 @@ class IndexCreator:
                         new_error(
                             IndexingErrorType.item_validation,
                             f"duplicate in '{item.collection}'/'{item.id}'",
+                            collection=item.collection,
+                            item=item.id,
                         )
                     )
                     counts["duplicates"] += 1
@@ -244,6 +251,8 @@ class IndexCreator:
                     new_error(
                         IndexingErrorType.unknown,
                         f"failed to insert into '{item.collection}'/'{item.id}': {e}",
+                        collection=item.collection,
+                        item=item.id,
                     )
                 )
                 counts["failed"] += 1
