@@ -1,7 +1,7 @@
 from typing import Any, List, Optional, Tuple
 
 from stac_index.common.index_reader import IndexReader
-from stac_index.reader.filesystem.filesystem_source_reader import FilesystemSourceReader
+from .filesystem_source_reader import FilesystemSourceReader
 
 
 class FilesystemIndexReader(IndexReader):

@@ -12,3 +12,8 @@
 .autoenv*.zsh
 
 !**/.gitkeep
+
+**/.pytest_cache
+**/*.pyc
+dist
+**/*.egg-info

@@ -1,0 +1,19 @@
+services:
+  api:
+    build:
+      dockerfile: docker/api/Dockerfile
+      context: .
+    image: sparkgeo/stac_fastapi_indexed
+    container_name: stac_fastapi_indexed
+    environment:
+      # jwt_secret random, generated with `openssl rand -base64 32`
+      # create a new secret for each environment
+      stac_api_indexed_token_jwt_secret: TtAeeoQ8Vr3w9yiCuE5rrbO6uIQ3Saxqu5vJmjAENVI=
+      stac_api_indexed_log_level: debug
+    healthcheck:
+      test: curl --fail http://localhost/_mgmt/ping
+      interval: 5s
+      timeout: 1s
+      retries: 50
+    ports:
+      - "8123:80"
