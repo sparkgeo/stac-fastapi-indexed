@@ -1034,6 +1034,9 @@ lambda = [
 server = [
     { name = "uvicorn" },
 ]
+test = [
+    { name = "pytest" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -1046,6 +1049,7 @@ requires-dist = [
     { name = "pygeofilter", extras = ["backend-native"], specifier = "==0.2.1" },
     { name = "pyjwt", specifier = "~=2.8.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = "~=8.2.2" },
+    { name = "pytest", marker = "extra == 'test'", specifier = "~=8.2.2" },
     { name = "pytz" },
     { name = "requests", marker = "extra == 'dev'", specifier = ">=2.32.3" },
     { name = "shapely", specifier = "~=2.0.4" },
@@ -1056,7 +1060,7 @@ requires-dist = [
     { name = "stac-pydantic", specifier = "~=3.1.0" },
     { name = "uvicorn", marker = "extra == 'server'", specifier = "~=0.30.1" },
 ]
-provides-extras = ["dev", "server", "lambda"]
+provides-extras = ["dev", "server", "lambda", "test"]
 
 [[package]]
 name = "stac-fastapi-types"
