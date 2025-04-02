@@ -2,10 +2,11 @@ from enum import Enum
 from typing import Any, Dict, List
 
 from pygeofilter.ast import Node
+from stac_fastapi.types.errors import InvalidQueryParameter
+
 from stac_fastapi.indexed.search.filter.attribute_config import AttributeConfig
 from stac_fastapi.indexed.search.filter.duckdb_sql_evaluator import to_filter_clause
 from stac_fastapi.indexed.search.filter_clause import FilterClause
-from stac_fastapi.types.errors import InvalidQueryParameter
 
 
 class FilterLanguage(str, Enum):

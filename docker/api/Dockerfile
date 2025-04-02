@@ -1,6 +1,6 @@
 FROM python:3.13-slim AS build
 
-SHELL ["sh", "-exc"]
+SHELL ["/bin/sh", "-exc"]
 
 ### Start build prep.
 
@@ -34,7 +34,7 @@ RUN uv sync \
 # ##########################################################################
 
 FROM python:3.13-slim
-SHELL ["sh", "-exc"]
+SHELL ["/bin/sh", "-exc"]
 
 ENV PATH=/opt/app/bin:$PATH
 

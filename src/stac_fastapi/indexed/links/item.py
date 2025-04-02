@@ -1,6 +1,8 @@
 from urllib.parse import urljoin
 
 from fastapi import Request
+from stac_fastapi.types.stac import Item
+
 from stac_fastapi.indexed.constants import (
     rel_collection,
     rel_parent,
@@ -11,7 +13,6 @@ from stac_fastapi.indexed.constants import (
 from stac_fastapi.indexed.links.catalog import get_catalog_link
 from stac_fastapi.indexed.links.collection import get_collection_link
 from stac_fastapi.indexed.links.util import get_base_href
-from stac_fastapi.types.stac import Item
 
 
 def fix_item_links(item: Item, request: Request) -> Item:

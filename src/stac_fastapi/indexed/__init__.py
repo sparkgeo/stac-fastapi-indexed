@@ -11,6 +11,7 @@ from sys import stdout
 from typing import Final
 
 from asgi_correlation_id import CorrelationIdFilter
+
 from stac_fastapi.indexed.settings import get_settings
 
 _default_log_level: Final[int] = INFO

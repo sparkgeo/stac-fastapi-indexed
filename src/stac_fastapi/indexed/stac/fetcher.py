@@ -1,11 +1,11 @@
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from stac_index.common import source_reader_classes
 from stac_index.common.source_reader import SourceReader
 from stac_pydantic.collection import Collection
 from stac_pydantic.item import Item
 
-_source_reader: SourceReader = None
+_source_reader: Optional[SourceReader] = None
 
 
 # currently assumes only one uri-style for the entire catalog

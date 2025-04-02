@@ -1,6 +1,6 @@
 FROM python:3.13-slim AS build
 
-SHELL ["sh", "-exc"]
+SHELL ["/bin/sh", "-exc"]
 
 ### Start build prep.
 
@@ -33,7 +33,7 @@ RUN uv sync \
 # ##########################################################################
 
 FROM python:3.13-slim
-SHELL ["sh", "-exc"]
+SHELL ["/bin/sh", "-exc"]
 
 ARG api_port=8000
 ARG num_workers=2
