@@ -2,6 +2,7 @@ from re import sub
 from typing import Any, List, Optional, Tuple
 
 from stac_index.common.index_reader import IndexReader
+
 from .s3_source_reader import S3SourceReader
 from .settings import get_settings
 

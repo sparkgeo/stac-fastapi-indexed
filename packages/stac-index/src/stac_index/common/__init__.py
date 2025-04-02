@@ -4,9 +4,9 @@ import inspect
 from logging import Logger, getLogger
 from typing import Final, List, Type
 
+from .. import readers
 from .index_reader import IndexReader
 from .source_reader import SourceReader
-from .. import readers
 
 _logger: Final[Logger] = getLogger(__file__)
 _package_prefix: Final[str] = "stac_index.readers."

@@ -2,6 +2,8 @@ from typing import Any, Dict
 from urllib.parse import urljoin
 
 from fastapi import Request
+from stac_fastapi.types.stac import Collection
+
 from stac_fastapi.indexed.constants import (
     rel_child,
     rel_item,
@@ -14,7 +16,6 @@ from stac_fastapi.indexed.constants import (
 )
 from stac_fastapi.indexed.links.catalog import get_catalog_link
 from stac_fastapi.indexed.links.util import get_base_href
-from stac_fastapi.types.stac import Collection
 
 
 def get_collections_link(request: Request, rel_type: str) -> Dict[str, Any]:

@@ -8,6 +8,7 @@ from boto3 import client
 from botocore.config import Config as BotoConfig
 from stac_index.common.async_util import get_callable_event_loop
 from stac_index.common.source_reader import SourceReader
+
 from .settings import get_settings
 
 _uri_prefix_regex: Final[str] = r"^s3://"

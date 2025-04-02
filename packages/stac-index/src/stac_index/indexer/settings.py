@@ -14,7 +14,7 @@ class _Settings(BaseSettings):
     test_collection_limit: Optional[int] = None
     output_dir: str = path.join(path.dirname(__file__), "index_data")
     permit_boto_debug: Optional[bool] = False
-    max_concurrency: Optional[int] = 10
+    max_concurrency: int = 10
 
 
 @lru_cache(maxsize=1)

@@ -36,6 +36,7 @@ from typing import Any, Dict, Final, List, Optional, Tuple, cast
 from pygeofilter import ast, values
 from pygeofilter.backends.evaluator import Evaluator, handle
 from shapely import geometry
+
 from stac_fastapi.indexed.search.filter.attribute_config import AttributeConfig
 from stac_fastapi.indexed.search.filter.errors import (
     NotAGeometryField,

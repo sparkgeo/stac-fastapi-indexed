@@ -1,6 +1,7 @@
 from typing import Any, Dict
 
 from fastapi import Request
+
 from stac_fastapi.indexed.constants import rel_root, type_json
 from stac_fastapi.indexed.links.util import get_base_href
 
