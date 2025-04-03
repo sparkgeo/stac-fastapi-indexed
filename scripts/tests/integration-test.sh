@@ -14,7 +14,7 @@ for dco in "${stack_commands[@]}"; do
     if [ $exit_code -ne 0 ]; then
         break
     fi
-    $dco build -q
+    $dco build
     build_result=$?
     if [ $build_result -ne 0 ]; then
         exit $build_result
