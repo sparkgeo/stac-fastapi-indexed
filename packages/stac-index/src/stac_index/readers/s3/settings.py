@@ -10,7 +10,6 @@ class _Settings(BaseSettings):
     )
     log_level: str = "info"
     endpoint: Optional[str] = None
-    permit_boto_debug: Optional[bool] = False
 
 
 @lru_cache(maxsize=1)

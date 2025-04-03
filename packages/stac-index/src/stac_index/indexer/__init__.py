@@ -1,12 +1,4 @@
-from logging import (
-    DEBUG,
-    INFO,
-    StreamHandler,
-    basicConfig,
-    getLevelName,
-    getLevelNamesMapping,
-    getLogger,
-)
+from logging import INFO, StreamHandler, basicConfig, getLevelName, getLevelNamesMapping
 from sys import stdout
 from typing import Final
 
@@ -30,6 +22,3 @@ basicConfig(
     level=log_level,
     format="%(levelname)s %(asctime)s %(message)s",
 )
-if log_level == DEBUG and not get_settings().permit_boto_debug:
-    for logger_name in ["botocore", "boto3", "nose", "s3transfer", "urllib3"]:
-        getLogger(logger_name).setLevel(_default_log_level)

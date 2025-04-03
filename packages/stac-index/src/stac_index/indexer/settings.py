@@ -13,7 +13,6 @@ class _Settings(BaseSettings):
     test_collection_item_limit: Optional[int] = None
     test_collection_limit: Optional[int] = None
     output_dir: str = path.join(path.dirname(__file__), "index_data")
-    permit_boto_debug: Optional[bool] = False
     max_concurrency: int = 10
 
 

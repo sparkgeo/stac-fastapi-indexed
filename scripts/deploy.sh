@@ -35,5 +35,4 @@ cdk deploy \
     -c AWS_REGION=$AWS_REGION \
     -c JWT_SECRET=${JWT_SECRET:-$(openssl rand -base64 32)} \
     -c LOG_LEVEL=${LOG_LEVEL} \
-    -c BOTO_DEBUG=${BOTO_DEBUG:-false} \
     -c DUCKDB_THREADS=${DUCKDB_THREADS:-}

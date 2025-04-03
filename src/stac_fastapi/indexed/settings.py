@@ -12,7 +12,6 @@ class _Settings(ApiSettings):
     index_manifest_uri: str
     token_jwt_secret: str
     s3_endpoint: Optional[str] = None
-    permit_boto_debug: bool = False
     duckdb_threads: Optional[int] = None
     deployment_stage: Optional[str] = None
 
