@@ -31,9 +31,6 @@ class CdkDeploymentStack(Stack):
         )  # ignore ''
         if requested_log_level is not None:
             environment[f"{api_env_var_prefix}log_level"] = requested_log_level
-        requested_boto_debug = self.node.try_get_context("BOTO_DEBUG") or None
-        if requested_boto_debug is not None:
-            environment[f"{api_env_var_prefix}permit_boto_debug"] = requested_boto_debug
         requested_duckdb_threads = self.node.try_get_context("DUCKDB_THREADS") or None
         if requested_duckdb_threads is not None:
             environment[f"{api_env_var_prefix}duckdb_threads"] = (
