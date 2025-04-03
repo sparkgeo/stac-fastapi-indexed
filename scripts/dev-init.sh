@@ -4,12 +4,7 @@ set -e
 
 pushd $(dirname $0)/..
 
-pip install -e ./stac-index.common[dev]
-pip install -e ./stac-index.reader.filesystem[dev]
-pip install -e ./stac-index.reader.https[dev]
-pip install -e ./stac-index.reader.s3[dev]
-pip install -e ./stac-index.indexer[dev,test]
-pip install -e ./stac-fastapi.indexed[dev,server]
+uv sync --extra dev --extra server --extra test
 pip install -r ./iac/requirements.txt
 
-pre-commit install
+uv run pre-commit install

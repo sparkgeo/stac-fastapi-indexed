@@ -1,35 +1,57 @@
-FROM python:3.12-slim
+FROM python:3.13-slim AS build
 
-RUN apt-get update --fix-missing \
-  && apt-get install -y --no-install-recommends \
-  jq \
-  && rm -rf /var/lib/apt/lists/*
+SHELL ["/bin/sh", "-exc"]
 
+### Start build prep.
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+ENV UV_LINK_MODE=copy \
+    UV_COMPILE_BYTECODE=1 \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_PYTHON=python3.13 \
+    UV_PROJECT_ENVIRONMENT=/opt/app
+
+### End build prep -- this is where your app Dockerfile should start.
+COPY ./ /src
+WORKDIR /src
+
+RUN uv sync \
+    --package=stac-index \
+    --directory=/src \
+    --locked \
+    --no-dev \
+    --no-install-project
+
+RUN uv sync \
+    --package=stac-index \
+    --directory=/src \
+    --locked \
+    --no-dev \
+    --no-editable
+
+# ##########################################################################
+
+FROM python:3.13-slim
+SHELL ["/bin/sh", "-exc"]
+
+ARG api_port=8000
+ARG num_workers=2
+
+ENV PORT=${api_port}
+ENV WORKERS=${num_workers}
+ENV PATH=/opt/app/bin:$PATH
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgeos3.11.1 \
+    jq \
+    && rm -rf /var/lib/apt/lists/*
+
+STOPSIGNAL SIGINT
+
+COPY --from=build /opt/app /opt/app
 COPY docker/indexer/command.sh /command.sh
 
-# see scripts/update-requirements.sh for detail on generated requirements
-COPY docker/requirements-index-common-generated.txt /requirements-index-common-generated.txt
-COPY docker/requirements-indexer-generated.txt /requirements-indexer-generated.txt
-COPY docker/requirements-reader-filesystem-generated.txt /requirements-reader-filesystem-generated.txt
-COPY docker/requirements-reader-filesystem-generated.txt /requirements-reader-https-generated.txt
-COPY docker/requirements-reader-s3-generated.txt /requirements-reader-s3-generated.txt
-RUN pip install -r /requirements-index-common-generated.txt
-RUN pip install -r /requirements-indexer-generated.txt
-RUN pip install -r /requirements-reader-filesystem-generated.txt
-RUN pip install -r /requirements-reader-https-generated.txt
-RUN pip install -r /requirements-reader-s3-generated.txt
-
-WORKDIR /app
-COPY stac-index.common ./stac-index.common
-COPY stac-index.reader.filesystem ./stac-index.reader.filesystem
-COPY stac-index.reader.https ./stac-index.reader.https
-COPY stac-index.reader.s3 ./stac-index.reader.s3
-COPY stac-index.indexer ./stac-index.indexer
-
-RUN pip install -e stac-index.common
-RUN pip install -e stac-index.reader.filesystem
-RUN pip install -e stac-index.reader.https
-RUN pip install -e stac-index.reader.s3
-RUN pip install -e stac-index.indexer[local-deps]
+WORKDIR /opt/app
 
 CMD ["/command.sh"]

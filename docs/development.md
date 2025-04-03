@@ -10,11 +10,8 @@ scripts/dev-init.sh
 
 ## Dependencies
 
-This project uses `pip-compile` from [pip-tools](https://pypi.org/project/pip-tools/) to generate requirements.txt files from setup.py dependencies to help accelerate container image builds during development. See [scripts/update-requirements.sh](../scripts/update-requirements.sh) for an expalanation of how and why. This script should be run after any change to dependencies within setup.py files:
+This project uses uv as the package manager, with `pyproject.toml` and `uv.lock` files to manage dependencies and versions. To add a package to the API, run `uv add <package>` in the root directory. For dependency packages, run the same command in their respective directories. If you manually edit `pyproject.toml`, the lock file will also need to be updated by running uv sync and include the optional packages (example: `uv sync --extra dev --extra server --extra test`).
 
-```sh
-scripts/update-requirements.sh
-```
 
 ## Testing
 

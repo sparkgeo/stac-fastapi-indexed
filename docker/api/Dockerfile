@@ -1,39 +1,55 @@
-FROM python:3.12-slim
+FROM python:3.13-slim AS build
 
-RUN apt-get update --fix-missing \
-  && apt-get install -y --no-install-recommends \
-  curl \
-  && rm -rf /var/lib/apt/lists/*
+SHELL ["/bin/sh", "-exc"]
 
-# see scripts/update-requirements.sh for detail on generated requirements
-COPY docker/requirements-index-common-generated.txt /requirements-index-common-generated.txt
-COPY docker/requirements-indexer-generated.txt /requirements-indexer-generated.txt
-COPY docker/requirements-reader-filesystem-generated.txt /requirements-reader-filesystem-generated.txt
-COPY docker/requirements-reader-filesystem-generated.txt /requirements-reader-https-generated.txt
-COPY docker/requirements-reader-s3-generated.txt /requirements-reader-s3-generated.txt
-COPY docker/requirements-api-generated.txt /requirements-api-generated.txt
-RUN pip install -r /requirements-index-common-generated.txt
-RUN pip install -r /requirements-indexer-generated.txt
-RUN pip install -r /requirements-reader-filesystem-generated.txt
-RUN pip install -r /requirements-reader-https-generated.txt
-RUN pip install -r /requirements-reader-s3-generated.txt
-RUN pip install -r /requirements-api-generated.txt
+### Start build prep.
 
-# Install DuckDB extensions in image rather than waiting for FastAPI init to install them.
-# This should result in shorter startup times.
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+ENV UV_LINK_MODE=copy \
+    UV_COMPILE_BYTECODE=1 \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_PYTHON=python3.13 \
+    UV_PROJECT_ENVIRONMENT=/opt/app
+
+### End build prep -- this is where your app Dockerfile should start.
+
+WORKDIR /src
+COPY ./ /src
+
+
+RUN uv sync \
+    --directory=/src \
+    --locked \
+    --no-dev \
+    --no-install-project
+
+RUN uv sync \
+    --extra server \
+    --locked \
+    --no-dev \
+    --no-editable
+
+
+# ##########################################################################
+
+FROM python:3.13-slim
+SHELL ["/bin/sh", "-exc"]
+
+ENV PATH=/opt/app/bin:$PATH
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgeos3.11.1 \
+    && rm -rf /var/lib/apt/lists/*
+
+STOPSIGNAL SIGINT
+
+COPY --from=build /opt/app /opt/app
+COPY packages/stac-index/src/ /opt/app/lib/python3.13/site-packages/
+COPY src/stac_fastapi/indexed /opt/app/lib/python3.13/site-packages/stac_fastapi/indexed
+
 RUN python -c "import duckdb; duckdb.execute('install spatial'); duckdb.execute('install httpfs')"
 
-WORKDIR /app
-COPY stac-index.common ./stac-index.common
-COPY stac-index.reader.filesystem ./stac-index.reader.filesystem
-COPY stac-index.reader.https ./stac-index.reader.https
-COPY stac-index.reader.s3 ./stac-index.reader.s3
-COPY stac-fastapi.indexed ./stac-fastapi.indexed
+WORKDIR /opt/app
 
-RUN pip install -e stac-index.common
-RUN pip install -e stac-index.reader.filesystem
-RUN pip install -e stac-index.reader.https
-RUN pip install -e stac-index.reader.s3
-RUN pip install -e stac-fastapi.indexed[server,local-deps]
-
-CMD ["uvicorn", "stac_fastapi.indexed.app:app", "--host", "0.0.0.0", "--port", "80"]
+CMD /opt/app/bin/uvicorn stac_fastapi.indexed.app:app --host=0.0.0.0 --port=80

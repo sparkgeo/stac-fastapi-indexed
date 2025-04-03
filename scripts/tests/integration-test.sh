@@ -22,7 +22,7 @@ for dco in "${stack_commands[@]}"; do
     $dco run --rm tester python -m pytest -k integration_tests
     exit_code=$?
     if [ $exit_code -ne 0 ] || [ ${TESTS_DEBUG:-0} -ne 0 ]; then
-        $dco logs
+        $dco logs --level INFO
     fi
     $dco down
 done
