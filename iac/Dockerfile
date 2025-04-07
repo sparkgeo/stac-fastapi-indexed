@@ -1,29 +1,53 @@
-FROM public.ecr.aws/lambda/python:3.12
+FROM python:3.13-slim AS build
+
+SHELL ["/bin/sh", "-exc"]
+
+### Start build prep.
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+ENV UV_LINK_MODE=copy \
+    UV_COMPILE_BYTECODE=1 \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_PYTHON=python3.13 \
+    UV_PROJECT_ENVIRONMENT=/opt/app
+
+### End build prep -- this is where your app Dockerfile should start.
+
+WORKDIR /src
+COPY ./ /src
+
+
+RUN uv sync \
+    --directory=/src \
+    --locked \
+    --no-dev \
+    --no-install-project
+
+RUN uv sync \
+    --extra lambda \
+    --locked \
+    --no-dev \
+    --no-editable
+
+
+# ##########################################################################
+
+FROM public.ecr.aws/lambda/python:3.13
+SHELL ["/bin/sh", "-exc"]
+
+ENV PATH=/opt/app/bin:$PATH
+
+STOPSIGNAL SIGINT
+
+COPY --from=build /opt/app /opt/app
+COPY packages/stac-index/src/ /opt/app/lib/python3.13/site-packages/
+COPY src/stac_fastapi/indexed /opt/app/lib/python3.13/site-packages/stac_fastapi/indexed
 
 ENV HOME=/tmp
+ENV PYTHONPATH=/opt/app/lib/python3.13/site-packages
+RUN python -c "import duckdb; duckdb.execute('install spatial'); duckdb.execute('install httpfs'); duckdb.execute('install aws')"
 
-WORKDIR /app
-
-# see scripts/update-requirements.sh for detail on generated requirements
-COPY docker/requirements-index-common-generated.txt /requirements-index-common-generated.txt
-COPY docker/requirements-indexer-generated.txt /requirements-indexer-generated.txt
-COPY docker/requirements-reader-s3-generated.txt /requirements-reader-s3-generated.txt
-COPY docker/requirements-api-generated.txt /requirements-api-generated.txt
-RUN pip install -r /requirements-index-common-generated.txt
-RUN pip install -r /requirements-indexer-generated.txt
-RUN pip install -r /requirements-reader-s3-generated.txt
-RUN pip install -r /requirements-api-generated.txt
-
-# Install DuckDB extensions in image rather than waiting for FastAPI init to install them.
-# This should result in shorter cold-boot times.
-RUN python -c "import duckdb; duckdb.execute('install spatial'); duckdb.execute('install httpfs')"
-
-COPY stac_index/common ./stac_index/common
-COPY stac_index/reader ./stac_index/reader
-COPY stac_fastapi/indexed ./stac_fastapi/indexed
-
-RUN pip install -e stac_index/common
-RUN pip install -e stac_index/reader/s3
-RUN pip install -e stac_fastapi/indexed[lambda,local-deps]
+WORKDIR /opt/app
 
 CMD ["stac_fastapi.indexed.app.handler"]
