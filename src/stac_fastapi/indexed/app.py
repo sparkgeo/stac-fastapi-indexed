@@ -1,5 +1,5 @@
 from logging import Logger, getLogger
-from typing import Final
+from typing import Final, List
 
 from asgi_correlation_id import CorrelationIdMiddleware
 from fastapi import FastAPI
@@ -91,7 +91,7 @@ async def shutdown_event():
 
 
 @app.get("/status/errors")
-async def get_status_errors() -> list[IndexingError]:
+async def get_status_errors() -> List[IndexingError]:
     return get_all_errors()
 
 
@@ -128,6 +128,7 @@ def create_handler(app):
                 "text/",
                 "application/json",
                 "application/geo+json",
+                "application/schema+json",
                 "application/vnd.oai.openapi",
             ],
         )
