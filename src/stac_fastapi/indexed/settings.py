@@ -13,7 +13,7 @@ class _Settings(ApiSettings):
     token_jwt_secret: str
     s3_endpoint: Optional[str] = None
     duckdb_threads: Optional[int] = None
-    deployment_stage: Optional[str] = None
+    deployment_root_path: Optional[str] = None
 
 
 @lru_cache(maxsize=1)

@@ -24,7 +24,7 @@ class CdkDeploymentStack(Stack):
             f"{api_env_var_prefix}token_jwt_secret": self.node.get_context(
                 "JWT_SECRET"
             ),
-            f"{api_env_var_prefix}deployment_stage": deploy_stage,
+            f"{api_env_var_prefix}deployment_root_path": "/{}".format(deploy_stage),
         }
         requested_log_level = (
             self.node.try_get_context("LOG_LEVEL") or None

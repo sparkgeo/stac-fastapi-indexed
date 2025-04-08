@@ -36,7 +36,7 @@ def fix_item_links(item: Item, request: Request) -> Item:
             "type": type_geojson,
             "href": urljoin(
                 base_href,
-                "/collections/{}/items/{}".format(
+                "collections/{}/items/{}".format(
                     item["collection"],
                     item["id"],
                 ),
