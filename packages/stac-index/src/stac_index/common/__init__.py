@@ -8,7 +8,7 @@ from .. import readers
 from .index_reader import IndexReader
 from .source_reader import SourceReader
 
-_logger: Final[Logger] = getLogger(__file__)
+_logger: Final[Logger] = getLogger(__name__)
 _package_prefix: Final[str] = "stac_index.readers."
 
 source_reader_classes: List[Type[SourceReader]] = []

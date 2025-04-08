@@ -52,7 +52,7 @@ from stac_fastapi.indexed.search.types import SearchDirection, SearchMethod
 from stac_fastapi.indexed.sortables.sortable_config import get_sortable_configs_by_field
 from stac_fastapi.indexed.stac.fetcher import fetch_dict
 
-_logger: Final[Logger] = getLogger(__file__)
+_logger: Final[Logger] = getLogger(__name__)
 _text_filter_wrap_key: Final[str] = "__text_filter"
 
 default_sorts: Final[List[SortExtension]] = [
