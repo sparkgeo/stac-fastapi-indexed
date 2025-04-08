@@ -9,7 +9,7 @@ from pydantic_core import ErrorDetails
 from stac_index.common.indexing_error import IndexingError, IndexingErrorType
 from stac_pydantic import Item
 
-_logger = getLogger(__file__)
+_logger = getLogger(__name__)
 
 
 class Fixer(ABC):

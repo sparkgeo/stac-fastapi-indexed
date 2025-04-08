@@ -26,7 +26,7 @@ def configure_logging() -> None:
     basicConfig(
         handlers=handlers,
         level=log_level,
-        format="%(levelname)s %(asctime)s [%(correlation_id)s] %(message)s",
+        format="%(levelname)s %(asctime)s [%(correlation_id)s] %(name)s: %(message)s",
         force=True,
     )
 

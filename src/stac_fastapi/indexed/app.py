@@ -29,7 +29,7 @@ from stac_fastapi.indexed.search.search_get_request import SearchGetRequest
 from stac_fastapi.indexed.settings import get_settings
 from stac_fastapi.indexed.sortables.routes import add_routes as add_sortables_routes
 
-_logger: Final[Logger] = getLogger(__file__)
+_logger: Final[Logger] = getLogger(__name__)
 
 extensions_map = {
     "sort": SortExtension(),

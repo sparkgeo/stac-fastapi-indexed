@@ -9,7 +9,7 @@ from stac_index.common.source_reader import SourceReader
 from .settings import get_settings
 
 _uri_prefix_regex: Final[str] = r"^s3://"
-_logger: Final[Logger] = getLogger(__file__)
+_logger: Final[Logger] = getLogger(__name__)
 
 
 class S3SourceReader(SourceReader):

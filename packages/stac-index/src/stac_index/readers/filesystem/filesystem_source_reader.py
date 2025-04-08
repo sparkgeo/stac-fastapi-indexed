@@ -7,7 +7,7 @@ from typing import Final, List, Optional, Tuple
 from stac_index.common.source_reader import SourceReader
 
 _uri_start_str: Final[str] = "/"
-_logger: Final[Logger] = getLogger(__file__)
+_logger: Final[Logger] = getLogger(__name__)
 
 
 class FilesystemSourceReader(SourceReader):

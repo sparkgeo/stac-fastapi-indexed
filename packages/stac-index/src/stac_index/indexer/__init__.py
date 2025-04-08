@@ -20,5 +20,5 @@ log_level = getLevelNamesMapping()[requested_log_level]
 basicConfig(
     handlers=handlers,
     level=log_level,
-    format="%(levelname)s %(asctime)s %(message)s",
+    format="%(levelname)s %(asctime)s %(name)s: %(message)s",
 )

@@ -5,7 +5,7 @@ from typing import Dict, Final, List
 
 from stac_fastapi.indexed.db import fetchall
 
-_logger: Final[Logger] = getLogger(__file__)
+_logger: Final[Logger] = getLogger(__name__)
 
 
 @dataclass

@@ -3,7 +3,7 @@ from typing import Any, Dict, Final, List, Optional, Tuple
 
 from stac_index.common.index_manifest import IndexManifest
 
-_logger: Final[Logger] = getLogger(__file__)
+_logger: Final[Logger] = getLogger(__name__)
 
 
 class IndexReader:

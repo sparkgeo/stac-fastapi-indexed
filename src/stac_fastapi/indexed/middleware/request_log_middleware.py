@@ -3,7 +3,7 @@ from typing import Final
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-_logger: Final[Logger] = getLogger(__file__)
+_logger: Final[Logger] = getLogger(__name__)
 
 
 class RequestLogMiddleware:

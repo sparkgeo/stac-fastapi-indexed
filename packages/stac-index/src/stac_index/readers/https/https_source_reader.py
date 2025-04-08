@@ -7,7 +7,7 @@ from aiohttp import ClientSession
 from stac_index.common.source_reader import SourceReader
 
 _uri_start_regex: Final[Pattern] = compile(r"^http(s)?://")
-_logger: Final[Logger] = getLogger(__file__)
+_logger: Final[Logger] = getLogger(__name__)
 
 
 class HttpsSourceReader(SourceReader):

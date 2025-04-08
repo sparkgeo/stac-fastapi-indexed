@@ -8,7 +8,7 @@ from stac_index.indexer.creator.creator import IndexCreator
 from stac_index.indexer.reader.reader import Reader
 from stac_index.indexer.types.index_config import IndexConfig
 
-_logger: Final[Logger] = getLogger(__file__)
+_logger: Final[Logger] = getLogger(__name__)
 
 
 def execute(

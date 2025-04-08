@@ -25,7 +25,7 @@ from stac_index.indexer.settings import get_settings
 from stac_index.indexer.types.index_config import IndexConfig, collection_wildcard
 from stac_index.indexer.types.stac_data import ItemWithLocation
 
-_logger: Final[Logger] = getLogger(__file__)
+_logger: Final[Logger] = getLogger(__name__)
 
 
 class IndexCreator:

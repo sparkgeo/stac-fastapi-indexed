@@ -9,7 +9,7 @@ from stac_index.common import index_reader_classes
 
 from stac_fastapi.indexed.settings import get_settings
 
-_logger: Final[Logger] = getLogger(__file__)
+_logger: Final[Logger] = getLogger(__name__)
 _query_timing_precision: Final[int] = 3
 _root_db_connection: DuckDBPyConnection = None
 

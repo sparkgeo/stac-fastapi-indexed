@@ -20,7 +20,7 @@ class _HasLinks(Protocol):
 
 
 _settings: Final = get_settings()
-_logger: Final[Logger] = getLogger(__file__)
+_logger: Final[Logger] = getLogger(__name__)
 _item_processor_mutex: Final[Lock] = Lock()
 _link_strip_regex: Final[Pattern] = compile(r"[^/]+$")
 _child_types_by_lower_type: Final[Dict[str, Type[_HasLinks]]] = {

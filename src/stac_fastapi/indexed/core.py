@@ -28,7 +28,7 @@ from stac_fastapi.indexed.search.filter.parser import FilterLanguage
 from stac_fastapi.indexed.search.search_handler import SearchHandler
 from stac_fastapi.indexed.stac.fetcher import fetch_dict
 
-_logger: Final[Logger] = getLogger(__file__)
+_logger: Final[Logger] = getLogger(__name__)
 
 
 @attr.s

@@ -8,7 +8,7 @@ from stac_fastapi.indexed.search.query_info import QueryInfo
 from stac_fastapi.indexed.settings import get_settings
 
 _hashing_algorithm: Final[str] = "HS256"
-_logger: Final[Logger] = getLogger(__file__)
+_logger: Final[Logger] = getLogger(__name__)
 
 
 def get_query_from_token(
