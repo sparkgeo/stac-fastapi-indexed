@@ -3,11 +3,18 @@ from typing import Optional
 
 from fastapi import Request
 
+from stac_fastapi.indexed.settings import get_settings
+
 
 def get_base_href(request: Request) -> str:
-    return "{}://{}".format(
+    root_path: str | None = get_settings().deployment_root_path
+    path_append = ""
+    if root_path is not None:
+        path_append = root_path if root_path.endswith("/") else f"{root_path}/"
+    return "{}://{}{}".format(
         _get_request_protocol(request),
         _get_header_value_by_name(request, "host"),
+        path_append,
     )
 
 

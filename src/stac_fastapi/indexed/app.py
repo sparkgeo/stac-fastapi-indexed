@@ -1,5 +1,4 @@
 from logging import Logger, getLogger
-from os import getenv
 from typing import Final
 
 from asgi_correlation_id import CorrelationIdMiddleware
@@ -46,9 +45,9 @@ def fastapi_factory() -> FastAPI:
     fapi_args = {
         "docs_url": "/api.html",
     }
-    api_stage = get_settings().deployment_stage
-    if api_stage is not None:
-        fapi_args["root_path"] = f"/{api_stage}"
+    root_path = get_settings().deployment_root_path
+    if root_path is not None:
+        fapi_args["root_path"] = root_path
     _logger.info(f"configuring FastAPI with {fapi_args}")
     return FastAPI(**fapi_args)
 
@@ -108,7 +107,7 @@ def run():
             port=settings.app_port,
             log_level="debug" if settings.log_level.upper() == "DEBUG" else "info",
             reload=settings.reload,
-            root_path=getenv("UVICORN_ROOT_PATH", ""),
+            root_path=settings.deployment_root_path or "",
         )
     except ImportError as e:
         raise RuntimeError("Uvicorn must be installed in order to use command") from e

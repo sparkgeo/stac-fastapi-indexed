@@ -24,7 +24,7 @@ def get_collections_link(request: Request, rel_type: str) -> Dict[str, Any]:
         "type": type_json,
         "href": urljoin(
             get_base_href(request),
-            "/collections",
+            "collections",
         ),
     }
 
@@ -35,9 +35,7 @@ def get_collection_link(
     return {
         "rel": rel_type,
         "type": type_json,
-        "href": urljoin(
-            get_base_href(request), "/collections/{}".format(collection_id)
-        ),
+        "href": urljoin(get_base_href(request), "collections/{}".format(collection_id)),
     }
 
 
@@ -64,7 +62,7 @@ def fix_collection_links(collection: Collection, request: Request) -> Collection
             "type": type_geojson,
             "href": urljoin(
                 base_href,
-                "/collections/{}/items".format(collection["id"]),
+                "collections/{}/items".format(collection["id"]),
             ),
         },
     ]
