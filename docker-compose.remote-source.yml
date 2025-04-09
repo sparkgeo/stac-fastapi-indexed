@@ -8,6 +8,7 @@ services:
       stac_index_indexer_output_dir: /output
     volumes:
       - "indexer-output:/output:rw"
+      # this compose file will not work without $tmp_index_config_path being set (it is set by scripts/run-with-remote-source.sh)
       - "${tmp_index_config_path}:/index-config.json:ro"
 
   api:
