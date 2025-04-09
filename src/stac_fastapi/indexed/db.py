@@ -15,7 +15,8 @@ _root_db_connection: DuckDBPyConnection = None
 
 
 async def connect_to_db() -> None:
-    index_manifest_uri = get_settings().index_manifest_uri
+    settings = get_settings()
+    index_manifest_uri = settings.index_manifest_uri
     compatible_index_readers = [
         index_reader
         for index_reader in index_reader_classes
@@ -35,13 +36,18 @@ async def connect_to_db() -> None:
             config_command[1],
         )
     times["index source configuration"] = time()
-    execute("INSTALL spatial")
+    if settings.install_duckdb_extensions:
+        # Dockerfiles pre-install extensions, so don't need installing here.
+        # Local debug (e.g. running in vscode) still requires this install.
+        execute("INSTALL spatial")
+        times["install spatial extension"]
+        execute("INSTALL httpfs")
+        times["install httpfs extension"]
     execute("LOAD spatial")
     times["load spatial extension"] = time()
-    execute("INSTALL httpfs")
     execute("LOAD httpfs")
     times["load httpfs extension"] = time()
-    duckdb_thread_count = get_settings().duckdb_threads
+    duckdb_thread_count = settings.duckdb_threads
     if duckdb_thread_count:
         _set_duckdb_threads(duckdb_thread_count)
     parquet_uris = await index_source.get_parquet_uris()

@@ -44,9 +44,25 @@ COPY --from=build /opt/app /opt/app
 COPY packages/stac-index/src/ /opt/app/lib/python3.13/site-packages/
 COPY src/stac_fastapi/indexed /opt/app/lib/python3.13/site-packages/stac_fastapi/indexed
 
-ENV HOME=/tmp
+ARG DUCKDB_VERSION=1.2.2
+WORKDIR /tmp
+RUN  curl -o spatial.gz http://extensions.duckdb.org/v${DUCKDB_VERSION}/linux_amd64_gcc4/spatial.duckdb_extension.gz \
+  && gunzip spatial.gz \
+  && curl -o httpfs.gz http://extensions.duckdb.org/v${DUCKDB_VERSION}/linux_amd64_gcc4/httpfs.duckdb_extension.gz \
+  && gunzip httpfs.gz \
+  && curl -o aws.gz http://extensions.duckdb.org/v${DUCKDB_VERSION}/linux_amd64_gcc4/aws.duckdb_extension.gz \
+  && gunzip aws.gz
+
 ENV PYTHONPATH=/opt/app/lib/python3.13/site-packages
-RUN python -c "import duckdb; duckdb.execute('install spatial'); duckdb.execute('install httpfs'); duckdb.execute('install aws')"
+RUN python -c "import duckdb; duckdb.execute(\"INSTALL '/tmp/spatial'\"); duckdb.execute(\"INSTALL '/tmp/httpfs'\"); duckdb.execute(\"INSTALL '/tmp/aws'\")"
+ENV stac_api_indexed_install_duckdb_extensions=false
+
+ENV HOME=/datastore
+RUN mkdir -p /datastore/.duckdb/extensions/v${DUCKDB_VERSION}/linux_amd64_gcc4 \
+  && mv spatial /datastore/.duckdb/extensions/v${DUCKDB_VERSION}/linux_amd64_gcc4/spatial.duckdb_extension \
+  && mv httpfs /datastore/.duckdb/extensions/v${DUCKDB_VERSION}/linux_amd64_gcc4/httpfs.duckdb_extension \
+  && mv aws /datastore/.duckdb/extensions/v${DUCKDB_VERSION}/linux_amd64_gcc4/aws.duckdb_extension \
+  && chmod 777 /datastore
 
 WORKDIR /opt/app
 

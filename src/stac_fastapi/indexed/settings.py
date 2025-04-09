@@ -14,6 +14,9 @@ class _Settings(ApiSettings):
     s3_endpoint: Optional[str] = None
     duckdb_threads: Optional[int] = None
     deployment_root_path: Optional[str] = None
+    install_duckdb_extensions: bool = (
+        True  # container images set this to false after installing extensions in build
+    )
 
 
 @lru_cache(maxsize=1)

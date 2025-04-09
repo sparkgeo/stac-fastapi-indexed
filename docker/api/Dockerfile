@@ -49,6 +49,7 @@ COPY packages/stac-index/src/ /opt/app/lib/python3.13/site-packages/
 COPY src/stac_fastapi/indexed /opt/app/lib/python3.13/site-packages/stac_fastapi/indexed
 
 RUN python -c "import duckdb; duckdb.execute('install spatial'); duckdb.execute('install httpfs')"
+ENV stac_api_indexed_install_duckdb_extensions=false
 
 WORKDIR /opt/app
 
