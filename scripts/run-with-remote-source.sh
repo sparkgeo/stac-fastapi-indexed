@@ -19,6 +19,10 @@ fi
 
 root_catalog_uri="$1"
 
+if [[ $root_catalog_uri == s3://* ]]; then
+    echo; echo "* Assumes \$AWS_ACCESS_KEY_ID, \$AWS_REGION, \$AWS_SECRET_ACCESS_KEY, and (optionally) \$AWS_SESSION_TOKEN are set for obstore *"; echo
+fi
+
 export tmp_index_config_path=$(mktemp)
 echo "{\"root_catalog_uri\": \"$root_catalog_uri\", \"indexables\": {}, \"queryables\": {}, \"sortables\": {} $fixes_json }" > $tmp_index_config_path
 dco="docker compose -f docker-compose.base.yml -f docker-compose.remote-source.yml"

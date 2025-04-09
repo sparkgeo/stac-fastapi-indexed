@@ -6,9 +6,13 @@ services:
     image: sparkgeo/stac_indexer
     environment:
       stac_index_indexer_output_dir: /output
+      AWS_ACCESS_KEY_ID:
+      AWS_REGION:
+      AWS_SECRET_ACCESS_KEY:
+      AWS_SESSION_TOKEN:
     volumes:
       - "indexer-output:/output:rw"
-      # this compose file will not work without $tmp_index_config_path being set (it is set by scripts/run-with-remote-source.sh)
+      # this compose file will not work without $tmp_index_config_path being set (this is intentional, it is set by scripts/run-with-remote-source.sh)
       - "${tmp_index_config_path}:/index-config.json:ro"
 
   api:
@@ -16,6 +20,10 @@ services:
       - indexer-output:/index:ro
     environment:
       stac_api_indexed_index_manifest_uri: /index/parquet/manifest.json
+      AWS_ACCESS_KEY_ID:
+      AWS_REGION:
+      AWS_SECRET_ACCESS_KEY:
+      AWS_SESSION_TOKEN:
     depends_on:
       indexer:
         condition: service_completed_successfully
