@@ -3,7 +3,7 @@ from functools import lru_cache
 from logging import Logger, getLogger
 from typing import Dict, Final
 
-from stac_fastapi.indexed.db import fetchall
+from stac_fastapi.indexed.db import fetchall, format_query_object_name
 
 _logger: Final[Logger] = getLogger(__name__)
 
@@ -25,7 +25,7 @@ def get_queryable_config_by_name() -> Dict[str, QueryableConfig]:
     _logger.debug("fetching queryable field config")
     field_config = {}
     for row in fetchall(
-        """
+        f"""
         SELECT name
              , qbc.collection_id
              , qbc.description
@@ -34,8 +34,8 @@ def get_queryable_config_by_name() -> Dict[str, QueryableConfig]:
              , icols.column_type as items_column_type
              , icols.column_type = 'GEOMETRY' as is_geometry
              , icols.column_type IN ('TIMESTAMP WITH TIME ZONE') as is_temporal
-          FROM queryables_by_collection qbc
-    INNER JOIN (DESCRIBE items) icols ON qbc.items_column = icols.column_name
+          FROM {format_query_object_name('queryables_by_collection')} qbc
+    INNER JOIN (DESCRIBE {format_query_object_name('items')}) icols ON qbc.items_column = icols.column_name
     """,
     ):
         field_config[row[0]] = QueryableConfig(

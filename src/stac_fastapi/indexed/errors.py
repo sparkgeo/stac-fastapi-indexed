@@ -2,7 +2,7 @@ from typing import List
 
 from stac_index.common.indexing_error import IndexingError
 
-from stac_fastapi.indexed.db import fetchall
+from stac_fastapi.indexed.db import fetchall, format_query_object_name
 
 
 def get_all_errors() -> List[IndexingError]:
@@ -18,7 +18,7 @@ def get_all_errors() -> List[IndexingError]:
             collection=row[6],
             item=row[7],
         )
-        for row in fetchall("""
+        for row in fetchall(f"""
         SELECT time
              , error_type
              , subtype
@@ -27,7 +27,7 @@ def get_all_errors() -> List[IndexingError]:
              , possible_fixes
              , collection
              , item
-         FROM errors
+         FROM {format_query_object_name('errors')}
      ORDER BY id
         """)
     ]

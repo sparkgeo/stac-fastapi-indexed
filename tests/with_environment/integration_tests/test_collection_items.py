@@ -66,7 +66,10 @@ def test_collection_items_token_immutable() -> None:
     token_match = match(r".+\?token=(.+)$", next_link["href"])
     assert token_match
     token = token_match.group(1)
-    token_claims = get_claims_from_token(token)
+    try:
+        token_claims = get_claims_from_token(token)
+    except Exception as e:
+        raise Exception(f"token decode failed on '{token}', link '{next_link}'", e)
     assert "limit" in token_claims
     assert token_claims["limit"] == limit
     altered_claims = {
