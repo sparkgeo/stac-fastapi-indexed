@@ -11,7 +11,6 @@ class _Settings(ApiSettings):
     log_level: str = "info"
     index_manifest_uri: str
     token_jwt_secret: str
-    s3_endpoint: Optional[str] = None
     duckdb_threads: Optional[int] = None
     deployment_root_path: Optional[str] = None
     install_duckdb_extensions: bool = (

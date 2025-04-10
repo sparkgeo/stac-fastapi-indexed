@@ -17,7 +17,7 @@ from stac_index.common.stac_parser import StacParser
 from stac_pydantic.shared import BBox
 
 from stac_fastapi.indexed.constants import rel_parent, rel_root, rel_self
-from stac_fastapi.indexed.db import fetchall, fetchone
+from stac_fastapi.indexed.db import fetchall, fetchone, format_query_object_name
 from stac_fastapi.indexed.links.catalog import get_catalog_link
 from stac_fastapi.indexed.links.collection import (
     fix_collection_links,
@@ -53,7 +53,7 @@ class CoreCrudClient(AsyncBaseCoreClient):
         self, collection_id: str, request: Request, **kwargs
     ) -> Collection:
         row = fetchone(
-            "SELECT stac_location FROM collections WHERE id = ?",
+            f"SELECT stac_location FROM {format_query_object_name('collections')} WHERE id = ?",
             [collection_id],
         )
         if row is not None:
@@ -102,7 +102,7 @@ class CoreCrudClient(AsyncBaseCoreClient):
             collection_id, request=request
         )  # will error if collection does not exist
         row = fetchone(
-            "SELECT stac_location, applied_fixes FROM items WHERE collection_id = ? and id = ?",
+            f"SELECT stac_location, applied_fixes FROM {format_query_object_name('items')} WHERE collection_id = ? and id = ?",
             [collection_id, item_id],
         )
         if row is not None:
@@ -200,7 +200,10 @@ class CoreCrudClient(AsyncBaseCoreClient):
             collections=[
                 Collection(**{"id": id})
                 for id in [
-                    row[0] for row in fetchall("SELECT id FROM collections ORDER BY id")
+                    row[0]
+                    for row in fetchall(
+                        f"SELECT id FROM {format_query_object_name('collections')} ORDER BY id"
+                    )
                 ]
             ],
             links=[],
@@ -211,7 +214,9 @@ class CoreCrudClient(AsyncBaseCoreClient):
             fetch_dict(url)
             for url in [
                 row[0]
-                for row in fetchall("SELECT stac_location FROM collections ORDER BY id")
+                for row in fetchall(
+                    f"SELECT stac_location FROM {format_query_object_name('collections')} ORDER BY id"
+                )
             ]
         ]
         collections = [

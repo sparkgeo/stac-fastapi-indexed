@@ -18,7 +18,7 @@ from stac_index.common.stac_parser import StacParser
 from stac_pydantic.api.extensions.sort import SortDirections, SortExtension
 
 from stac_fastapi.indexed.constants import rel_root, rel_self
-from stac_fastapi.indexed.db import fetchall
+from stac_fastapi.indexed.db import fetchall, format_query_object_name
 from stac_fastapi.indexed.links.catalog import get_catalog_link
 from stac_fastapi.indexed.links.item import fix_item_links
 from stac_fastapi.indexed.links.search import get_search_link, get_token_link
@@ -165,12 +165,13 @@ class SearchHandler:
             params.extend(addition.params)
         query = """
             SELECT stac_location, applied_fixes
-            FROM items
+            FROM {table_name}
               {where}
               {order}
               {{limit}}
               {{offset}}
             """.format(
+            table_name=format_query_object_name("items"),
             where="WHERE {}".format(" AND ".join(clauses)) if len(clauses) > 0 else "",
             order="ORDER BY {}".format(", ".join(sorts)),
         )

@@ -3,7 +3,7 @@ from functools import lru_cache
 from logging import Logger, getLogger
 from typing import Dict, Final, List
 
-from stac_fastapi.indexed.db import fetchall
+from stac_fastapi.indexed.db import fetchall, format_query_object_name
 
 _logger: Final[Logger] = getLogger(__name__)
 
@@ -27,12 +27,12 @@ def get_sortable_configs() -> List[SortableConfig]:
             items_column=row[3],
         )
         for row in fetchall(
-            """
+            f"""
         SELECT name
              , collection_id
              , description
              , items_column
-          FROM sortables_by_collection
+          FROM {format_query_object_name('sortables_by_collection')}
     """
         )
     ]

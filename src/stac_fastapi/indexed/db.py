@@ -1,7 +1,8 @@
+import re
 from logging import Logger, getLogger
 from os import environ
 from time import time
-from typing import Any, Final, List, Optional
+from typing import Any, Dict, Final, List, Optional
 
 from duckdb import DuckDBPyConnection
 from duckdb import connect as duckdb_connect
@@ -11,7 +12,14 @@ from stac_fastapi.indexed.settings import get_settings
 
 _logger: Final[Logger] = getLogger(__name__)
 _query_timing_precision: Final[int] = 3
+_query_object_identifier_prefix: Final[str] = "src:"
+_query_object_identifier_suffix: Final[str] = ":src"
+_query_object_identifier_template: Final[str] = (
+    f"{_query_object_identifier_prefix}{{}}{_query_object_identifier_suffix}"
+)
+
 _root_db_connection: DuckDBPyConnection = None
+_parquet_uris: Dict[str, str] = {}
 
 
 async def connect_to_db() -> None:
@@ -40,9 +48,9 @@ async def connect_to_db() -> None:
         # Dockerfiles pre-install extensions, so don't need installing here.
         # Local debug (e.g. running in vscode) still requires this install.
         execute("INSTALL spatial")
-        times["install spatial extension"]
+        times["install spatial extension"] = time()
         execute("INSTALL httpfs")
-        times["install httpfs extension"]
+        times["install httpfs extension"] = time()
     execute("LOAD spatial")
     times["load spatial extension"] = time()
     execute("LOAD httpfs")
@@ -50,12 +58,11 @@ async def connect_to_db() -> None:
     duckdb_thread_count = settings.duckdb_threads
     if duckdb_thread_count:
         _set_duckdb_threads(duckdb_thread_count)
-    parquet_uris = await index_source.get_parquet_uris()
-    if len(parquet_uris.keys()) == 0:
+    global _parquet_uris
+    _parquet_uris = await index_source.get_parquet_uris()
+    times["get parquet URIs"] = time()
+    if len(_parquet_uris.keys()) == 0:
         raise Exception(f"no URIs found from '{index_manifest_uri}'")
-    for view_name, source_uri in parquet_uris.items():
-        execute(f"CREATE VIEW {view_name} AS SELECT * FROM '{source_uri}'")
-    times["create views from parquet"] = time()
     for operation, completed_at in times.items():
         _logger.info(
             "'{}' completed in {}s".format(
@@ -73,28 +80,56 @@ async def disconnect_from_db() -> None:
             _logger.error(e)
 
 
-def get_db_connection():
-    return _root_db_connection.cursor()
+# SQL queries include placeholder strings that are replaced with Parquet URIs prior to query execution.
+# This improves query performance relative to creating views in DuckDB from Parquet files and querying those.
+# Placeholders are used until the point of query execution so that API search pagination tokens,
+# which are JWT-encoded SQL queries and visible to the client, do not leak implementation detail around
+# parquet URI locations.
+def format_query_object_name(object_name: str) -> str:
+    return _query_object_identifier_template.format(object_name)
 
 
 def execute(statement: str, params: Optional[List[Any]] = None) -> None:
     start = time()
-    get_db_connection().execute(statement, params)
+    statement = _prepare_statement(statement)
+    _get_db_connection().execute(statement, params)
     _sql_log_message(statement, time() - start, None, params)
 
 
 def fetchone(statement: str, params: Optional[List[Any]] = None) -> Any:
     start = time()
-    result = get_db_connection().execute(statement, params).fetchone()
+    statement = _prepare_statement(statement)
+    result = _get_db_connection().execute(statement, params).fetchone()
     _sql_log_message(statement, time() - start, 1 if result is not None else 0, params)
     return result
 
 
 def fetchall(statement: str, params: Optional[List[Any]] = None) -> List[Any]:
     start = time()
-    result = get_db_connection().execute(statement, params).fetchall()
+    statement = _prepare_statement(statement)
+    result = _get_db_connection().execute(statement, params).fetchall()
     _sql_log_message(statement, time() - start, len(result), params)
     return result
+
+
+def _get_db_connection():
+    return _root_db_connection.cursor()
+
+
+def _prepare_statement(statement: str) -> str:
+    query_object_identifier_regex = rf"\b{re.escape(_query_object_identifier_prefix)}([^:]+){re.escape(_query_object_identifier_suffix)}\b"
+    for query_object_name in re.findall(query_object_identifier_regex, statement):
+        if query_object_name not in _parquet_uris:
+            _logger.warning(
+                f"{query_object_name} not in parquet URI map, query will likely fail"
+            )
+            continue
+        statement = re.sub(
+            rf"\b{re.escape(_query_object_identifier_prefix)}{re.escape(query_object_name)}{re.escape(_query_object_identifier_suffix)}\b",
+            f"'{_parquet_uris[query_object_name]}'",
+            statement,
+        )
+    return statement
 
 
 def _sql_log_message(

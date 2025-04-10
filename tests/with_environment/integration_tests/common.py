@@ -1,4 +1,4 @@
-from base64 import b64decode, b64encode
+from base64 import urlsafe_b64decode, urlsafe_b64encode
 from datetime import datetime
 from glob import glob
 from json import dumps, load, loads
@@ -116,8 +116,8 @@ def get_claims_from_token(token: str) -> Dict[str, Any]:
     claims_part = token_parts[1]
     missing_padding = len(claims_part) % 4
     if missing_padding:
-        claims_part += "=" * (4 - missing_padding)
-    decoded_bytes = b64decode(claims_part)
+        claims_part += "=" * (-len(claims_part) % 4)
+    decoded_bytes = urlsafe_b64decode(claims_part)
     return loads(decoded_bytes.decode("UTF-8"))
 
 
@@ -128,7 +128,7 @@ def rebuild_token_with_altered_claims(
     assert len(token_parts) == 3
     return "{}.{}.{}".format(
         token_parts[0],
-        b64encode(dumps(altered_claims).encode("UTF-8")).decode("UTF-8"),
+        urlsafe_b64encode(dumps(altered_claims).encode("UTF-8")).decode("UTF-8"),
         token_parts[2],
     )
 
