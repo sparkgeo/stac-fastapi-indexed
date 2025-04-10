@@ -45,7 +45,7 @@ class CdkDeploymentStack(Stack):
             code=lambda_code,
             timeout=Duration.seconds(300),
             environment=environment,
-            memory_size=1500,
+            memory_size=6144,
         )
         bucket.grant_read(stac_serverless_lambda)
         cors = apigw.CorsOptions(allow_origins=["*"])
