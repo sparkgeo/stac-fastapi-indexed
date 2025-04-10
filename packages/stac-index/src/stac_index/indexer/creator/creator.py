@@ -29,8 +29,7 @@ _logger: Final[Logger] = getLogger(__name__)
 
 
 class IndexCreator:
-    def __init__(self, index_config: IndexConfig):
-        self._index_config = index_config
+    def __init__(self):
         self._creation_time = datetime.now(tz=timezone.utc)
         self._conn = connect()
         self._conn.execute("INSTALL spatial")
@@ -42,25 +41,30 @@ class IndexCreator:
         except Exception:
             pass
 
-    def create_empty(self, output_dir: Optional[str] = None) -> None:
+    def create_empty(self, output_dir: Optional[str] = None) -> str:
         _logger.info("creating empty parquet index")
         self._create_db_objects()
         self._log_creation_event()
-        self._export_db_objects(output_dir or get_settings().output_dir)
+        return self._export_db_objects(output_dir or get_settings().output_dir)
 
     async def create_and_populate(
-        self, reader: Reader, output_dir: Optional[str] = None
-    ) -> List[IndexingError]:
+        self,
+        index_config: IndexConfig,
+        reader: Reader,
+        output_dir: Optional[str] = None,
+    ) -> Tuple[List[IndexingError], str]:
         _logger.info("creating and populating parquet index")
         # may eventually want some logic here to find an update an existing index, for not just creating from scratch each time
         self._create_db_objects()
-        add_items_columns(self._index_config, self._conn)
+        add_items_columns(index_config, self._conn)
         collections, collection_errors = await self._request_collections(reader)
-        items_errors = await self._request_items(reader, collections)
-        configure_indexables(self._index_config, self._conn)
+        items_errors = await self._request_items(index_config, reader, collections)
+        configure_indexables(index_config, self._conn)
         self._log_creation_event()
-        self._export_db_objects(output_dir or get_settings().output_dir)
-        return collection_errors + items_errors
+        return (
+            collection_errors + items_errors,
+            self._export_db_objects(output_dir or get_settings().output_dir),
+        )
 
     def _create_db_objects(self) -> None:
         sql_directory = path.join(path.dirname(__file__), "sql")
@@ -70,7 +74,7 @@ class IndexCreator:
             with open(sql_path, "r") as f:
                 self._conn.execute(f.read())
 
-    def _export_db_objects(self, output_dir: str) -> None:
+    def _export_db_objects(self, output_dir: str) -> str:
         manifest = IndexManifest(
             created=self._creation_time,
         )
@@ -103,12 +107,14 @@ class IndexCreator:
             manifest.tables[table_name] = TableMetadata(
                 relative_path=output_filename,
             )
-        with open(path.join(output_dir, "manifest.json"), "w") as f:
+        manifest_path = path.join(output_dir, "manifest.json")
+        with open(manifest_path, "w") as f:
             dump(
                 manifest.model_dump(),
                 f,
                 indent=2,
             )
+        return manifest_path
 
     async def _request_collections(
         self, reader: Reader
@@ -144,7 +150,7 @@ class IndexCreator:
     # Instead we pass a processor function to the reader so that each item can be processed (i.e. inserted into a table)
     # as it is retrieved.
     async def _request_items(
-        self, reader: Reader, collections: List[Collection]
+        self, index_config: IndexConfig, reader: Reader, collections: List[Collection]
     ) -> List[IndexingError]:
         counts: Dict[str, int] = {
             "inserted": 0,
@@ -162,7 +168,7 @@ class IndexCreator:
             "stac_location": "?",
             "applied_fixes": "?",
         }
-        for indexable in self._index_config.indexables.values():
+        for indexable in index_config.indexables.values():
             insert_fields_and_values_template[indexable.table_column_name] = "?"
 
         def processor(item: ItemWithLocation) -> List[IndexingError]:
@@ -195,7 +201,7 @@ class IndexCreator:
             for (
                 collection_id,
                 indexable_by_field_name,
-            ) in self._index_config.all_indexables_by_collection.items():
+            ) in index_config.all_indexables_by_collection.items():
                 if (
                     collection_id == collection_wildcard
                     or collection_id == item.collection

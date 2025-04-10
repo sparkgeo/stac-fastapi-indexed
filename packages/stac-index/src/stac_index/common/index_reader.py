@@ -1,6 +1,7 @@
 from logging import Logger, getLogger
 from typing import Any, Dict, Final, List, Optional, Tuple
 
+from stac_index.common.exceptions import MissingIndexException, UriNotFoundException
 from stac_index.common.index_manifest import IndexManifest
 
 _logger: Final[Logger] = getLogger(__name__)
@@ -25,9 +26,12 @@ class IndexReader:
             )
 
     async def get_parquet_uris(self) -> Dict[str, str]:
-        manifest = IndexManifest(
-            **await self._source_reader.load_json_from_uri(self.index_manifest_uri)
-        )
+        try:
+            manifest = IndexManifest(
+                **await self._source_reader.load_json_from_uri(self.index_manifest_uri)
+            )
+        except UriNotFoundException:
+            raise MissingIndexException()
         return {
             table_name: "/".join(
                 self.index_manifest_uri.split("/")[:-1] + [metadata.relative_path]

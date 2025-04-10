@@ -9,13 +9,14 @@ class _Settings(ApiSettings):
         env_prefix="stac_api_indexed_",
     )
     log_level: str = "info"
-    index_manifest_uri: str
+    index_manifest_uri: str = "/index/manifest.json"
     token_jwt_secret: str
     duckdb_threads: Optional[int] = None
     deployment_root_path: Optional[str] = None
     install_duckdb_extensions: bool = (
         True  # container images set this to false after installing extensions in build
     )
+    create_empty_index_if_missing: bool = False
 
 
 @lru_cache(maxsize=1)
