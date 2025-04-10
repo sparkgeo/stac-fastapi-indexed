@@ -9,6 +9,7 @@ services:
       # create a new secret for each environment
       stac_api_indexed_token_jwt_secret: TtAeeoQ8Vr3w9yiCuE5rrbO6uIQ3Saxqu5vJmjAENVI=
       stac_api_indexed_log_level: debug
+      stac_api_indexed_create_empty_index_if_missing: ${create_empty_index_if_missing:-false}
     healthcheck:
       test: curl --fail http://localhost/_mgmt/ping
       interval: 5s
