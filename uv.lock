@@ -1114,6 +1114,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "asgi-correlation-id" },
+    { name = "brotli-asgi" },
     { name = "duckdb" },
     { name = "orjson" },
     { name = "pydantic-settings" },
@@ -1151,6 +1152,7 @@ test = [
 requires-dist = [
     { name = "asgi-correlation-id", specifier = "~=4.3.3" },
     { name = "aws-cdk-lib", marker = "extra == 'iac'", specifier = "~=2.189.0" },
+    { name = "brotli-asgi", specifier = "~=1.4.0" },
     { name = "duckdb", specifier = "~=1.2.2" },
     { name = "mangum", marker = "extra == 'lambda'", specifier = "~=0.17.0" },
     { name = "orjson" },

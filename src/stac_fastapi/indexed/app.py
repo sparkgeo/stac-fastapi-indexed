@@ -2,6 +2,7 @@ from logging import Logger, getLogger
 from typing import Final, List
 
 from asgi_correlation_id import CorrelationIdMiddleware
+from brotli_asgi import BrotliMiddleware
 from fastapi import FastAPI
 from fastapi.middleware import Middleware
 from fastapi.responses import ORJSONResponse
@@ -72,6 +73,7 @@ api = StacApi(
         Middleware(ProxyHeaderMiddleware),
         Middleware(RequestLogMiddleware),
         Middleware(CorrelationIdMiddleware),
+        Middleware(BrotliMiddleware),
     ],
 )
 app = api.app
