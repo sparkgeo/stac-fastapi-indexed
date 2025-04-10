@@ -25,7 +25,7 @@ def execute(
 
 
 async def _call_process(index_config: IndexConfig) -> List[IndexingError]:
-    return await IndexCreator(index_config=index_config).process(
+    return await IndexCreator(index_config=index_config).create_and_populate(
         Reader(
             root_catalog_uri=index_config.root_catalog_uri,
             fixes_to_apply=index_config.fixes_to_apply,

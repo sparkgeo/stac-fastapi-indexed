@@ -3,7 +3,7 @@ from glob import glob
 from json import dump
 from logging import Logger, getLogger
 from os import makedirs, path
-from typing import Dict, Final, List, Tuple
+from typing import Dict, Final, List, Optional, Tuple
 
 from duckdb import ConstraintException, connect
 from shapely import Geometry, is_valid_reason
@@ -42,16 +42,35 @@ class IndexCreator:
         except Exception:
             pass
 
-    async def process(self, reader: Reader) -> List[IndexingError]:
-        _logger.info("creating parquet index")
+    def create_empty(self, output_dir: Optional[str] = None) -> None:
+        _logger.info("creating empty parquet index")
+        self._create_db_objects()
+        self._log_creation_event()
+        self._export_db_objects(output_dir or get_settings().output_dir)
+
+    async def create_and_populate(
+        self, reader: Reader, output_dir: Optional[str] = None
+    ) -> List[IndexingError]:
+        _logger.info("creating and populating parquet index")
         # may eventually want some logic here to find an update an existing index, for not just creating from scratch each time
         self._create_db_objects()
         add_items_columns(self._index_config, self._conn)
         collections, collection_errors = await self._request_collections(reader)
         items_errors = await self._request_items(reader, collections)
         configure_indexables(self._index_config, self._conn)
-        self._insert_metadata()
-        output_dir = path.join(get_settings().output_dir, "parquet")
+        self._log_creation_event()
+        self._export_db_objects(output_dir or get_settings().output_dir)
+        return collection_errors + items_errors
+
+    def _create_db_objects(self) -> None:
+        sql_directory = path.join(path.dirname(__file__), "sql")
+        for sql_path in sorted(
+            glob(path.join(sql_directory, "**", "*.sql"), recursive=True)
+        ):
+            with open(sql_path, "r") as f:
+                self._conn.execute(f.read())
+
+    def _export_db_objects(self, output_dir: str) -> None:
         manifest = IndexManifest(
             created=self._creation_time,
         )
@@ -90,15 +109,6 @@ class IndexCreator:
                 f,
                 indent=2,
             )
-        return collection_errors + items_errors
-
-    def _create_db_objects(self) -> None:
-        sql_directory = path.join(path.dirname(__file__), "sql")
-        for sql_path in sorted(
-            glob(path.join(sql_directory, "**", "*.sql"), recursive=True)
-        ):
-            with open(sql_path, "r") as f:
-                self._conn.execute(f.read())
 
     async def _request_collections(
         self, reader: Reader
@@ -262,7 +272,7 @@ class IndexCreator:
         _logger.info(counts)
         return errors
 
-    def _insert_metadata(self) -> None:
+    def _log_creation_event(self) -> None:
         self._conn.execute(
             "INSERT INTO audit (event, time, notes) VALUES (?, ?, ?)",
             (

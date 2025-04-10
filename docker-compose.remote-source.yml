@@ -19,7 +19,7 @@ services:
     volumes:
       - indexer-output:/index:ro
     environment:
-      stac_api_indexed_index_manifest_uri: /index/parquet/manifest.json
+      stac_api_indexed_index_manifest_uri: /index/manifest.json
       AWS_ACCESS_KEY_ID:
       AWS_REGION:
       AWS_SECRET_ACCESS_KEY:

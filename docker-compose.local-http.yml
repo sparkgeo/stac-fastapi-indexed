@@ -54,7 +54,7 @@ services:
     volumes:
       - indexer-output:/index:ro
     environment:
-      stac_api_indexed_index_manifest_uri: /index/parquet/manifest.json
+      stac_api_indexed_index_manifest_uri: /index/manifest.json
     depends_on:
       indexer:
         condition: service_completed_successfully
