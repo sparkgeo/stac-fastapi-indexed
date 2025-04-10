@@ -62,7 +62,7 @@ RUN mkdir -p /datastore/.duckdb/extensions/v${DUCKDB_VERSION}/linux_amd64_gcc4 \
   && mv spatial /datastore/.duckdb/extensions/v${DUCKDB_VERSION}/linux_amd64_gcc4/spatial.duckdb_extension \
   && mv httpfs /datastore/.duckdb/extensions/v${DUCKDB_VERSION}/linux_amd64_gcc4/httpfs.duckdb_extension \
   && mv aws /datastore/.duckdb/extensions/v${DUCKDB_VERSION}/linux_amd64_gcc4/aws.duckdb_extension \
-  && chmod 777 /datastore
+  && chmod -R 755 /datastore
 
 WORKDIR /opt/app
 
