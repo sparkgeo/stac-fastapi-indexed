@@ -35,6 +35,9 @@ lambda = [
 test = [
     "pytest~=8.2.2",
 ]
+iac = [
+    "aws-cdk-lib~=2.189.0",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["./src"]
