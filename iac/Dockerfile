@@ -44,25 +44,17 @@ COPY --from=build /opt/app /opt/app
 COPY packages/stac-index/src/ /opt/app/lib/python3.13/site-packages/
 COPY src/stac_fastapi/indexed /opt/app/lib/python3.13/site-packages/stac_fastapi/indexed
 
-ARG DUCKDB_VERSION=1.2.2
-WORKDIR /tmp
-RUN  curl -o spatial.gz http://extensions.duckdb.org/v${DUCKDB_VERSION}/linux_amd64_gcc4/spatial.duckdb_extension.gz \
-  && gunzip spatial.gz \
-  && curl -o httpfs.gz http://extensions.duckdb.org/v${DUCKDB_VERSION}/linux_amd64_gcc4/httpfs.duckdb_extension.gz \
-  && gunzip httpfs.gz \
-  && curl -o aws.gz http://extensions.duckdb.org/v${DUCKDB_VERSION}/linux_amd64_gcc4/aws.duckdb_extension.gz \
-  && gunzip aws.gz
-
 ENV PYTHONPATH=/opt/app/lib/python3.13/site-packages
-RUN python -c "import duckdb; duckdb.execute(\"INSTALL '/tmp/spatial'\"); duckdb.execute(\"INSTALL '/tmp/httpfs'\"); duckdb.execute(\"INSTALL '/tmp/aws'\")"
+RUN python -c "import duckdb; duckdb.execute('INSTALL spatial'); duckdb.execute('INSTALL httpfs'); duckdb.execute('INSTALL aws')"
 ENV stac_api_indexed_install_duckdb_extensions=false
 
-ENV HOME=/datastore
-RUN mkdir -p /datastore/.duckdb/extensions/v${DUCKDB_VERSION}/linux_amd64_gcc4 \
-  && mv spatial /datastore/.duckdb/extensions/v${DUCKDB_VERSION}/linux_amd64_gcc4/spatial.duckdb_extension \
-  && mv httpfs /datastore/.duckdb/extensions/v${DUCKDB_VERSION}/linux_amd64_gcc4/httpfs.duckdb_extension \
-  && mv aws /datastore/.duckdb/extensions/v${DUCKDB_VERSION}/linux_amd64_gcc4/aws.duckdb_extension \
+ARG DUCKDB_VERSION=1.2.2
+# Store installed extensions at an alternate location so that the Lambda's least-privileged user can access them.
+WORKDIR /datastore/.duckdb/extensions/v${DUCKDB_VERSION}/linux_amd64_gcc4
+RUN  mv /root/.duckdb/extensions/v${DUCKDB_VERSION}/linux_amd64_gcc4/* . \
   && chmod -R 755 /datastore
+# Tell DuckDB to look here for its installed extensions.
+ENV HOME=/datastore
 
 WORKDIR /opt/app
 
