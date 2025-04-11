@@ -4,6 +4,7 @@ from json import dump
 from logging import Logger, getLogger
 from os import makedirs, path
 from typing import Dict, Final, List, Optional, Tuple
+from uuid import uuid4
 
 from duckdb import ConstraintException, connect
 from shapely import Geometry, is_valid_reason
@@ -28,9 +29,13 @@ from stac_index.indexer.types.stac_data import ItemWithLocation
 _logger: Final[Logger] = getLogger(__name__)
 
 
+def _current_time() -> datetime:
+    return datetime.now(tz=timezone.utc)
+
+
 class IndexCreator:
     def __init__(self):
-        self._creation_time = datetime.now(tz=timezone.utc)
+        self._creation_time = _current_time()
         self._conn = connect()
         self._conn.execute("INSTALL spatial")
         self._conn.execute("LOAD spatial")
@@ -44,7 +49,6 @@ class IndexCreator:
     def create_empty(self, output_dir: Optional[str] = None) -> str:
         _logger.info("creating empty parquet index")
         self._create_db_objects()
-        self._log_creation_event()
         return self._export_db_objects(output_dir or get_settings().output_dir)
 
     async def create_and_populate(
@@ -53,14 +57,15 @@ class IndexCreator:
         reader: Reader,
         output_dir: Optional[str] = None,
     ) -> Tuple[List[IndexingError], str]:
-        _logger.info("creating and populating parquet index")
+        load_id: Final[str] = str(uuid4())
+        _logger.info(f"creating and populating parquet index for load {load_id}")
         # may eventually want some logic here to find an update an existing index, for not just creating from scratch each time
         self._create_db_objects()
         add_items_columns(index_config, self._conn)
         collections, collection_errors = await self._request_collections(reader)
         items_errors = await self._request_items(index_config, reader, collections)
         configure_indexables(index_config, self._conn)
-        self._log_creation_event()
+        self._log_index_event(load_id=load_id, index_config=index_config)
         return (
             collection_errors + items_errors,
             self._export_db_objects(output_dir or get_settings().output_dir),
@@ -72,7 +77,11 @@ class IndexCreator:
             glob(path.join(sql_directory, "**", "*.sql"), recursive=True)
         ):
             with open(sql_path, "r") as f:
-                self._conn.execute(f.read())
+                try:
+                    self._conn.execute(f.read())
+                except Exception:
+                    _logger.exception(f"SQL failure at {sql_path}")
+                    raise
 
     def _export_db_objects(self, output_dir: str) -> str:
         manifest = IndexManifest(
@@ -278,13 +287,19 @@ class IndexCreator:
         _logger.info(counts)
         return errors
 
-    def _log_creation_event(self) -> None:
+    def _log_index_event(self, load_id: str, index_config: IndexConfig) -> None:
         self._conn.execute(
-            "INSERT INTO audit (event, time, notes) VALUES (?, ?, ?)",
+            "INSERT INTO index_history (id, start_time, end_time, root_catalog_uris, loaded, added, removed, updated, unchanged) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                "create",
+                load_id,
                 self._creation_time,
-                None,
+                _current_time(),
+                [index_config.root_catalog_uri],
+                0,
+                0,
+                0,
+                0,
+                0,
             ),
         )
 
