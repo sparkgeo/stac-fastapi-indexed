@@ -1,11 +1,6 @@
 from abc import ABC, abstractmethod
 from json import loads
-from logging import Logger, getLogger
-from typing import Any, Dict, Final, List, Optional, Tuple
-
-from stac_index.common.exceptions import UriNotFoundException
-
-_logger: Final[Logger] = getLogger(__name__)
+from typing import Any, Dict, List, Optional, Tuple
 
 
 class SourceReader(ABC):
@@ -34,8 +29,4 @@ class SourceReader(ABC):
         pass
 
     async def load_json_from_uri(self, uri: str) -> Dict[str, Any]:
-        try:
-            json_string = await self.get_uri_as_string(uri)
-        except Exception:
-            raise UriNotFoundException(uri)
-        return loads(json_string)
+        return loads(await self.get_uri_as_string(uri))

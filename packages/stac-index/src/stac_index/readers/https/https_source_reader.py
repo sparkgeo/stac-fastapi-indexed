@@ -4,6 +4,7 @@ from time import time
 from typing import Any, Dict, Final, List, Optional, Tuple, cast
 
 from aiohttp import ClientSession
+from stac_index.common.exceptions import UriNotFoundException
 from stac_index.common.source_reader import SourceReader
 
 _uri_start_regex: Final[Pattern] = compile(r"^http(s)?://")
@@ -33,6 +34,8 @@ class HttpsSourceReader(SourceReader):
                             )
                         )
                         return content
+                    elif response.status == 404:
+                        raise UriNotFoundException(uri)
                     else:
                         return f"Unable to read '{uri}' ({response.status})"
         except Exception as e:

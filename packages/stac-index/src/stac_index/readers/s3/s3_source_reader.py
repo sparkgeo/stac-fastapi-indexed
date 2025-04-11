@@ -4,6 +4,7 @@ from time import time
 from typing import Final, List, Optional, Tuple, cast
 
 from obstore.store import S3Store
+from stac_index.common.exceptions import UriNotFoundException
 from stac_index.common.source_reader import SourceReader
 
 from .settings import get_settings
@@ -57,6 +58,8 @@ class S3SourceReader(SourceReader):
                 )
             )
             return object_bytes.to_bytes().decode("UTF-8")
+        except FileNotFoundError:
+            raise UriNotFoundException(uri)
         except Exception:
             _logger.exception(f"S3: failed to fetch {uri}")
             raise
