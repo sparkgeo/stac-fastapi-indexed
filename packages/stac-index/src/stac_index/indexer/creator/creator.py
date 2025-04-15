@@ -25,8 +25,12 @@ from stac_index.indexer.reader.reader import Reader
 from stac_index.indexer.settings import get_settings
 from stac_index.indexer.types.index_config import IndexConfig, collection_wildcard
 from stac_index.indexer.types.stac_data import ItemWithLocation
+from stac_index.readers import get_index_reader_class_for_uri
 
 _logger: Final[Logger] = getLogger(__name__)
+_indexer_version: Final[int] = (
+    1  # only increment on changes that are not backwards-compatible
+)
 
 
 def _current_time() -> datetime:
@@ -47,19 +51,27 @@ class IndexCreator:
             pass
 
     def create_empty(self, output_dir: Optional[str] = None) -> str:
-        _logger.info("creating empty parquet index")
+        _logger.info("creating empty index")
         self._create_db_objects()
         return self._export_db_objects(output_dir or get_settings().output_dir)
 
-    async def create_and_populate(
+    async def index_stac_source(
         self,
         index_config: IndexConfig,
         reader: Reader,
         output_dir: Optional[str] = None,
     ) -> Tuple[List[IndexingError], str]:
         load_id: Final[str] = str(uuid4())
-        _logger.info(f"creating and populating parquet index for load {load_id}")
-        # may eventually want some logic here to find an update an existing index, for not just creating from scratch each time
+        _logger.info(f"indexing stac source for load {load_id}")
+        if index_config.existing_manifest_json_uri is not None:
+            index_reader = get_index_reader_class_for_uri(
+                index_config.existing_manifest_json_uri
+            )(index_config.existing_manifest_json_uri)
+            index_manifest = await index_reader.get_index_manifest()
+            if index_manifest.indexer_version != _indexer_version:
+                raise Exception(
+                    f"indexer v{_indexer_version} incompatible with manifest from v{index_manifest.indexer_version}"
+                )
         self._create_db_objects()
         add_items_columns(index_config, self._conn)
         collections, collection_errors = await self._request_collections(reader)
@@ -85,6 +97,7 @@ class IndexCreator:
 
     def _export_db_objects(self, output_dir: str) -> str:
         manifest = IndexManifest(
+            indexer_version=_indexer_version,
             created=self._creation_time,
         )
         try:

@@ -3,13 +3,13 @@ from logging import Logger, getLogger
 from os import environ
 from tempfile import mkdtemp
 from time import time
-from typing import Any, Dict, Final, List, Optional, Type
+from typing import Any, Dict, Final, List, Optional
 
 from duckdb import DuckDBPyConnection
 from duckdb import connect as duckdb_connect
-from stac_index.common import IndexReader, index_reader_classes
 from stac_index.common.exceptions import MissingIndexException
 from stac_index.indexer.creator.creator import IndexCreator
+from stac_index.readers import get_index_reader_class_for_uri
 
 from stac_fastapi.indexed.settings import get_settings
 
@@ -29,7 +29,7 @@ async def connect_to_db() -> None:
     times = {}
     settings = get_settings()
     index_manifest_uri = settings.index_manifest_uri
-    index_reader = _get_index_reader_class_for_uri(index_manifest_uri)(
+    index_reader = get_index_reader_class_for_uri(index_manifest_uri)(
         index_manifest_uri
     )
     start = time()
@@ -40,7 +40,7 @@ async def connect_to_db() -> None:
         _logger.warning(f"index missing at {index_manifest_uri}")
         if settings.create_empty_index_if_missing:
             index_manifest_uri = IndexCreator().create_empty(mkdtemp())
-            index_reader = _get_index_reader_class_for_uri(index_manifest_uri)(
+            index_reader = get_index_reader_class_for_uri(index_manifest_uri)(
                 index_manifest_uri
             )
             _parquet_uris = await index_reader.get_parquet_uris()
@@ -118,17 +118,6 @@ def fetchall(statement: str, params: Optional[List[Any]] = None) -> List[Any]:
     result = _get_db_connection().execute(statement, params).fetchall()
     _sql_log_message(statement, time() - start, len(result), params)
     return result
-
-
-def _get_index_reader_class_for_uri(uri: str) -> Type[IndexReader]:
-    compatible_index_readers = [
-        index_reader
-        for index_reader in index_reader_classes
-        if index_reader.can_handle_source_uri(uri)
-    ]
-    if len(compatible_index_readers) == 0:
-        raise Exception(f"no index readers support manifest URI '{uri}'")
-    return compatible_index_readers[0]
 
 
 def _get_db_connection():

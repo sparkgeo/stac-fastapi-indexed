@@ -26,7 +26,7 @@ def execute(
 
 
 async def _call_process(index_config: IndexConfig) -> Tuple[List[IndexingError], str]:
-    return await IndexCreator().create_and_populate(
+    return await IndexCreator().index_stac_source(
         index_config=index_config,
         reader=Reader(
             root_catalog_uri=index_config.root_catalog_uri,

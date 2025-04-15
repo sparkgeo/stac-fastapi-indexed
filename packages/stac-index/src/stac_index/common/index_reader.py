@@ -25,13 +25,16 @@ class IndexReader:
                 f"unable to locate reader capable of reading '{index_manifest_uri}'"
             )
 
-    async def get_parquet_uris(self) -> Dict[str, str]:
+    async def get_index_manifest(self) -> IndexManifest:
         try:
-            manifest = IndexManifest(
+            return IndexManifest(
                 **await self._source_reader.load_json_from_uri(self.index_manifest_uri)
             )
         except UriNotFoundException:
             raise MissingIndexException()
+
+    async def get_parquet_uris(self) -> Dict[str, str]:
+        manifest = await self.get_index_manifest()
         return {
             table_name: "/".join(
                 self.index_manifest_uri.split("/")[:-1] + [metadata.relative_path]

@@ -9,6 +9,7 @@ class TableMetadata(BaseModel):
 
 
 class IndexManifest(BaseModel):
+    indexer_version: int
     created: datetime
     tables: Dict[str, TableMetadata] = {}
 
