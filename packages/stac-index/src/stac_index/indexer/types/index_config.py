@@ -43,9 +43,9 @@ IndexableByCollection = Dict[str, IndexableByFieldName]
 
 class IndexConfig(BaseModel):
     root_catalog_uri: str
-    indexables: IndexableByFieldName
-    queryables: QueryableByFieldName
-    sortables: SortablesByFieldName
+    indexables: IndexableByFieldName = {}
+    queryables: QueryableByFieldName = {}
+    sortables: SortablesByFieldName = {}
     fixes_to_apply: List[str] = []
 
     def __init__(self, **data):
