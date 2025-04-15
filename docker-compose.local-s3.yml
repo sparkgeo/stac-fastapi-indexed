@@ -75,7 +75,7 @@ services:
   api:
     environment:
       <<: *minio-environment
-      stac_api_indexed_index_manifest_uri: s3://index/index/parquet/manifest.json
+      stac_api_indexed_index_manifest_uri: s3://index/index/manifest.json
       stac_index_reader_s3_endpoint: http://minio:9000
     depends_on:
       minio-index-loader:

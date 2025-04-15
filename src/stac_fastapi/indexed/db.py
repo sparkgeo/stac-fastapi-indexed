@@ -1,12 +1,15 @@
 import re
 from logging import Logger, getLogger
 from os import environ
+from tempfile import mkdtemp
 from time import time
-from typing import Any, Dict, Final, List, Optional
+from typing import Any, Dict, Final, List, Optional, Type
 
 from duckdb import DuckDBPyConnection
 from duckdb import connect as duckdb_connect
-from stac_index.common import index_reader_classes
+from stac_index.common import IndexReader, index_reader_classes
+from stac_index.common.exceptions import MissingIndexException
+from stac_index.indexer.creator.creator import IndexCreator
 
 from stac_fastapi.indexed.settings import get_settings
 
@@ -23,22 +26,33 @@ _parquet_uris: Dict[str, str] = {}
 
 
 async def connect_to_db() -> None:
+    times = {}
     settings = get_settings()
     index_manifest_uri = settings.index_manifest_uri
-    compatible_index_readers = [
-        index_reader
-        for index_reader in index_reader_classes
-        if index_reader.can_handle_source_uri(index_manifest_uri)
-    ]
-    if len(compatible_index_readers) == 0:
-        raise Exception(f"no index readers support manifest URI '{index_manifest_uri}'")
-    index_source = compatible_index_readers[0](index_manifest_uri)
-    times = {}
+    index_reader = _get_index_reader_class_for_uri(index_manifest_uri)(
+        index_manifest_uri
+    )
     start = time()
+    global _parquet_uris
+    try:
+        _parquet_uris = await index_reader.get_parquet_uris()
+    except MissingIndexException:
+        _logger.warning(f"index missing at {index_manifest_uri}")
+        if settings.create_empty_index_if_missing:
+            index_manifest_uri = IndexCreator().create_empty(mkdtemp())
+            index_reader = _get_index_reader_class_for_uri(index_manifest_uri)(
+                index_manifest_uri
+            )
+            _parquet_uris = await index_reader.get_parquet_uris()
+        else:
+            raise Exception(
+                "not configured to create empty index if missing, cannot proceed"
+            )
+    times["get parquet URIs"] = time()
     global _root_db_connection
     _root_db_connection = duckdb_connect()
     times["create db connection"] = time()
-    for config_command in index_source.get_duckdb_configuration_statements():
+    for config_command in index_reader.get_duckdb_configuration_statements():
         execute(
             config_command[0],
             config_command[1],
@@ -55,14 +69,8 @@ async def connect_to_db() -> None:
     times["load spatial extension"] = time()
     execute("LOAD httpfs")
     times["load httpfs extension"] = time()
-    duckdb_thread_count = settings.duckdb_threads
-    if duckdb_thread_count:
-        _set_duckdb_threads(duckdb_thread_count)
-    global _parquet_uris
-    _parquet_uris = await index_source.get_parquet_uris()
-    times["get parquet URIs"] = time()
-    if len(_parquet_uris.keys()) == 0:
-        raise Exception(f"no URIs found from '{index_manifest_uri}'")
+    if settings.duckdb_threads:
+        _set_duckdb_threads(settings.duckdb_threads)
     for operation, completed_at in times.items():
         _logger.info(
             "'{}' completed in {}s".format(
@@ -110,6 +118,17 @@ def fetchall(statement: str, params: Optional[List[Any]] = None) -> List[Any]:
     result = _get_db_connection().execute(statement, params).fetchall()
     _sql_log_message(statement, time() - start, len(result), params)
     return result
+
+
+def _get_index_reader_class_for_uri(uri: str) -> Type[IndexReader]:
+    compatible_index_readers = [
+        index_reader
+        for index_reader in index_reader_classes
+        if index_reader.can_handle_source_uri(uri)
+    ]
+    if len(compatible_index_readers) == 0:
+        raise Exception(f"no index readers support manifest URI '{uri}'")
+    return compatible_index_readers[0]
 
 
 def _get_db_connection():

@@ -30,4 +30,4 @@ dco="docker compose -f docker-compose.base.yml -f docker-compose.remote-source.y
 $dco build
 echo; echo "* Indexing may take some time, depending on the size of the catalog *"; echo
 sleep 1
-$dco up
+$dco up --force-recreate

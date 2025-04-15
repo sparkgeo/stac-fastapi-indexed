@@ -4,6 +4,7 @@ from os import path
 from time import time
 from typing import Final, List, Optional, Tuple
 
+from stac_index.common.exceptions import UriNotFoundException
 from stac_index.common.source_reader import SourceReader
 
 _uri_start_str: Final[str] = "/"
@@ -35,7 +36,7 @@ class FilesystemSourceReader(SourceReader):
             except Exception as e:
                 raise Exception(f"Unable to read '{uri}'", e)
         else:
-            raise ValueError(f"'{uri}' does not exist")
+            raise UriNotFoundException(uri)
 
     async def get_item_uris_from_items_uri(
         self, uri: str, item_limit: Optional[int] = None
