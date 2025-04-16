@@ -3,6 +3,7 @@ from typing import Any, Dict, Final, List, Optional, Tuple
 
 from stac_index.common.exceptions import MissingIndexException, UriNotFoundException
 from stac_index.common.index_manifest import IndexManifest
+from stac_index.common.source_reader import SourceReader
 
 _logger: Final[Logger] = getLogger(__name__)
 
@@ -24,6 +25,10 @@ class IndexReader:
             raise Exception(
                 f"unable to locate reader capable of reading '{index_manifest_uri}'"
             )
+
+    @property
+    def source_reader(self) -> SourceReader:
+        return self._source_reader
 
     async def get_index_manifest(self) -> IndexManifest:
         try:

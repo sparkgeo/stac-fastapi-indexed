@@ -1,9 +1,9 @@
 from logging import Logger, getLogger
 from re import Pattern, compile, match
 from time import time
-from typing import Any, Dict, Final, List, Optional, Tuple, cast
+from typing import Any, Callable, Coroutine, Dict, Final, List, Optional, Tuple, cast
 
-from aiohttp import ClientSession
+from aiohttp import ClientResponse, ClientSession
 from stac_index.common.exceptions import UriNotFoundException
 from stac_index.common.source_reader import SourceReader
 
@@ -20,26 +20,48 @@ class HttpsSourceReader(SourceReader):
         super().__init__(*args, **kwargs)
         _logger.info("creating HTTPS Reader")
 
-    async def get_uri_as_string(self, uri: str) -> str:
-        try:
-            start = time()
-            async with ClientSession() as session:
-                async with session.get(uri) as response:
-                    if response.status == 200:
-                        content = await response.text()
-                        _logger.debug(
-                            "HTTPS: fetched '{}' in {}s".format(
-                                uri,
-                                round(time() - start, 3),
-                            )
+    def path_separator(self) -> str:
+        return "/"
+
+    async def _get_uri_and_process(
+        self,
+        uri: str,
+        processor: Callable[[ClientResponse], Coroutine[None, None, None]],
+        success_statuses: List[int] = [200],
+    ) -> None:
+        start = time()
+        async with ClientSession() as session:
+            async with session.get(uri) as response:
+                if response.status in success_statuses:
+                    await processor(response)
+                    _logger.debug(
+                        "HTTPS: fetched '{}' in {}s".format(
+                            uri,
+                            round(time() - start, 3),
                         )
-                        return content
-                    elif response.status == 404:
-                        raise UriNotFoundException(uri)
-                    else:
-                        return f"Unable to read '{uri}' ({response.status})"
-        except Exception as e:
-            raise Exception(f"Unable to read '{uri}'", e)
+                    )
+                elif response.status == 404:
+                    raise UriNotFoundException(uri)
+                else:
+                    raise Exception(f"Unable to read '{uri}' ({response.status})")
+
+    async def get_uri_as_string(self, uri: str) -> str:
+        result = ""
+
+        async def process(response: ClientResponse) -> None:
+            nonlocal result
+            result = await response.text()
+
+        await self._get_uri_and_process(uri, process)
+        return result
+
+    async def get_uri_to_file(self, uri: str, file_path: str) -> None:
+        async def process(response: ClientResponse) -> None:
+            with open(file_path, "wb") as f:
+                async for chunk in response.content.iter_chunked(1000000):
+                    f.write(chunk)
+
+        await self._get_uri_and_process(uri, process)
 
     # This function interacts with HTTP endpoints inefficiently.
     # See https://github.com/sparkgeo/STAC-API-Serverless/issues/98 for thoughts on this.

@@ -1,6 +1,7 @@
 from glob import glob
 from logging import Logger, getLogger
 from os import path
+from shutil import copy
 from time import time
 from typing import Final, List, Optional, Tuple
 
@@ -20,6 +21,9 @@ class FilesystemSourceReader(SourceReader):
         super().__init__(*args, **kwargs)
         _logger.info("creating Filesystem Reader")
 
+    def path_separator(self) -> str:
+        return _uri_start_str  # sorry Windows
+
     async def get_uri_as_string(self, uri: str) -> str:
         if path.exists(uri):
             start = time()
@@ -37,6 +41,9 @@ class FilesystemSourceReader(SourceReader):
                 raise Exception(f"Unable to read '{uri}'", e)
         else:
             raise UriNotFoundException(uri)
+
+    async def get_uri_to_file(self, uri: str, file_path: str):
+        copy(uri, file_path)
 
     async def get_item_uris_from_items_uri(
         self, uri: str, item_limit: Optional[int] = None

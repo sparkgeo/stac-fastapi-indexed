@@ -3,6 +3,7 @@ from glob import glob
 from json import dump
 from logging import Logger, getLogger
 from os import makedirs, path
+from tempfile import mkdtemp
 from typing import Dict, Final, List, Optional, Tuple
 from uuid import uuid4
 
@@ -63,15 +64,7 @@ class IndexCreator:
     ) -> Tuple[List[IndexingError], str]:
         load_id: Final[str] = str(uuid4())
         _logger.info(f"indexing stac source for load {load_id}")
-        if index_config.existing_manifest_json_uri is not None:
-            index_reader = get_index_reader_class_for_uri(
-                index_config.existing_manifest_json_uri
-            )(index_config.existing_manifest_json_uri)
-            index_manifest = await index_reader.get_index_manifest()
-            if index_manifest.indexer_version != _indexer_version:
-                raise Exception(
-                    f"indexer v{_indexer_version} incompatible with manifest from v{index_manifest.indexer_version}"
-                )
+        await self._load_existing_data(index_config=index_config)
         self._create_db_objects()
         add_items_columns(index_config, self._conn)
         collections, collection_errors = await self._request_collections(reader)
@@ -319,3 +312,36 @@ class IndexCreator:
     def _insert_errors(self, errors: list[IndexingError]) -> None:
         for error in errors:
             save_error(self._conn, error)
+
+    async def _load_existing_data(self, index_config: IndexConfig) -> None:
+        if index_config.existing_manifest_json_uri is None:
+            return
+        index_reader = get_index_reader_class_for_uri(
+            index_config.existing_manifest_json_uri
+        )(index_config.existing_manifest_json_uri)
+        index_manifest = await index_reader.get_index_manifest()
+        if index_manifest.indexer_version != _indexer_version:
+            raise Exception(
+                f"indexer v{_indexer_version} incompatible with manifest from v{index_manifest.indexer_version}"
+            )
+        tmp_dir_path = mkdtemp()
+        for table_name in ["collections", "items"]:
+            if table_name not in index_manifest.tables:
+                raise ValueError(f"{table_name} table not present in index_manifest")
+            relative_path = index_manifest.tables[table_name].relative_path
+            tmp_file_path = path.join(tmp_dir_path, relative_path)
+            source_reader = index_reader.source_reader
+            await source_reader.get_uri_to_file(
+                source_reader.path_separator().join(
+                    index_config.existing_manifest_json_uri.split(
+                        source_reader.path_separator()
+                    )[:-1]
+                    + [relative_path]
+                ),
+                tmp_file_path,
+            )
+            previous_table_name = f"{table_name}_previous"
+            _logger.info(f"creating {previous_table_name} from {tmp_file_path}")
+            self._conn.execute(
+                f"CREATE TABLE {previous_table_name} AS SELECT * FROM '{tmp_file_path}'"
+            )

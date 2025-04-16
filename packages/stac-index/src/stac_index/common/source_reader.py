@@ -19,7 +19,15 @@ class SourceReader(ABC):
         pass
 
     @abstractmethod
+    def path_separator(self) -> str:
+        pass
+
+    @abstractmethod
     async def get_uri_as_string(self, uri: str) -> str:
+        pass
+
+    @abstractmethod
+    async def get_uri_to_file(self, uri: str, file_path: str) -> None:
         pass
 
     @abstractmethod

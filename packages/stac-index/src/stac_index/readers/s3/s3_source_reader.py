@@ -3,6 +3,7 @@ from re import Match, match
 from time import time
 from typing import Final, List, Optional, Tuple, cast
 
+from obstore import Bytes
 from obstore.store import S3Store
 from stac_index.common.exceptions import UriNotFoundException
 from stac_index.common.source_reader import SourceReader
@@ -22,6 +23,9 @@ class S3SourceReader(SourceReader):
         super().__init__(*args, **kwargs)
         self._obstore_cache = {}  # stores are bucket-specific, so need one per unique bucket
 
+    def path_separator(self) -> str:
+        return "/"
+
     def _obstore_for_bucket(self, bucket: str) -> S3Store:
         if bucket not in self._obstore_cache:
             _logger.info(f"creating S3 Reader obstore for bucket '{bucket}'")
@@ -38,13 +42,13 @@ class S3SourceReader(SourceReader):
         return self._obstore_cache[bucket]
 
     def _get_s3_key_parts(self, key: str) -> Tuple[str, str]:
-        return cast(Match, match(rf"{_uri_prefix_regex}([^/]+)/(.+)", key)).groups()
-
-    async def get_uri_as_string(self, uri: str) -> str:
         try:
-            bucket, key = self._get_s3_key_parts(uri)
+            return cast(Match, match(rf"{_uri_prefix_regex}([^/]+)/(.+)", key)).groups()
         except Exception as e:
-            raise ValueError(f"'{uri}' is not in the expected format", e)
+            raise ValueError(f"'{key}' is not in the expected format", e)
+
+    async def _get_uri_as_bytes(self, uri: str) -> Bytes:
+        bucket, key = self._get_s3_key_parts(uri)
         try:
             start = time()
             object_bytes = await (
@@ -57,12 +61,25 @@ class S3SourceReader(SourceReader):
                     round(time() - start, 3),
                 )
             )
-            return object_bytes.to_bytes().decode("UTF-8")
+            return object_bytes
         except FileNotFoundError:
             raise UriNotFoundException(uri)
         except Exception:
             _logger.exception(f"S3: failed to fetch {uri}")
             raise
+
+    async def get_uri_as_string(self, uri: str) -> str:
+        return (await self._get_uri_as_bytes(uri)).to_bytes().decode("UTF-8")
+
+    async def get_uri_to_file(self, uri, file_path: str):
+        chunk_size = 1000000
+        source = await self._get_uri_as_bytes(uri)
+        with open(file_path, "wb") as f:
+            offset = 0
+            while offset < len(source):
+                chunk = source[offset : offset + chunk_size]
+                f.write(chunk)
+                offset += chunk_size
 
     async def get_item_uris_from_items_uri(
         self, uri: str, item_limit: Optional[int] = None
