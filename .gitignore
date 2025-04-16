@@ -17,3 +17,6 @@
 **/*.pyc
 dist
 **/*.egg-info
+
+# indexer when run locally
+packages/stac-index/src/stac_index/indexer/index_data/
