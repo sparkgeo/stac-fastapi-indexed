@@ -30,7 +30,7 @@ _child_types_by_lower_type: Final[Dict[str, Type[_HasLinks]]] = {
 
 
 @dataclass
-class Reader:
+class StacCatalogReader:
     root_catalog_uri: str
     fixes_to_apply: List[str]
 

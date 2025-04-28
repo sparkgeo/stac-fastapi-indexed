@@ -42,7 +42,8 @@ services:
     image: sparkgeo/stac_indexer
     environment:
       stac_index_indexer_output_dir: /output
-      INDEX_CATALOG_ROOT_PATH: http://fileserver:8001/stac/catalog.json
+      INDEX_ROOT_CATALOG_URI: http://fileserver:8001/stac/catalog.json
+      INDEX_CONFIG_PATH: /index-config.json
     volumes:
       - "indexer-output:/output:rw"
       - "./data/STAC/sample/index-config.json:/index-config.json:ro"

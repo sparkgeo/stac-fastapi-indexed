@@ -42,8 +42,6 @@ IndexableByCollection = Dict[str, IndexableByFieldName]
 
 
 class IndexConfig(BaseModel):
-    root_catalog_uri: str
-    existing_manifest_json_uri: Optional[str] = None
     indexables: IndexableByFieldName = {}
     queryables: QueryableByFieldName = {}
     sortables: SortablesByFieldName = {}

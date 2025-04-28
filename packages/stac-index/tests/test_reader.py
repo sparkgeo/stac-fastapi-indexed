@@ -2,7 +2,7 @@ from types import SimpleNamespace
 from typing import List
 from unittest.mock import Mock
 
-from stac_index.indexer.reader.reader import _expand_relative_links
+from stac_index.indexer.stac_catalog_reader import _expand_relative_links
 
 
 def _get_link_provider(links: List[str]) -> SimpleNamespace:

@@ -34,5 +34,5 @@ def get_index_reader_class_for_uri(uri: str) -> Type[IndexReader]:
         if index_reader.can_handle_source_uri(uri)
     ]
     if len(compatible_index_readers) == 0:
-        raise Exception(f"no index readers support manifest URI '{uri}'")
+        raise Exception(f"no index readers support URI '{uri}'")
     return compatible_index_readers[0]

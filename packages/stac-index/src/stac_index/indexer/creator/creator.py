@@ -4,7 +4,7 @@ from json import dump
 from logging import Logger, getLogger
 from os import makedirs, path
 from tempfile import mkdtemp
-from typing import Dict, Final, List, Optional, Tuple
+from typing import Dict, Final, List, Optional, Self, Tuple, cast
 from uuid import uuid4
 
 from duckdb import ConstraintException, connect
@@ -22,8 +22,8 @@ from stac_index.indexer.creator.configurer import (
     add_items_columns,
     configure_indexables,
 )
-from stac_index.indexer.reader.reader import Reader
 from stac_index.indexer.settings import get_settings
+from stac_index.indexer.stac_catalog_reader import StacCatalogReader
 from stac_index.indexer.types.index_config import IndexConfig, collection_wildcard
 from stac_index.indexer.types.stac_data import ItemWithLocation
 from stac_index.readers import get_index_reader_class_for_uri
@@ -39,44 +39,70 @@ def _current_time() -> datetime:
 
 
 class IndexCreator:
-    def __init__(self):
+    def __init__(self: Self):
         self._creation_time = _current_time()
         self._conn = connect()
         self._conn.execute("INSTALL spatial")
         self._conn.execute("LOAD spatial")
 
-    def __del__(self):
+    def __del__(self: Self):
         try:
             self._conn.close()
         except Exception:
             pass
 
-    def create_empty(self, output_dir: Optional[str] = None) -> str:
+    def create_empty(self: Self, output_dir: Optional[str] = None) -> str:
         _logger.info("creating empty index")
         self._create_db_objects()
         return self._export_db_objects(output_dir or get_settings().output_dir)
 
-    async def index_stac_source(
-        self,
-        index_config: IndexConfig,
-        reader: Reader,
+    async def create_new_index(
+        self: Self,
+        root_catalog_uri: str,
+        index_config: Optional[IndexConfig] = None,
+    ) -> Tuple[List[IndexingError], str]:
+        return await self._index_stac_source(
+            root_catalog_uri=root_catalog_uri, index_config=index_config
+        )
+
+    async def update_index(
+        self: Self,
+        manifest_json_uri: str,
+    ) -> Tuple[List[IndexingError], str]:
+        existing_index_manifest = await self._load_existing_index(manifest_json_uri)
+        return await self._index_stac_source(
+            root_catalog_uri=cast(str, existing_index_manifest.root_catalog_uri),
+            index_config=existing_index_manifest.index_config,
+        )
+
+    async def _index_stac_source(
+        self: Self,
+        root_catalog_uri: str,
+        index_config: Optional[IndexConfig] = None,
         output_dir: Optional[str] = None,
     ) -> Tuple[List[IndexingError], str]:
-        load_id: Final[str] = str(uuid4())
+        load_id: Final[str] = uuid4().hex
         _logger.info(f"indexing stac source for load {load_id}")
-        await self._load_existing_data(index_config=index_config)
         self._create_db_objects()
+        index_config = index_config or IndexConfig()
         add_items_columns(index_config, self._conn)
+        reader = StacCatalogReader(
+            root_catalog_uri=root_catalog_uri,
+            fixes_to_apply=index_config.fixes_to_apply,
+        )
         collections, collection_errors = await self._request_collections(reader)
         items_errors = await self._request_items(index_config, reader, collections)
         configure_indexables(index_config, self._conn)
-        self._log_index_event(load_id=load_id, index_config=index_config)
+        self._log_index_event(load_id=load_id, root_catalog_uri=root_catalog_uri)
         return (
             collection_errors + items_errors,
-            self._export_db_objects(output_dir or get_settings().output_dir),
+            self._export_db_objects(
+                output_dir=output_dir or get_settings().output_dir,
+                root_catalog_uri=root_catalog_uri,
+            ),
         )
 
-    def _create_db_objects(self) -> None:
+    def _create_db_objects(self: Self) -> None:
         sql_directory = path.join(path.dirname(__file__), "sql")
         for sql_path in sorted(
             glob(path.join(sql_directory, "**", "*.sql"), recursive=True)
@@ -88,10 +114,17 @@ class IndexCreator:
                     _logger.exception(f"SQL failure at {sql_path}")
                     raise
 
-    def _export_db_objects(self, output_dir: str) -> str:
+    def _export_db_objects(
+        self: Self,
+        output_dir: str,
+        root_catalog_uri: Optional[str] = None,
+        index_config: Optional[IndexConfig] = None,
+    ) -> str:
         manifest = IndexManifest(
             indexer_version=_indexer_version,
             created=self._creation_time,
+            root_catalog_uri=root_catalog_uri,
+            index_config=index_config,
         )
         try:
             makedirs(output_dir, exist_ok=True)
@@ -132,7 +165,7 @@ class IndexCreator:
         return manifest_path
 
     async def _request_collections(
-        self, reader: Reader
+        self: Self, reader: StacCatalogReader
     ) -> Tuple[List[Collection], List[IndexingError]]:
         collections, errors = await reader.get_collections(
             await reader.get_root_catalog()
@@ -165,7 +198,10 @@ class IndexCreator:
     # Instead we pass a processor function to the reader so that each item can be processed (i.e. inserted into a table)
     # as it is retrieved.
     async def _request_items(
-        self, index_config: IndexConfig, reader: Reader, collections: List[Collection]
+        self: Self,
+        index_config: IndexConfig,
+        reader: StacCatalogReader,
+        collections: List[Collection],
     ) -> List[IndexingError]:
         counts: Dict[str, int] = {
             "inserted": 0,
@@ -293,14 +329,14 @@ class IndexCreator:
         _logger.info(counts)
         return errors
 
-    def _log_index_event(self, load_id: str, index_config: IndexConfig) -> None:
+    def _log_index_event(self: Self, load_id: str, root_catalog_uri: str) -> None:
         self._conn.execute(
             "INSERT INTO index_history (id, start_time, end_time, root_catalog_uris, loaded, added, removed, updated, unchanged) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 load_id,
                 self._creation_time,
                 _current_time(),
-                [index_config.root_catalog_uri],
+                [root_catalog_uri],
                 0,
                 0,
                 0,
@@ -309,16 +345,14 @@ class IndexCreator:
             ),
         )
 
-    def _insert_errors(self, errors: list[IndexingError]) -> None:
+    def _insert_errors(self: Self, errors: list[IndexingError]) -> None:
         for error in errors:
             save_error(self._conn, error)
 
-    async def _load_existing_data(self, index_config: IndexConfig) -> None:
-        if index_config.existing_manifest_json_uri is None:
-            return
-        index_reader = get_index_reader_class_for_uri(
-            index_config.existing_manifest_json_uri
-        )(index_config.existing_manifest_json_uri)
+    async def _load_existing_index(self: Self, manifest_json_uri: str) -> IndexManifest:
+        index_reader = get_index_reader_class_for_uri(manifest_json_uri)(
+            manifest_json_uri
+        )
         index_manifest = await index_reader.get_index_manifest()
         if index_manifest.indexer_version != _indexer_version:
             raise Exception(
@@ -333,9 +367,7 @@ class IndexCreator:
             source_reader = index_reader.source_reader
             await source_reader.get_uri_to_file(
                 source_reader.path_separator().join(
-                    index_config.existing_manifest_json_uri.split(
-                        source_reader.path_separator()
-                    )[:-1]
+                    manifest_json_uri.split(source_reader.path_separator())[:-1]
                     + [relative_path]
                 ),
                 tmp_file_path,
@@ -345,3 +377,4 @@ class IndexCreator:
             self._conn.execute(
                 f"CREATE TABLE {previous_table_name} AS SELECT * FROM '{tmp_file_path}'"
             )
+        return index_manifest
