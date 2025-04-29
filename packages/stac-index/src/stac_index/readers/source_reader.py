@@ -3,8 +3,8 @@ from json import loads
 from logging import Logger, getLogger
 from typing import Any, Dict, Final, List, Optional, Self, Tuple
 
-from stac_index.common.exceptions import MissingIndexException, UriNotFoundException
-from stac_index.common.index_manifest import IndexManifest
+from stac_index.indexer.types.index_manifest import IndexManifest
+from stac_index.readers.exceptions import MissingIndexException, UriNotFoundException
 
 _logger: Final[Logger] = getLogger(__name__)
 

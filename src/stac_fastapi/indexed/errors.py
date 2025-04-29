@@ -1,6 +1,6 @@
 from typing import List
 
-from stac_index.common.indexing_error import IndexingError
+from stac_index.indexer.types.indexing_error import IndexingError
 
 from stac_fastapi.indexed.db import fetchall, format_query_object_name
 

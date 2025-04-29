@@ -11,13 +11,6 @@ from duckdb import ConstraintException, connect
 from shapely import Geometry, is_valid_reason
 from shapely.wkt import loads as wkt_loads
 from stac_fastapi.types.stac import Collection
-from stac_index.common.index_manifest import IndexManifest, TableMetadata
-from stac_index.common.indexing_error import (
-    IndexingError,
-    IndexingErrorType,
-    new_error,
-    save_error,
-)
 from stac_index.indexer.creator.configurer import (
     add_items_columns,
     configure_indexables,
@@ -25,6 +18,13 @@ from stac_index.indexer.creator.configurer import (
 from stac_index.indexer.settings import get_settings
 from stac_index.indexer.stac_catalog_reader import StacCatalogReader
 from stac_index.indexer.types.index_config import IndexConfig, collection_wildcard
+from stac_index.indexer.types.index_manifest import IndexManifest, TableMetadata
+from stac_index.indexer.types.indexing_error import (
+    IndexingError,
+    IndexingErrorType,
+    new_error,
+    save_error,
+)
 from stac_index.indexer.types.stac_data import ItemWithLocation
 from stac_index.readers import get_reader_class_for_uri
 

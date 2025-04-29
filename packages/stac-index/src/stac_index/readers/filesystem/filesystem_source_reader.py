@@ -5,8 +5,8 @@ from shutil import copy
 from time import time
 from typing import Final, List, Optional, Tuple
 
-from stac_index.common.exceptions import UriNotFoundException
-from stac_index.common.source_reader import SourceReader
+from stac_index.readers.exceptions import UriNotFoundException
+from stac_index.readers.source_reader import SourceReader
 
 _uri_start_str: Final[str] = "/"
 _logger: Final[Logger] = getLogger(__name__)

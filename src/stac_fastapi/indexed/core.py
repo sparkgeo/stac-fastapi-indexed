@@ -13,7 +13,7 @@ from stac_fastapi.types.errors import NotFoundError
 from stac_fastapi.types.rfc3339 import DateTimeType
 from stac_fastapi.types.search import BaseSearchPostRequest
 from stac_fastapi.types.stac import Collection, Collections, Item, ItemCollection
-from stac_index.common.stac_parser import StacParser
+from stac_index.indexer.stac_parser import StacParser
 from stac_pydantic.shared import BBox
 
 from stac_fastapi.indexed.constants import rel_parent, rel_root, rel_self

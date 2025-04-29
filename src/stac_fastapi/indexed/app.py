@@ -19,7 +19,7 @@ from stac_fastapi.extensions.core import (
     SortExtension,
     TokenPaginationExtension,
 )
-from stac_index.common.indexing_error import IndexingError
+from stac_index.indexer.types.indexing_error import IndexingError
 
 from stac_fastapi.indexed.core import CoreCrudClient
 from stac_fastapi.indexed.db import connect_to_db, disconnect_from_db

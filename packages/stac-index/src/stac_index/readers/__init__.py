@@ -1,9 +1,9 @@
 from typing import List, Type
 
-from ..common.source_reader import SourceReader
 from .filesystem.filesystem_source_reader import FilesystemSourceReader  # noqa: F401
 from .https.https_source_reader import HttpsSourceReader  # noqa: F401
 from .s3.s3_source_reader import S3SourceReader  # noqa: F401
+from .source_reader import SourceReader
 
 __all__ = [
     "FilesystemSourceReader",

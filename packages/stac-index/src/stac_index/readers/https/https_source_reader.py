@@ -4,8 +4,8 @@ from time import time
 from typing import Any, Callable, Coroutine, Dict, Final, List, Optional, Tuple, cast
 
 from aiohttp import ClientResponse, ClientSession
-from stac_index.common.exceptions import UriNotFoundException
-from stac_index.common.source_reader import SourceReader
+from stac_index.readers.exceptions import UriNotFoundException
+from stac_index.readers.source_reader import SourceReader
 
 _uri_start_regex: Final[Pattern] = compile(r"^http(s)?://")
 _logger: Final[Logger] = getLogger(__name__)

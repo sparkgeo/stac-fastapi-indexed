@@ -5,8 +5,8 @@ from typing import Any, Dict, Final, List, Optional, Self, Tuple, cast
 
 from obstore import Bytes
 from obstore.store import S3Store
-from stac_index.common.exceptions import UriNotFoundException
-from stac_index.common.source_reader import IndexReader, SourceReader
+from stac_index.readers.exceptions import UriNotFoundException
+from stac_index.readers.source_reader import IndexReader, SourceReader
 
 from .settings import get_settings
 

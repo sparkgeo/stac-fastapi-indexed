@@ -3,9 +3,9 @@ from json import load
 from logging import Logger, getLogger
 from typing import Final, List, Optional, Tuple
 
-from stac_index.common.indexing_error import IndexingError
 from stac_index.indexer.creator.creator import IndexCreator
 from stac_index.indexer.types.index_config import IndexConfig
+from stac_index.indexer.types.indexing_error import IndexingError
 
 _logger: Final[Logger] = getLogger(__name__)
 

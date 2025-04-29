@@ -5,12 +5,16 @@ from re import Pattern, compile, sub
 from threading import Lock
 from typing import Any, Callable, Dict, Final, List, Protocol, Tuple, Type, cast
 
-from stac_index.common.indexing_error import IndexingError, IndexingErrorType, new_error
-from stac_index.common.source_reader import SourceReader
-from stac_index.common.stac_parser import StacParser, StacParserException
 from stac_index.indexer.settings import get_settings
+from stac_index.indexer.stac_parser import StacParser, StacParserException
+from stac_index.indexer.types.indexing_error import (
+    IndexingError,
+    IndexingErrorType,
+    new_error,
+)
 from stac_index.indexer.types.stac_data import CollectionWithLocation, ItemWithLocation
 from stac_index.readers import source_reader_classes
+from stac_index.readers.source_reader import SourceReader
 from stac_pydantic import Catalog, Collection
 from stac_pydantic.links import Links
 

@@ -7,9 +7,9 @@ from typing import Any, Dict, Final, List, Optional
 
 from duckdb import DuckDBPyConnection
 from duckdb import connect as duckdb_connect
-from stac_index.common.exceptions import MissingIndexException
 from stac_index.indexer.creator.creator import IndexCreator
 from stac_index.readers import get_reader_class_for_uri
+from stac_index.readers.exceptions import MissingIndexException
 
 from stac_fastapi.indexed.settings import get_settings
 

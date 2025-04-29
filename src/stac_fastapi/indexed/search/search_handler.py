@@ -14,7 +14,7 @@ from stac_fastapi.types.errors import InvalidQueryParameter
 from stac_fastapi.types.rfc3339 import str_to_interval
 from stac_fastapi.types.search import BaseSearchPostRequest
 from stac_fastapi.types.stac import Item, ItemCollection
-from stac_index.common.stac_parser import StacParser
+from stac_index.indexer.stac_parser import StacParser
 from stac_pydantic.api.extensions.sort import SortDirections, SortExtension
 
 from stac_fastapi.indexed.constants import rel_root, rel_self
