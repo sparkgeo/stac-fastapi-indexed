@@ -148,6 +148,7 @@ class IndexCreator:
                 "queryables_by_collection",
                 "sortables_by_collection",
                 "errors",
+                "index_history",
             ]:
                 continue
             output_filename = f"{table_name}-{load_id}.parquet"
