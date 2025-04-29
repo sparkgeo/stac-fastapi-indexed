@@ -1,12 +1,12 @@
 from logging import Logger, getLogger
-from re import Match, match
+from re import Match, match, sub
 from time import time
-from typing import Final, List, Optional, Tuple, cast
+from typing import Any, Dict, Final, List, Optional, Self, Tuple, cast
 
 from obstore import Bytes
 from obstore.store import S3Store
 from stac_index.common.exceptions import UriNotFoundException
-from stac_index.common.source_reader import SourceReader
+from stac_index.common.source_reader import IndexReader, SourceReader
 
 from .settings import get_settings
 
@@ -14,19 +14,46 @@ _uri_prefix_regex: Final[str] = r"^s3://"
 _logger: Final[Logger] = getLogger(__name__)
 
 
+class _S3IndexReader(IndexReader):
+    def get_duckdb_configuration_statements(
+        self,
+    ) -> List[Tuple[str, Optional[List[Any]]]]:
+        s3_endpoint = get_settings().endpoint
+        s3_insecure = s3_endpoint is not None and s3_endpoint.startswith("http://")
+        config_parts = {
+            "TYPE": "S3",
+            "PROVIDER": "CREDENTIAL_CHAIN",
+        }
+        if s3_endpoint is not None:
+            config_parts["ENDPOINT"] = "'{}'".format(sub(r"^.+://", "", s3_endpoint))
+            config_parts["URL_STYLE"] = "'path'"
+        if s3_insecure:
+            config_parts["USE_SSL"] = "false"
+        return [
+            (
+                "CREATE SECRET ({})".format(
+                    ", ".join([f"{key} {value}" for key, value in config_parts.items()])
+                ),
+                None,
+            )
+        ]
+
+
 class S3SourceReader(SourceReader):
     @staticmethod
     def can_handle_uri(uri: str) -> bool:
         return not not match(_uri_prefix_regex, uri)
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self: Self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._obstore_cache = {}  # stores are bucket-specific, so need one per unique bucket
+        self._obstore_cache: Dict[
+            str, S3Store
+        ] = {}  # stores are bucket-specific, so need one per unique bucket
 
-    def path_separator(self) -> str:
+    def path_separator(self: Self) -> str:
         return "/"
 
-    def _obstore_for_bucket(self, bucket: str) -> S3Store:
+    def _obstore_for_bucket(self: Self, bucket: str) -> S3Store:
         if bucket not in self._obstore_cache:
             _logger.info(f"creating S3 Reader obstore for bucket '{bucket}'")
             client_config = {}
@@ -41,13 +68,13 @@ class S3SourceReader(SourceReader):
             )
         return self._obstore_cache[bucket]
 
-    def _get_s3_key_parts(self, key: str) -> Tuple[str, str]:
+    def _get_s3_key_parts(self: Self, key: str) -> Tuple[str, str]:
         try:
             return cast(Match, match(rf"{_uri_prefix_regex}([^/]+)/(.+)", key)).groups()
         except Exception as e:
             raise ValueError(f"'{key}' is not in the expected format", e)
 
-    async def _get_uri_as_bytes(self, uri: str) -> Bytes:
+    async def _get_uri_as_bytes(self: Self, uri: str) -> Bytes:
         bucket, key = self._get_s3_key_parts(uri)
         try:
             start = time()
@@ -68,10 +95,10 @@ class S3SourceReader(SourceReader):
             _logger.exception(f"S3: failed to fetch {uri}")
             raise
 
-    async def get_uri_as_string(self, uri: str) -> str:
+    async def get_uri_as_string(self: Self, uri: str) -> str:
         return (await self._get_uri_as_bytes(uri)).to_bytes().decode("UTF-8")
 
-    async def get_uri_to_file(self, uri, file_path: str):
+    async def get_uri_to_file(self: Self, uri, file_path: str):
         chunk_size = 1000000
         source = await self._get_uri_as_bytes(uri)
         with open(file_path, "wb") as f:
@@ -82,7 +109,7 @@ class S3SourceReader(SourceReader):
                 offset += chunk_size
 
     async def get_item_uris_from_items_uri(
-        self, uri: str, item_limit: Optional[int] = None
+        self: Self, uri: str, item_limit: Optional[int] = None
     ) -> Tuple[List[str], List[str]]:
         bucket, prefix = self._get_s3_key_parts(uri)
         uris: List[str] = []
@@ -93,3 +120,6 @@ class S3SourceReader(SourceReader):
             for entry in chunk:
                 uris.append("s3://{}/{}".format(bucket, entry["path"]))
         return (uris if item_limit is None else uris[:item_limit], [])
+
+    def get_index_reader(self: Self):
+        return _S3IndexReader(source_reader=self)

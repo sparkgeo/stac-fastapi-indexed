@@ -9,7 +9,7 @@ from duckdb import DuckDBPyConnection
 from duckdb import connect as duckdb_connect
 from stac_index.common.exceptions import MissingIndexException
 from stac_index.indexer.creator.creator import IndexCreator
-from stac_index.readers import get_index_reader_class_for_uri
+from stac_index.readers import get_reader_class_for_uri
 
 from stac_fastapi.indexed.settings import get_settings
 
@@ -29,21 +29,23 @@ async def connect_to_db() -> None:
     times = {}
     settings = get_settings()
     index_manifest_uri = settings.index_manifest_uri
-    index_reader = get_index_reader_class_for_uri(index_manifest_uri)(
-        index_manifest_uri
-    )
+    source_reader = get_reader_class_for_uri(index_manifest_uri)()
+    index_reader = source_reader.get_index_reader()
     start = time()
     global _parquet_uris
     try:
-        _parquet_uris = await index_reader.get_parquet_uris()
+        _parquet_uris = await index_reader.get_parquet_uris(
+            index_manifest_uri=index_manifest_uri
+        )
     except MissingIndexException:
         _logger.warning(f"index missing at {index_manifest_uri}")
         if settings.create_empty_index_if_missing:
             index_manifest_uri = IndexCreator().create_empty(mkdtemp())
-            index_reader = get_index_reader_class_for_uri(index_manifest_uri)(
-                index_manifest_uri
+            source_reader = get_reader_class_for_uri(index_manifest_uri)()
+            index_reader = source_reader.get_index_reader()
+            _parquet_uris = await index_reader.get_parquet_uris(
+                index_manifest_uri=index_manifest_uri
             )
-            _parquet_uris = await index_reader.get_parquet_uris()
         else:
             raise Exception(
                 "not configured to create empty index if missing, cannot proceed"

@@ -1,18 +1,13 @@
 from typing import List, Type
 
-from ..common.index_reader import IndexReader
 from ..common.source_reader import SourceReader
-from .filesystem.filesystem_index_reader import FilesystemIndexReader  # noqa: F401
 from .filesystem.filesystem_source_reader import FilesystemSourceReader  # noqa: F401
 from .https.https_source_reader import HttpsSourceReader  # noqa: F401
-from .s3.s3_index_reader import S3IndexReader  # noqa: F401
 from .s3.s3_source_reader import S3SourceReader  # noqa: F401
 
 __all__ = [
-    "FilesystemIndexReader",
     "FilesystemSourceReader",
     "HttpsSourceReader",
-    "S3IndexReader",
     "S3SourceReader",
 ]
 
@@ -21,18 +16,14 @@ source_reader_classes: List[Type[SourceReader]] = [
     HttpsSourceReader,
     S3SourceReader,
 ]
-index_reader_classes: List[Type[IndexReader]] = [
-    FilesystemIndexReader,
-    S3IndexReader,
-]
 
 
-def get_index_reader_class_for_uri(uri: str) -> Type[IndexReader]:
-    compatible_index_readers = [
-        index_reader
-        for index_reader in index_reader_classes
-        if index_reader.can_handle_source_uri(uri)
+def get_reader_class_for_uri(uri: str) -> Type[SourceReader]:
+    compatible_source_readers = [
+        source_reader
+        for source_reader in source_reader_classes
+        if source_reader.can_handle_uri(uri)
     ]
-    if len(compatible_index_readers) == 0:
-        raise Exception(f"no index readers support URI '{uri}'")
-    return compatible_index_readers[0]
+    if len(compatible_source_readers) == 0:
+        raise Exception(f"no source readers support URI '{uri}'")
+    return compatible_source_readers[0]
