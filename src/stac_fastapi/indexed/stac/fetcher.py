@@ -1,7 +1,7 @@
 from typing import Any, Dict, Optional
 
-from stac_index.common import source_reader_classes
 from stac_index.common.source_reader import SourceReader
+from stac_index.readers import source_reader_classes
 from stac_pydantic.collection import Collection
 from stac_pydantic.item import Item
 

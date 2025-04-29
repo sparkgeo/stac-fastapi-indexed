@@ -15,7 +15,7 @@ class IndexReader:
 
     def __init__(self, index_manifest_uri: str):
         self.index_manifest_uri = index_manifest_uri
-        from stac_index.common import source_reader_classes
+        from stac_index.readers import source_reader_classes
 
         for reader_class in source_reader_classes:
             if reader_class.can_handle_uri(index_manifest_uri):
