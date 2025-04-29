@@ -54,7 +54,9 @@ class IndexCreator:
     def create_empty(self: Self, output_dir: Optional[str] = None) -> str:
         _logger.info("creating empty index")
         self._create_db_objects()
-        return self._export_db_objects(output_dir or get_settings().output_dir)
+        return self._export_db_objects(
+            output_dir or get_settings().output_dir, load_id=self._create_load_id()
+        )
 
     async def create_new_index(
         self: Self,
@@ -81,7 +83,7 @@ class IndexCreator:
         index_config: Optional[IndexConfig] = None,
         output_dir: Optional[str] = None,
     ) -> Tuple[List[IndexingError], str]:
-        load_id: Final[str] = uuid4().hex
+        load_id = self._create_load_id()
         _logger.info(f"indexing stac source for load {load_id}")
         self._create_db_objects()
         index_config = index_config or IndexConfig()
@@ -98,6 +100,7 @@ class IndexCreator:
             collection_errors + items_errors,
             self._export_db_objects(
                 output_dir=output_dir or get_settings().output_dir,
+                load_id=load_id,
                 root_catalog_uri=root_catalog_uri,
             ),
         )
@@ -117,12 +120,14 @@ class IndexCreator:
     def _export_db_objects(
         self: Self,
         output_dir: str,
+        load_id: str,
         root_catalog_uri: Optional[str] = None,
         index_config: Optional[IndexConfig] = None,
     ) -> str:
         manifest = IndexManifest(
             indexer_version=_indexer_version,
-            created=self._creation_time,
+            updated=self._creation_time,
+            load_id=load_id,
             root_catalog_uri=root_catalog_uri,
             index_config=index_config,
         )
@@ -145,7 +150,7 @@ class IndexCreator:
                 "errors",
             ]:
                 continue
-            output_filename = f"{table_name}.parquet"
+            output_filename = f"{table_name}-{load_id}.parquet"
             self._conn.execute(f"""
                 COPY (SELECT * FROM {table_name})
                   TO '{output_dir}/{output_filename}'
@@ -378,3 +383,6 @@ class IndexCreator:
                 f"CREATE TABLE {previous_table_name} AS SELECT * FROM '{tmp_file_path}'"
             )
         return index_manifest
+
+    def _create_load_id(self: Self) -> str:
+        return uuid4().hex

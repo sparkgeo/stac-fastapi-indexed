@@ -11,12 +11,13 @@ class TableMetadata(BaseModel):
 
 class IndexManifest(BaseModel):
     indexer_version: int
-    created: datetime
+    updated: datetime
+    load_id: str
     root_catalog_uri: Optional[str] = None
     index_config: Optional[IndexConfig] = None
     tables: Dict[str, TableMetadata] = {}
 
-    @field_serializer("created")
+    @field_serializer("updated")
     def serialize_timestamp(self, timestamp: datetime) -> str:
         return timestamp.isoformat()
 
