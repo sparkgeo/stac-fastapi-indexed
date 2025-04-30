@@ -25,6 +25,10 @@ Any new functionality should extend integration tests as a first priority. Unit 
 scripts/tests/unit-test.sh
 scripts/tests/smoke-test.sh
 scripts/tests/integration-test.sh
+# hang after each test run to permit interaction with test infrastructure and test debugging
+scripts/tests/integration-test.sh --debug
+# dump container logs after each test run
+scripts/tests/integration-test.sh --dump-log
 ```
 
 # Deployment

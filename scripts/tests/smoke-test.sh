@@ -20,7 +20,7 @@ for dco in "${stack_commands[@]}"; do
     if [ $exit_code -ne 0 ] || [ ${TESTS_DEBUG:-0} -ne 0 ]; then
         $dco logs
     fi
-    $dco down
+    $dco down --volumes
 done
 
 exit $exit_code
