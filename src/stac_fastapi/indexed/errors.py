@@ -5,7 +5,7 @@ from stac_index.indexer.types.indexing_error import IndexingError
 from stac_fastapi.indexed.db import fetchall, format_query_object_name
 
 
-def get_all_errors() -> List[IndexingError]:
+async def get_all_errors() -> List[IndexingError]:
     """Query the database for the list of errors that occured during indexing."""
     return [
         IndexingError(
@@ -18,7 +18,7 @@ def get_all_errors() -> List[IndexingError]:
             collection=row[6],
             item=row[7],
         )
-        for row in fetchall(f"""
+        for row in await fetchall(f"""
         SELECT time
              , error_type
              , subtype

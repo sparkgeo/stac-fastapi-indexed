@@ -1,7 +1,8 @@
 from dataclasses import dataclass
-from functools import lru_cache
 from logging import Logger, getLogger
 from typing import Dict, Final, List
+
+from async_lru import alru_cache
 
 from stac_fastapi.indexed.db import fetchall, format_query_object_name
 
@@ -16,8 +17,8 @@ class SortableConfig:
     items_column: str
 
 
-@lru_cache(maxsize=1)
-def get_sortable_configs() -> List[SortableConfig]:
+@alru_cache(maxsize=1)
+async def get_sortable_configs() -> List[SortableConfig]:
     _logger.debug("fetching sortable field config")
     return [
         SortableConfig(
@@ -26,7 +27,7 @@ def get_sortable_configs() -> List[SortableConfig]:
             description=row[2],
             items_column=row[3],
         )
-        for row in fetchall(
+        for row in await fetchall(
             f"""
         SELECT name
              , collection_id
@@ -38,5 +39,5 @@ def get_sortable_configs() -> List[SortableConfig]:
     ]
 
 
-def get_sortable_configs_by_field() -> Dict[str, SortableConfig]:
-    return {config.name: config for config in get_sortable_configs()}
+async def get_sortable_configs_by_field() -> Dict[str, SortableConfig]:
+    return {config.name: config for config in await get_sortable_configs()}

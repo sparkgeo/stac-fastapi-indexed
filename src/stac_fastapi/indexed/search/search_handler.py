@@ -80,7 +80,7 @@ class SearchHandler:
     async def search(self) -> ItemCollection:
         if cast(POSTTokenPagination, self.search_request).token is None:
             _logger.debug("no token, building new query")
-            query_info = self._new_query()
+            query_info = await self._new_query()
         else:
             _logger.debug("token provided")
             query_info = get_query_from_token(
@@ -94,7 +94,7 @@ class SearchHandler:
             limit=limit_text,
             offset=offset_text,
         )
-        rows = fetchall(
+        rows = await fetchall(
             current_query,
             query_info.params,
         )
@@ -143,12 +143,12 @@ class SearchHandler:
             links=links,
         )
 
-    def _new_query(
+    async def _new_query(
         self,
     ) -> QueryInfo:
         clauses: List[str] = []
         params: List[Any] = []
-        sorts: List[str] = self._determine_order()
+        sorts: List[str] = await self._determine_order()
         for addition in [
             addition
             for addition in [
@@ -157,7 +157,7 @@ class SearchHandler:
                 self._include_bbox(),
                 self._include_intersects(),
                 self._include_datetime(),
-                self._include_filter(),
+                await self._include_filter(),
             ]
             if addition is not None
         ]:
@@ -182,14 +182,14 @@ class SearchHandler:
             offset=None,
         )
 
-    def _determine_order(self) -> List[str]:
+    async def _determine_order(self) -> List[str]:
         sort_fields: List[str] = []
         user_provided_sorts = cast(SortExtensionPostRequest, self.search_request).sortby
         if user_provided_sorts is not None and len(user_provided_sorts) > 0:
             effective_sorts = user_provided_sorts
         else:
             effective_sorts = default_sorts
-        sortables = get_sortable_configs_by_field()
+        sortables = await get_sortable_configs_by_field()
         for effective_sort in effective_sorts:
             if effective_sort.field not in sortables:
                 raise InvalidQueryParameter(
@@ -305,13 +305,13 @@ class SearchHandler:
                     pass  # unbounded datetime means all results are valid
         return None
 
-    def _include_filter(self) -> Optional[FilterClause]:
+    async def _include_filter(self) -> Optional[FilterClause]:
         search_request = cast(FilterExtensionPostRequest, self.search_request)
         if search_request.filter:
             ast = self._get_ast_from_filter(
                 search_request.filter, search_request.filter_lang
             )
-            queryable_config = get_queryable_config_by_name()
+            queryable_config = await get_queryable_config_by_name()
             try:
                 return ast_to_filter_clause(
                     ast=ast,

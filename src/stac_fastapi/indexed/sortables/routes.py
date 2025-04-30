@@ -23,7 +23,7 @@ def add_routes(app: FastAPI) -> None:
                     title=config.name,
                     description=config.description,
                 )
-                for config in get_sortable_configs()
+                for config in await get_sortable_configs()
                 if config.collection_id == collection_wildcard
             ]
         )
@@ -41,7 +41,7 @@ def add_routes(app: FastAPI) -> None:
                     title=config.name,
                     description=config.description,
                 )
-                for config in get_sortable_configs()
+                for config in await get_sortable_configs()
                 if config.collection_id in [collection_id, collection_wildcard]
             ]
         )

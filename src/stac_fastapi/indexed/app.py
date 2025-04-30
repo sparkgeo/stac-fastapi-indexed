@@ -94,7 +94,7 @@ async def shutdown_event():
 
 @app.get("/status/errors")
 async def get_status_errors() -> List[IndexingError]:
-    return get_all_errors()
+    return await get_all_errors()
 
 
 def run():
