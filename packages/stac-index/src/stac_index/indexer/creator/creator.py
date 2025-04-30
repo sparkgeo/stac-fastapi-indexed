@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from glob import glob
+from hashlib import md5
 from json import dump
 from logging import Logger, getLogger
 from os import makedirs, path
@@ -44,6 +45,7 @@ class IndexCreator:
         self._conn = connect()
         self._conn.execute("INSTALL spatial")
         self._conn.execute("LOAD spatial")
+        self._load_id = uuid4().hex
 
     def __del__(self: Self):
         try:
@@ -54,9 +56,7 @@ class IndexCreator:
     def create_empty(self: Self, output_dir: Optional[str] = None) -> str:
         _logger.info("creating empty index")
         self._create_db_objects()
-        return self._export_db_objects(
-            output_dir or get_settings().output_dir, load_id=self._create_load_id()
-        )
+        return self._export_db_objects(output_dir or get_settings().output_dir)
 
     async def create_new_index(
         self: Self,
@@ -83,8 +83,7 @@ class IndexCreator:
         index_config: Optional[IndexConfig] = None,
         output_dir: Optional[str] = None,
     ) -> Tuple[List[IndexingError], str]:
-        load_id = self._create_load_id()
-        _logger.info(f"indexing stac source for load {load_id}")
+        _logger.info(f"indexing stac source for load {self._load_id}")
         self._create_db_objects()
         index_config = index_config or IndexConfig()
         add_items_columns(index_config, self._conn)
@@ -95,12 +94,11 @@ class IndexCreator:
         collections, collection_errors = await self._request_collections(reader)
         items_errors = await self._request_items(index_config, reader, collections)
         configure_indexables(index_config, self._conn)
-        self._log_index_event(load_id=load_id, root_catalog_uri=root_catalog_uri)
+        self._log_index_event(root_catalog_uri=root_catalog_uri)
         return (
             collection_errors + items_errors,
             self._export_db_objects(
                 output_dir=output_dir or get_settings().output_dir,
-                load_id=load_id,
                 root_catalog_uri=root_catalog_uri,
             ),
         )
@@ -120,14 +118,13 @@ class IndexCreator:
     def _export_db_objects(
         self: Self,
         output_dir: str,
-        load_id: str,
         root_catalog_uri: Optional[str] = None,
         index_config: Optional[IndexConfig] = None,
     ) -> str:
         manifest = IndexManifest(
             indexer_version=_indexer_version,
             updated=self._creation_time,
-            load_id=load_id,
+            load_id=self._load_id,
             root_catalog_uri=root_catalog_uri,
             index_config=index_config,
         )
@@ -151,7 +148,7 @@ class IndexCreator:
                 "index_history",
             ]:
                 continue
-            output_filename = f"{table_name}-{load_id}.parquet"
+            output_filename = f"{table_name}-{self._load_id}.parquet"
             self._conn.execute(f"""
                 COPY (SELECT * FROM {table_name})
                   TO '{output_dir}/{output_filename}'
@@ -182,12 +179,22 @@ class IndexCreator:
                 INSERT INTO collections (
                     id
                 , stac_location
+                , load_id
+                , collection_hash
                 ) VALUES (
-                    ?, ?
+                    ?, ?, ?, ?
                 );
             """
             try:
-                self._conn.execute(insert_sql, (collection.id, collection.location))
+                self._conn.execute(
+                    insert_sql,
+                    (
+                        collection.id,
+                        collection.location,
+                        self._load_id,
+                        self._hash_data(collection.to_json()),
+                    ),
+                )
             except Exception as e:
                 errors.append(
                     new_error(
@@ -224,6 +231,8 @@ class IndexCreator:
             "end_datetime": "?",
             "stac_location": "?",
             "applied_fixes": "?",
+            "load_id": "?",
+            "item_hash": "?",
         }
         for indexable in index_config.indexables.values():
             insert_fields_and_values_template[indexable.table_column_name] = "?"
@@ -254,6 +263,8 @@ class IndexCreator:
                 ",".join(item.applied_fixes)
                 if item.applied_fixes is not None
                 else "NONE",
+                self._load_id,
+                self._hash_data(item.to_json()),
             ]
             for (
                 collection_id,
@@ -335,11 +346,11 @@ class IndexCreator:
         _logger.info(counts)
         return errors
 
-    def _log_index_event(self: Self, load_id: str, root_catalog_uri: str) -> None:
+    def _log_index_event(self: Self, root_catalog_uri: str) -> None:
         self._conn.execute(
             "INSERT INTO index_history (id, start_time, end_time, root_catalog_uris, loaded, added, removed, updated, unchanged) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                load_id,
+                self._load_id,
                 self._creation_time,
                 _current_time(),
                 [root_catalog_uri],
@@ -385,5 +396,5 @@ class IndexCreator:
             )
         return index_manifest
 
-    def _create_load_id(self: Self) -> str:
-        return uuid4().hex
+    def _hash_data(self: Self, data_str: str) -> str:
+        return md5(data_str.encode()).hexdigest()
