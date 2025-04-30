@@ -121,5 +121,13 @@ class S3SourceReader(SourceReader):
                 uris.append("s3://{}/{}".format(bucket, entry["path"]))
         return (uris if item_limit is None else uris[:item_limit], [])
 
-    def get_index_reader(self: Self):
-        return _S3IndexReader(source_reader=self)
+    async def get_last_modified_epoch_for_uri(self: Self, uri: str) -> int:
+        bucket, prefix = self._get_s3_key_parts(uri)
+        object_meta = await self._obstore_for_bucket(bucket=bucket).head_async(
+            path=prefix
+        )
+        last_modified = object_meta["last_modified"]
+        return round(last_modified.timestamp())
+
+    def get_index_reader(self: Self, index_manifest_uri: str):
+        return _S3IndexReader(source_reader=self, index_manifest_uri=index_manifest_uri)

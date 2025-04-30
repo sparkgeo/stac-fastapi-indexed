@@ -368,10 +368,10 @@ class IndexCreator:
 
     async def _load_existing_index(self: Self, manifest_json_uri: str) -> IndexManifest:
         source_reader = get_reader_class_for_uri(manifest_json_uri)()
-        index_reader = source_reader.get_index_reader()
-        index_manifest = await index_reader.get_index_manifest(
+        index_reader = source_reader.get_index_reader(
             index_manifest_uri=manifest_json_uri
         )
+        index_manifest = await index_reader.get_index_manifest()
         if index_manifest.indexer_version != _indexer_version:
             raise Exception(
                 f"indexer v{_indexer_version} incompatible with manifest from v{index_manifest.indexer_version}"

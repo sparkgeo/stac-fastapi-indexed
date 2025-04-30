@@ -10,22 +10,23 @@ _logger: Final[Logger] = getLogger(__name__)
 
 
 class IndexReader:
-    def __init__(self: Self, source_reader: "SourceReader"):
+    def __init__(self: Self, source_reader: "SourceReader", index_manifest_uri: str):
         self._source_reader = source_reader
+        self._index_manifest_uri = index_manifest_uri
 
-    async def get_index_manifest(self: Self, index_manifest_uri: str) -> IndexManifest:
+    async def get_index_manifest(self: Self) -> IndexManifest:
         try:
             return IndexManifest(
-                **await self._source_reader.load_json_from_uri(index_manifest_uri)
+                **await self._source_reader.load_json_from_uri(self._index_manifest_uri)
             )
         except UriNotFoundException:
-            raise MissingIndexException()
+            raise MissingIndexException(f"index missing at {self._index_manifest_uri}")
 
-    async def get_parquet_uris(self: Self, index_manifest_uri: str) -> Dict[str, str]:
-        manifest = await self.get_index_manifest(index_manifest_uri=index_manifest_uri)
+    async def get_parquet_uris(self: Self) -> Dict[str, str]:
+        manifest = await self.get_index_manifest()
         return {
             table_name: "/".join(
-                index_manifest_uri.split("/")[:-1] + [metadata.relative_path]
+                self._index_manifest_uri.split("/")[:-1] + [metadata.relative_path]
             )
             for table_name, metadata in manifest.tables.items()
         }
@@ -70,8 +71,12 @@ class SourceReader(ABC):
     ) -> Tuple[List[str], List[str]]:
         pass
 
+    @abstractmethod
+    async def get_last_modified_epoch_for_uri(self: Self, uri: str) -> int:
+        pass
+
     async def load_json_from_uri(self: Self, uri: str) -> Dict[str, Any]:
         return loads(await self.get_uri_as_string(uri))
 
-    def get_index_reader(self: Self) -> IndexReader:
-        return IndexReader(source_reader=self)
+    def get_index_reader(self: Self, index_manifest_uri: str) -> IndexReader:
+        return IndexReader(source_reader=self, index_manifest_uri=index_manifest_uri)

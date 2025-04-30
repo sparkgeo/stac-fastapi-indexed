@@ -3,7 +3,7 @@ from logging import Logger, getLogger
 from os import path
 from shutil import copy
 from time import time
-from typing import Final, List, Optional, Tuple
+from typing import Final, List, Optional, Self, Tuple
 
 from stac_index.readers.exceptions import UriNotFoundException
 from stac_index.readers.source_reader import SourceReader
@@ -17,14 +17,14 @@ class FilesystemSourceReader(SourceReader):
     def can_handle_uri(uri: str) -> bool:
         return uri.startswith(_uri_start_str)
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self: Self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         _logger.info("creating Filesystem Reader")
 
-    def path_separator(self) -> str:
+    def path_separator(self: Self) -> str:
         return _uri_start_str  # sorry Windows
 
-    async def get_uri_as_string(self, uri: str) -> str:
+    async def get_uri_as_string(self: Self, uri: str) -> str:
         if path.exists(uri):
             start = time()
             try:
@@ -42,13 +42,16 @@ class FilesystemSourceReader(SourceReader):
         else:
             raise UriNotFoundException(uri)
 
-    async def get_uri_to_file(self, uri: str, file_path: str):
+    async def get_uri_to_file(self: Self, uri: str, file_path: str):
         copy(uri, file_path)
 
     async def get_item_uris_from_items_uri(
-        self, uri: str, item_limit: Optional[int] = None
+        self: Self, uri: str, item_limit: Optional[int] = None
     ) -> Tuple[List[str], List[str]]:
         all_uris = glob(
             "{prefix}*".format(prefix=uri if uri.endswith("/") else f"{uri}/")
         )
         return (all_uris[:item_limit], [])
+
+    async def get_last_modified_epoch_for_uri(self: Self, uri: str) -> int:
+        return round(path.getmtime(filename=uri))

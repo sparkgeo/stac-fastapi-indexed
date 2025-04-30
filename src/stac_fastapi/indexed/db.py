@@ -10,6 +10,7 @@ from duckdb import connect as duckdb_connect
 from stac_index.indexer.creator.creator import IndexCreator
 from stac_index.readers import get_reader_class_for_uri
 from stac_index.readers.exceptions import MissingIndexException
+from stac_index.readers.source_reader import IndexReader, SourceReader
 
 from stac_fastapi.indexed.settings import get_settings
 
@@ -23,6 +24,8 @@ _query_object_identifier_template: Final[str] = (
 
 _root_db_connection: DuckDBPyConnection = None
 _parquet_uris: Dict[str, str] = {}
+_index_manifest_last_modified: int = 0
+_last_load_id: Optional[str] = None
 
 
 async def connect_to_db() -> None:
@@ -30,27 +33,14 @@ async def connect_to_db() -> None:
     settings = get_settings()
     index_manifest_uri = settings.index_manifest_uri
     source_reader = get_reader_class_for_uri(index_manifest_uri)()
-    index_reader = source_reader.get_index_reader()
+    index_reader = source_reader.get_index_reader(index_manifest_uri=index_manifest_uri)
     start = time()
-    global _parquet_uris
-    try:
-        _parquet_uris = await index_reader.get_parquet_uris(
-            index_manifest_uri=index_manifest_uri
-        )
-    except MissingIndexException:
-        _logger.warning(f"index missing at {index_manifest_uri}")
-        if settings.create_empty_index_if_missing:
-            index_manifest_uri = IndexCreator().create_empty(mkdtemp())
-            source_reader = get_reader_class_for_uri(index_manifest_uri)()
-            index_reader = source_reader.get_index_reader()
-            _parquet_uris = await index_reader.get_parquet_uris(
-                index_manifest_uri=index_manifest_uri
-            )
-        else:
-            raise Exception(
-                "not configured to create empty index if missing, cannot proceed"
-            )
-    times["get parquet URIs"] = time()
+    await _set_index_manifest_last_modified(
+        source_reader=source_reader, index_manifest_uri=index_manifest_uri
+    )
+    times["set index manifest last modified"] = time()
+    await _set_parquet_uris(index_reader)
+    times["set parquet URIs"] = time()
     global _root_db_connection
     _root_db_connection = duckdb_connect()
     times["create db connection"] = time()
@@ -71,6 +61,8 @@ async def connect_to_db() -> None:
     times["load spatial extension"] = time()
     execute("LOAD httpfs")
     times["load httpfs extension"] = time()
+    _set_last_load_id()
+    times["set last_load_id"] = time()
     if settings.duckdb_threads:
         _set_duckdb_threads(settings.duckdb_threads)
     for operation, completed_at in times.items():
@@ -120,6 +112,12 @@ def fetchall(statement: str, params: Optional[List[Any]] = None) -> List[Any]:
     result = _get_db_connection().execute(statement, params).fetchall()
     _sql_log_message(statement, time() - start, len(result), params)
     return result
+
+
+def get_last_load_id() -> str:
+    if _last_load_id is None:
+        raise Exception("attempt to access load id before set")
+    return _last_load_id
 
 
 def _get_db_connection():
@@ -176,3 +174,41 @@ def _set_duckdb_threads(duckdb_thread_count: int) -> None:
                 )
             )
     execute(f"SET threads to {duckdb_thread_count}")
+
+
+async def _set_index_manifest_last_modified(
+    source_reader: SourceReader, index_manifest_uri: str
+) -> None:
+    global _index_manifest_last_modified
+    _index_manifest_last_modified = await source_reader.get_last_modified_epoch_for_uri(
+        uri=index_manifest_uri
+    )
+
+
+def _set_last_load_id() -> None:
+    global _last_load_id
+    _last_load_id = fetchone(f"""
+        SELECT id AS last_load_id
+          FROM '{_parquet_uris["index_history"]}'
+      ORDER BY end_time DESC
+         LIMIT 1
+    """)
+
+
+async def _set_parquet_uris(index_reader: IndexReader) -> None:
+    global _parquet_uris
+    try:
+        _parquet_uris = await index_reader.get_parquet_uris()
+    except MissingIndexException:
+        _logger.warning("index missing")
+        if get_settings().create_empty_index_if_missing:
+            index_manifest_uri = IndexCreator().create_empty(mkdtemp())
+            source_reader = get_reader_class_for_uri(index_manifest_uri)()
+            index_reader = source_reader.get_index_reader(
+                index_manifest_uri=index_manifest_uri
+            )
+            _parquet_uris = await index_reader.get_parquet_uris()
+        else:
+            raise Exception(
+                "not configured to create empty index if missing, cannot proceed"
+            )

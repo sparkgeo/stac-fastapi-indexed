@@ -1,7 +1,19 @@
+from datetime import UTC, datetime
 from logging import Logger, getLogger
 from re import Pattern, compile, match
 from time import time
-from typing import Any, Callable, Coroutine, Dict, Final, List, Optional, Tuple, cast
+from typing import (
+    Any,
+    Callable,
+    Coroutine,
+    Dict,
+    Final,
+    List,
+    Optional,
+    Self,
+    Tuple,
+    cast,
+)
 
 from aiohttp import ClientResponse, ClientSession
 from stac_index.readers.exceptions import UriNotFoundException
@@ -16,15 +28,15 @@ class HttpsSourceReader(SourceReader):
     def can_handle_uri(uri: str) -> bool:
         return not not match(_uri_start_regex, uri)
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self: Self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         _logger.info("creating HTTPS Reader")
 
-    def path_separator(self) -> str:
+    def path_separator(self: Self) -> str:
         return "/"
 
     async def _get_uri_and_process(
-        self,
+        self: Self,
         uri: str,
         processor: Callable[[ClientResponse], Coroutine[None, None, None]],
         success_statuses: List[int] = [200],
@@ -45,7 +57,7 @@ class HttpsSourceReader(SourceReader):
                 else:
                     raise Exception(f"Unable to read '{uri}' ({response.status})")
 
-    async def get_uri_as_string(self, uri: str) -> str:
+    async def get_uri_as_string(self: Self, uri: str) -> str:
         result = ""
 
         async def process(response: ClientResponse) -> None:
@@ -55,7 +67,7 @@ class HttpsSourceReader(SourceReader):
         await self._get_uri_and_process(uri, process)
         return result
 
-    async def get_uri_to_file(self, uri: str, file_path: str) -> None:
+    async def get_uri_to_file(self: Self, uri: str, file_path: str) -> None:
         async def process(response: ClientResponse) -> None:
             with open(file_path, "wb") as f:
                 async for chunk in response.content.iter_chunked(1000000):
@@ -66,7 +78,7 @@ class HttpsSourceReader(SourceReader):
     # This function interacts with HTTP endpoints inefficiently.
     # See https://github.com/sparkgeo/STAC-API-Serverless/issues/98 for thoughts on this.
     async def get_item_uris_from_items_uri(
-        self, uri: str, item_limit: Optional[int] = None
+        self: Self, uri: str, item_limit: Optional[int] = None
     ) -> Tuple[List[str], List[str]]:
         # assume this is a STAC API, otherwise no standard way to parse the response
         item_uris: List[str] = []
@@ -102,3 +114,7 @@ class HttpsSourceReader(SourceReader):
             else:
                 next_items_uri = None
         return (item_uris, errors)
+
+    async def get_last_modified_epoch_for_uri(self: Self, uri: str) -> int:
+        # cannot reliably determine last modified over all HTTP endpoints, always report now
+        return round(datetime.now(tz=UTC).timestamp())
