@@ -27,7 +27,7 @@ from stac_index.indexer.types.indexing_error import (
     save_error,
 )
 from stac_index.indexer.types.stac_data import ItemWithLocation
-from stac_index.readers import get_reader_class_for_uri
+from stac_index.readers import get_reader_for_uri
 
 _logger: Final[Logger] = getLogger(__name__)
 _indexer_version: Final[int] = (
@@ -367,7 +367,7 @@ class IndexCreator:
             save_error(self._conn, error)
 
     async def _load_existing_index(self: Self, manifest_json_uri: str) -> IndexManifest:
-        source_reader = get_reader_class_for_uri(manifest_json_uri)()
+        source_reader = get_reader_for_uri(uri=manifest_json_uri)
         index_reader = source_reader.get_index_reader(
             index_manifest_uri=manifest_json_uri
         )

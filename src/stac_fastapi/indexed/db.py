@@ -8,7 +8,7 @@ from typing import Any, Dict, Final, List, Optional
 from duckdb import DuckDBPyConnection
 from duckdb import connect as duckdb_connect
 from stac_index.indexer.creator.creator import IndexCreator
-from stac_index.readers import get_reader_class_for_uri
+from stac_index.readers import get_reader_for_uri
 from stac_index.readers.exceptions import MissingIndexException
 from stac_index.readers.source_reader import IndexReader
 
@@ -32,7 +32,7 @@ async def connect_to_db() -> None:
     times: Dict[str, float] = {}
     settings = get_settings()
     index_manifest_uri = settings.index_manifest_uri
-    source_reader = get_reader_class_for_uri(index_manifest_uri)()
+    source_reader = get_reader_for_uri(uri=index_manifest_uri)
     index_reader = source_reader.get_index_reader(index_manifest_uri=index_manifest_uri)
     start = time()
     await _ensure_latest_data()
@@ -186,7 +186,7 @@ async def _ensure_latest_data() -> None:
     global _index_manifest_last_modified
     start = time()
     index_manifest_uri = get_settings().index_manifest_uri
-    source_reader = get_reader_class_for_uri(index_manifest_uri)()
+    source_reader = get_reader_for_uri(uri=index_manifest_uri)
     new_last_modified = await source_reader.get_last_modified_epoch_for_uri(
         uri=index_manifest_uri
     )
@@ -204,7 +204,7 @@ async def _ensure_latest_data() -> None:
 
 async def _set_last_load_id() -> None:
     index_manifest_uri = get_settings().index_manifest_uri
-    source_reader = get_reader_class_for_uri(index_manifest_uri)()
+    source_reader = get_reader_for_uri(uri=index_manifest_uri)
     index_manifest = await source_reader.get_index_reader(
         index_manifest_uri=index_manifest_uri
     ).get_index_manifest()
@@ -220,7 +220,7 @@ async def _set_parquet_uris(index_reader: IndexReader) -> None:
         _logger.warning("index missing")
         if get_settings().create_empty_index_if_missing:
             index_manifest_uri = IndexCreator().create_empty(mkdtemp())
-            source_reader = get_reader_class_for_uri(index_manifest_uri)()
+            source_reader = get_reader_for_uri(uri=index_manifest_uri)
             index_reader = source_reader.get_index_reader(
                 index_manifest_uri=index_manifest_uri
             )
