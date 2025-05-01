@@ -13,6 +13,7 @@ class QueryInfo:
     params: List[Any] = field(default_factory=list)
     limit: int
     offset: Optional[int] = None
+    last_load_id: str
 
     def next(self) -> "QueryInfo":
         return QueryInfo(
@@ -22,6 +23,7 @@ class QueryInfo:
             offset=(self.offset + self.limit)
             if self.offset is not None
             else self.limit,
+            last_load_id=self.last_load_id,
         )
 
     def previous(self) -> "QueryInfo":
@@ -35,6 +37,7 @@ class QueryInfo:
             offset=(current_offset - self.limit)
             if current_offset > self.limit
             else None,
+            last_load_id=self.last_load_id,
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -58,6 +61,7 @@ class QueryInfo:
             params=new_params,
             limit=self.limit,
             offset=self.offset,
+            last_load_id=self.last_load_id,
         )
 
 

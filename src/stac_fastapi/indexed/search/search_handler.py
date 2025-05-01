@@ -5,7 +5,7 @@ from logging import Logger, getLogger
 from re import sub
 from typing import Any, Dict, Final, List, Optional, Union, cast
 
-from fastapi import Request
+from fastapi import HTTPException, Request, status
 from pygeofilter.ast import Node
 from stac_fastapi.extensions.core.filter.filter import FilterExtensionPostRequest
 from stac_fastapi.extensions.core.pagination.token_pagination import POSTTokenPagination
@@ -18,7 +18,7 @@ from stac_index.indexer.stac_parser import StacParser
 from stac_pydantic.api.extensions.sort import SortDirections, SortExtension
 
 from stac_fastapi.indexed.constants import rel_root, rel_self
-from stac_fastapi.indexed.db import fetchall, format_query_object_name
+from stac_fastapi.indexed.db import fetchall, format_query_object_name, get_last_load_id
 from stac_fastapi.indexed.links.catalog import get_catalog_link
 from stac_fastapi.indexed.links.item import fix_item_links
 from stac_fastapi.indexed.links.search import get_search_link, get_token_link
@@ -78,11 +78,14 @@ class SearchHandler:
         return cast(Dict[str, Any], filter)
 
     async def search(self) -> ItemCollection:
+        reject_if_load_id_changed = False
         if cast(POSTTokenPagination, self.search_request).token is None:
             _logger.debug("no token, building new query")
             query_info = await self._new_query()
         else:
             _logger.debug("token provided")
+            # do not permit paging across data changes as paged results may be inconsistent
+            reject_if_load_id_changed = True
             query_info = get_query_from_token(
                 cast(POSTTokenPagination, self.search_request).token
             )
@@ -98,6 +101,11 @@ class SearchHandler:
             current_query,
             query_info.params,
         )
+        if reject_if_load_id_changed and get_last_load_id() != query_info.last_load_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="STAC data recently changed and paging behaviour cannot be guaranteed. Remove the paging token to start again.",
+            )
         has_next_page = len(rows) > query_info.limit
         has_previous_page = query_info.offset is not None
         fetch_tasks = [
@@ -180,6 +188,7 @@ class SearchHandler:
             params=params,
             limit=self.search_request.limit,
             offset=None,
+            last_load_id=get_last_load_id(),
         )
 
     async def _determine_order(self) -> List[str]:

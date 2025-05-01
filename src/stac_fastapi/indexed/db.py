@@ -10,7 +10,7 @@ from duckdb import connect as duckdb_connect
 from stac_index.indexer.creator.creator import IndexCreator
 from stac_index.readers import get_reader_class_for_uri
 from stac_index.readers.exceptions import MissingIndexException
-from stac_index.readers.source_reader import IndexReader, SourceReader
+from stac_index.readers.source_reader import IndexReader
 
 from stac_fastapi.indexed.settings import get_settings
 
@@ -29,20 +29,14 @@ _last_load_id: Optional[str] = None
 
 
 async def connect_to_db() -> None:
-    times = {}
+    times: Dict[str, float] = {}
     settings = get_settings()
     index_manifest_uri = settings.index_manifest_uri
     source_reader = get_reader_class_for_uri(index_manifest_uri)()
     index_reader = source_reader.get_index_reader(index_manifest_uri=index_manifest_uri)
     start = time()
-    _set_index_manifest_last_modified(
-        last_modified=await _get_index_manifest_last_modified(
-            source_reader=source_reader, index_manifest_uri=index_manifest_uri
-        )
-    )
-    times["set index manifest last modified"] = time()
-    await _set_parquet_uris(index_reader)
-    times["set parquet URIs"] = time()
+    await _ensure_latest_data()
+    times["set data versioning variables"] = time()
     global _root_db_connection
     _root_db_connection = duckdb_connect()
     times["create db connection"] = time()
@@ -63,8 +57,6 @@ async def connect_to_db() -> None:
     times["load spatial extension"] = time()
     _execute("LOAD httpfs")
     times["load httpfs extension"] = time()
-    await _set_last_load_id()
-    times["set last_load_id"] = time()
     if settings.duckdb_threads:
         _set_duckdb_threads(settings.duckdb_threads)
     for operation, completed_at in times.items():
@@ -191,46 +183,33 @@ def _set_duckdb_threads(duckdb_thread_count: int) -> None:
 
 
 async def _ensure_latest_data() -> None:
+    global _index_manifest_last_modified
     start = time()
     index_manifest_uri = get_settings().index_manifest_uri
     source_reader = get_reader_class_for_uri(index_manifest_uri)()
-    current_last_modified = await _get_index_manifest_last_modified(
-        source_reader=source_reader, index_manifest_uri=index_manifest_uri
+    new_last_modified = await source_reader.get_last_modified_epoch_for_uri(
+        uri=index_manifest_uri
     )
-    if current_last_modified != _index_manifest_last_modified:
+    if new_last_modified != _index_manifest_last_modified:
         _logger.warning("index manifest has changed, reloading data")
         await _set_parquet_uris(
             source_reader.get_index_reader(index_manifest_uri=index_manifest_uri)
         )
         await _set_last_load_id()
-        _set_index_manifest_last_modified(last_modified=current_last_modified)
+        _index_manifest_last_modified = new_last_modified
     _logger.debug(
         f"ensured latest data in {round(time() - start, _query_timing_precision)}s"
     )
 
 
-async def _get_index_manifest_last_modified(
-    source_reader: SourceReader, index_manifest_uri: str
-) -> int:
-    return await source_reader.get_last_modified_epoch_for_uri(uri=index_manifest_uri)
-
-
-def _set_index_manifest_last_modified(last_modified: int) -> None:
-    global _index_manifest_last_modified
-    _index_manifest_last_modified = last_modified
-
-
 async def _set_last_load_id() -> None:
+    index_manifest_uri = get_settings().index_manifest_uri
+    source_reader = get_reader_class_for_uri(index_manifest_uri)()
+    index_manifest = await source_reader.get_index_reader(
+        index_manifest_uri=index_manifest_uri
+    ).get_index_manifest()
     global _last_load_id
-    _last_load_id = await fetchone(
-        statement=f"""
-        SELECT id AS last_load_id
-          FROM '{_parquet_uris["index_history"]}'
-      ORDER BY end_time DESC
-         LIMIT 1
-    """,
-        perform_latest_data_check=False,
-    )
+    _last_load_id = index_manifest.load_id
 
 
 async def _set_parquet_uris(index_reader: IndexReader) -> None:
