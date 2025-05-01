@@ -347,20 +347,122 @@ class IndexCreator:
         return errors
 
     def _log_index_event(self: Self, root_catalog_uri: str) -> None:
-        self._conn.execute(
-            "INSERT INTO index_history (id, start_time, end_time, root_catalog_uris, loaded, added, removed, updated, unchanged) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                self._load_id,
-                self._creation_time,
-                _current_time(),
-                [root_catalog_uri],
-                0,
-                0,
-                0,
-                0,
-                0,
-            ),
+        insert_sql_template = """
+        INSERT INTO index_history (
+            id
+            , start_time
+            , end_time
+            , root_catalog_uris
+            , items_loaded
+            , items_added
+            , items_removed
+            , items_updated
+            , items_unchanged
+            , collections_loaded
+            , collections_added
+            , collections_removed
+            , collections_updated
+            , collections_unchanged
         )
+        VALUES (?, ?, ?, ?, {items_loaded}, {items_added}, {items_removed}, {items_updated}, {items_unchanged}, {collections_loaded}, {collections_added}, {collections_removed}, {collections_updated}, {collections_unchanged})
+        """
+        insert_sql_args = (
+            self._load_id,
+            self._creation_time,
+            _current_time(),
+            [root_catalog_uri],
+        )
+        history_tables = (
+            "items_previous",
+            "collections_previous",
+            "index_history_previous",
+        )
+        has_history = self._conn.execute(
+            f"""
+            SELECT COUNT(*) = {len(history_tables)}
+              FROM duckdb_tables() t
+        INNER JOIN UNNEST(['{"', '".join(history_tables)}']) AS vals(expected_table_name)
+                ON t.table_name = vals.expected_table_name
+        """
+        ).fetchone()[0]
+        if has_history:
+            self._conn.execute(
+                """
+                INSERT INTO index_history
+                SELECT *
+                  FROM index_history_previous
+                """
+            )
+            # these statements will need updating if we support multi-catalog indexing where individual catalogs can be updated separately
+            # right now we can assume that the items and collections tables represent all source data and therefore don't need to check load IDs or catalogs
+            insert_sql = insert_sql_template.format(
+                items_loaded="(SELECT COUNT(*) FROM items)",
+                items_added=""" (
+                SELECT COUNT(*)
+                  FROM items
+                 WHERE CONCAT(collection_id, '.', id) NOT IN (SELECT CONCAT(collection_id, '.', id) FROM items_previous)
+                ) """,
+                items_removed=""" (
+                SELECT COUNT(*)
+                  FROM items_previous
+                 WHERE CONCAT(collection_id, '.', id) NOT IN (SELECT CONCAT(collection_id, '.', id) FROM items)
+                ) """,
+                items_updated=""" (
+                SELECT COUNT(*)
+                  FROM items i
+            INNER JOIN items_previous ip ON CONCAT(i.collection_id, '.', i.id) = CONCAT(ip.collection_id, '.', ip.id)
+                   AND i.item_hash != ip.item_hash
+                ) """,
+                items_unchanged=""" (
+                SELECT COUNT(*)
+                  FROM items i
+            INNER JOIN items_previous ip ON CONCAT(i.collection_id, '.', i.id) = CONCAT(ip.collection_id, '.', ip.id)
+                   AND i.item_hash = ip.item_hash
+                ) """,
+                collections_loaded="(SELECT COUNT(*) FROM collections)",
+                collections_added=""" (
+                SELECT COUNT(*)
+                  FROM collections
+                 WHERE id NOT IN (SELECT id FROM collections_previous)
+                ) """,
+                collections_removed=""" (
+                SELECT COUNT(*)
+                  FROM collections_previous
+                 WHERE id NOT IN (SELECT id FROM collections)
+                ) """,
+                collections_updated=""" (
+                SELECT COUNT(*)
+                  FROM collections c
+            INNER JOIN collections_previous cp ON c.id = cp.id
+                   AND c.collection_hash != cp.collection_hash
+                ) """,
+                collections_unchanged=""" (
+                SELECT COUNT(*)
+                  FROM collections c
+            INNER JOIN collections_previous cp ON c.id = cp.id
+                   AND c.collection_hash = cp.collection_hash
+                ) """,
+            )
+        else:
+            insert_sql = insert_sql_template.format(
+                items_loaded="(SELECT COUNT(*) FROM items)",
+                items_added="(SELECT COUNT(*) FROM items)",
+                items_removed=0,
+                items_updated=0,
+                items_unchanged=0,
+                collections_loaded="(SELECT COUNT(*) FROM collections)",
+                collections_added="(SELECT COUNT(*) FROM collections)",
+                collections_removed=0,
+                collections_updated=0,
+                collections_unchanged=0,
+            )
+        try:
+            self._conn.execute(insert_sql, insert_sql_args)
+        except ConstraintException:
+            _logger.exception(
+                "invalid load counts. ?_loaded is not the sum of all other counts"
+            )
+            raise
 
     def _insert_errors(self: Self, errors: list[IndexingError]) -> None:
         for error in errors:
@@ -377,7 +479,7 @@ class IndexCreator:
                 f"indexer v{_indexer_version} incompatible with manifest from v{index_manifest.indexer_version}"
             )
         tmp_dir_path = mkdtemp()
-        for table_name in ["collections", "items"]:
+        for table_name in ["collections", "items", "index_history"]:
             if table_name not in index_manifest.tables:
                 raise ValueError(f"{table_name} table not present in index_manifest")
             relative_path = index_manifest.tables[table_name].relative_path
