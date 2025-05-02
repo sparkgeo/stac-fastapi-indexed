@@ -1,11 +1,14 @@
-from asyncio import run
+from asyncio import gather, run
 from json import load
 from logging import Logger, getLogger
+from os import path
 from typing import Final, List, Optional, Tuple
 
 from stac_index.indexer.creator.creator import IndexCreator
 from stac_index.indexer.types.index_config import IndexConfig
+from stac_index.indexer.types.index_manifest import IndexManifest
 from stac_index.indexer.types.indexing_error import IndexingError
+from stac_index.io.writers import get_writer_for_uri
 
 _logger: Final[Logger] = getLogger(__name__)
 
@@ -16,6 +19,20 @@ def execute(
     index_config_path: Optional[str] = None,
     publish_uri: Optional[str] = None,
 ):
+    if root_catalog_uri is not None:
+        if manifest_json_uri is not None:
+            raise ValueError(
+                "root_catalog_uri and manifest_json_uri are mutually exclusive"
+            )
+    if manifest_json_uri is not None:
+        if index_config_path is not None:
+            raise ValueError(
+                "manifest_json_uri and index_config are mutually exclusive"
+            )
+    if root_catalog_uri is None and manifest_json_uri is None:
+        raise ValueError(
+            "Either root_catalog_uri or manifest_json_uri must be provided"
+        )
     errors, manifest_path = run(
         _call_process(
             root_catalog_uri=root_catalog_uri,
@@ -29,7 +46,7 @@ def execute(
         )
     _logger.info(manifest_path)
     if publish_uri is not None:
-        _logger.info(f"publishing to {publish_uri}")
+        run(_publish_index(manifest_path=manifest_path, publish_uri=publish_uri))
 
 
 async def _call_process(
@@ -51,6 +68,25 @@ async def _call_process(
     elif manifest_json_uri is not None:
         return await index_creator.update_index(manifest_json_uri=manifest_json_uri)
     raise Exception("No useable arguments provided")
+
+
+async def _publish_index(manifest_path: str, publish_uri: str) -> None:
+    source_writer = get_writer_for_uri(publish_uri)
+    if not publish_uri.endswith(source_writer.path_separator()):
+        publish_uri = f"{publish_uri}{source_writer.path_separator()}"
+    _logger.info(f"publishing to {publish_uri}")
+    with open(manifest_path, "r") as f:
+        index_manifest = IndexManifest(**load(f))
+    table_uploads = []
+    for metadata in index_manifest.tables.values():
+        table_file_path = path.join(path.dirname(manifest_path), metadata.relative_path)
+        target_uri = "{}{}".format(publish_uri, metadata.relative_path)
+        table_uploads.append(source_writer.put_file_to_uri(table_file_path, target_uri))
+    await gather(*table_uploads)
+    # manifest must go after parquet files so that data is immediately accessible after manifest update
+    await source_writer.put_file_to_uri(
+        manifest_path, "{}{}".format(publish_uri, path.basename(manifest_path))
+    )
 
 
 if __name__ == "__main__":
@@ -85,20 +121,6 @@ if __name__ == "__main__":
         help="Optional URI for index publish location",
     )
     args = parser.parse_args()
-    if args.root_catalog_uri is not None:
-        if args.manifest_json_uri is not None:
-            raise ValueError(
-                f"{root_catalog_uri_key} and {manifest_json_uri_key} are mutually exclusive"
-            )
-    if args.manifest_json_uri is not None:
-        if args.index_config is not None:
-            raise ValueError(
-                f"{manifest_json_uri_key} and {index_config_key} are mutually exclusive"
-            )
-    if args.root_catalog_uri is None and args.manifest_json_uri is None:
-        raise ValueError(
-            f"Either {root_catalog_uri_key} or {manifest_json_uri_key} must be provided"
-        )
     execute(
         root_catalog_uri=args.root_catalog_uri,
         manifest_json_uri=args.manifest_json_uri,

@@ -1,17 +1,16 @@
 from logging import Logger, getLogger
-from re import Match, match, sub
+from re import sub
 from time import time
-from typing import Any, Dict, Final, List, Optional, Self, Tuple, cast
+from typing import Any, Dict, Final, List, Optional, Self, Tuple
 
 from obstore import Bytes
 from obstore.store import S3Store
 from stac_index.io.readers.exceptions import UriNotFoundException
 from stac_index.io.readers.source_reader import IndexReader, SourceReader
 from stac_index.io.s3_common import can_handle_uri as can_handle_uri_common
-from stac_index.io.s3_common import get_settings
+from stac_index.io.s3_common import get_s3_key_parts, get_settings
 from stac_index.io.s3_common import obstore_for_bucket as obstore_for_bucket_common
 from stac_index.io.s3_common import path_separator as path_separator_common
-from stac_index.io.s3_common import uri_prefix_regex
 
 _logger: Final[Logger] = getLogger(__name__)
 
@@ -62,14 +61,8 @@ class S3SourceReader(SourceReader):
             self._obstore_cache[bucket] = obstore_for_bucket_common(bucket=bucket)
         return self._obstore_cache[bucket]
 
-    def _get_s3_key_parts(self: Self, key: str) -> Tuple[str, str]:
-        try:
-            return cast(Match, match(rf"{uri_prefix_regex}([^/]+)/(.+)", key)).groups()
-        except Exception as e:
-            raise ValueError(f"'{key}' is not in the expected format", e)
-
     async def _get_uri_as_bytes(self: Self, uri: str) -> Bytes:
-        bucket, key = self._get_s3_key_parts(uri)
+        bucket, key = get_s3_key_parts(uri)
         try:
             start = time()
             object_bytes = await (
@@ -105,7 +98,7 @@ class S3SourceReader(SourceReader):
     async def get_item_uris_from_items_uri(
         self: Self, uri: str, item_limit: Optional[int] = None
     ) -> Tuple[List[str], List[str]]:
-        bucket, prefix = self._get_s3_key_parts(uri)
+        bucket, prefix = get_s3_key_parts(uri)
         uris: List[str] = []
         list_stream = self._obstore_for_bucket(bucket=bucket).list(prefix=prefix)
         async for chunk in list_stream:
@@ -116,7 +109,7 @@ class S3SourceReader(SourceReader):
         return (uris if item_limit is None else uris[:item_limit], [])
 
     async def get_last_modified_epoch_for_uri(self: Self, uri: str) -> int:
-        bucket, prefix = self._get_s3_key_parts(uri)
+        bucket, prefix = get_s3_key_parts(uri)
         object_meta = await self._obstore_for_bucket(bucket=bucket).head_async(
             path=prefix
         )

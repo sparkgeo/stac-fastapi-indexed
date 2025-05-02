@@ -3,6 +3,7 @@ from typing import Dict, Final, Self
 
 from obstore.store import S3Store
 from stac_index.io.s3_common import can_handle_uri as can_handle_uri_common
+from stac_index.io.s3_common import get_s3_key_parts
 from stac_index.io.s3_common import obstore_for_bucket as obstore_for_bucket_common
 from stac_index.io.s3_common import path_separator as path_separator_common
 from stac_index.io.writers.source_writer import SourceWriter
@@ -26,7 +27,10 @@ class S3SourceWriter(SourceWriter):
         return path_separator_common()
 
     async def put_file_to_uri(self: Self, file_path: str, uri: str) -> None:
-        pass
+        _logger.info(f"uploading {file_path} to {uri}")
+        bucket, key = get_s3_key_parts(key=uri)
+        obstore = self._obstore_for_bucket(bucket=bucket)
+        await obstore.put_async(path=key, file=file_path)
 
     def _obstore_for_bucket(self: Self, bucket: str) -> S3Store:
         if bucket not in self._obstore_cache:

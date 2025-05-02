@@ -1,4 +1,6 @@
 from logging import Logger, getLogger
+from os import makedirs, path
+from shutil import copyfile
 from typing import Final, Self
 
 from stac_index.io.filesystem_common import can_handle_uri as can_handle_uri_common
@@ -21,4 +23,6 @@ class FilesystemSourceWriter(SourceWriter):
         return path_separator_common()
 
     async def put_file_to_uri(self: Self, file_path: str, uri: str) -> None:
-        pass
+        _logger.info(f"copying {file_path} to {uri}")
+        makedirs(path.dirname(uri), exist_ok=True)
+        copyfile(src=file_path, dst=uri)

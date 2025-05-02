@@ -1,6 +1,6 @@
 from functools import lru_cache
-from re import match
-from typing import Final, Optional
+from re import Match, match
+from typing import Final, Optional, Tuple, cast
 
 from obstore.store import S3Store
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -14,6 +14,13 @@ def can_handle_uri(uri: str) -> bool:
 
 def path_separator() -> str:
     return "/"
+
+
+def get_s3_key_parts(key: str) -> Tuple[str, str]:
+    try:
+        return cast(Match, match(rf"{uri_prefix_regex}([^/]+)/(.+)", key)).groups()
+    except Exception as e:
+        raise ValueError(f"'{key}' is not in the expected format", e)
 
 
 def obstore_for_bucket(bucket: str) -> S3Store:
