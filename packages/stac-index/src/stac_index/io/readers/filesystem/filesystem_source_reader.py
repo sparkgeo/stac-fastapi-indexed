@@ -5,24 +5,25 @@ from shutil import copy
 from time import time
 from typing import Final, List, Optional, Self, Tuple
 
-from stac_index.readers.exceptions import UriNotFoundException
-from stac_index.readers.source_reader import SourceReader
+from stac_index.io.filesystem_common import can_handle_uri as can_handle_uri_common
+from stac_index.io.filesystem_common import path_separator as path_separator_common
+from stac_index.io.readers.exceptions import UriNotFoundException
+from stac_index.io.readers.source_reader import SourceReader
 
-_uri_start_str: Final[str] = "/"
 _logger: Final[Logger] = getLogger(__name__)
 
 
 class FilesystemSourceReader(SourceReader):
     @staticmethod
     def can_handle_uri(uri: str) -> bool:
-        return uri.startswith(_uri_start_str)
+        return can_handle_uri_common(uri=uri)
 
     def __init__(self: Self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         _logger.info("creating Filesystem Reader")
 
     def path_separator(self: Self) -> str:
-        return _uri_start_str  # sorry Windows
+        return path_separator_common()
 
     async def get_uri_as_string(self: Self, uri: str) -> str:
         if path.exists(uri):
@@ -49,7 +50,11 @@ class FilesystemSourceReader(SourceReader):
         self: Self, uri: str, item_limit: Optional[int] = None
     ) -> Tuple[List[str], List[str]]:
         all_uris = glob(
-            "{prefix}*".format(prefix=uri if uri.endswith("/") else f"{uri}/")
+            "{prefix}*".format(
+                prefix=uri
+                if uri.endswith(self.path_separator())
+                else f"{uri}{self.path_separator()}"
+            )
         )
         return (all_uris[:item_limit], [])
 

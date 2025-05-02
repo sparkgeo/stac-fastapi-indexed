@@ -1,6 +1,5 @@
 from datetime import UTC, datetime
 from logging import Logger, getLogger
-from re import Pattern, compile, match
 from time import time
 from typing import (
     Any,
@@ -16,24 +15,25 @@ from typing import (
 )
 
 from aiohttp import ClientResponse, ClientSession
-from stac_index.readers.exceptions import UriNotFoundException
-from stac_index.readers.source_reader import SourceReader
+from stac_index.io.https_common import can_handle_uri as can_handle_uri_common
+from stac_index.io.https_common import path_separator as path_separator_common
+from stac_index.io.readers.exceptions import UriNotFoundException
+from stac_index.io.readers.source_reader import SourceReader
 
-_uri_start_regex: Final[Pattern] = compile(r"^http(s)?://")
 _logger: Final[Logger] = getLogger(__name__)
 
 
 class HttpsSourceReader(SourceReader):
     @staticmethod
     def can_handle_uri(uri: str) -> bool:
-        return not not match(_uri_start_regex, uri)
+        return can_handle_uri_common(uri=uri)
 
     def __init__(self: Self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         _logger.info("creating HTTPS Reader")
 
     def path_separator(self: Self) -> str:
-        return "/"
+        return path_separator_common()
 
     async def _get_uri_and_process(
         self: Self,

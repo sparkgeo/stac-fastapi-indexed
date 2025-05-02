@@ -1,6 +1,6 @@
 from typing import Any, Dict, Type
 
-from stac_index.readers import SourceReader, get_reader_for_uri
+from stac_index.io.readers import SourceReader, get_reader_for_uri
 from stac_pydantic.collection import Collection
 from stac_pydantic.item import Item
 

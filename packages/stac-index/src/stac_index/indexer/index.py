@@ -14,6 +14,7 @@ def execute(
     root_catalog_uri: Optional[str] = None,
     manifest_json_uri: Optional[str] = None,
     index_config_path: Optional[str] = None,
+    publish_uri: Optional[str] = None,
 ):
     errors, manifest_path = run(
         _call_process(
@@ -27,6 +28,8 @@ def execute(
             f"Indexing encountered {len(errors)} error(s). Review errors via API at GET /status/errors"
         )
     _logger.info(manifest_path)
+    if publish_uri is not None:
+        _logger.info(f"publishing to {publish_uri}")
 
 
 async def _call_process(
@@ -75,6 +78,12 @@ if __name__ == "__main__":
         default=None,
         help=f"Optional path to an index configuration file if creating a new index. Required for custom indexables, queryables, sortables. Not compatible with {manifest_json_uri_key} (index config cannot be changed in an index update)",
     )
+    parser.add_argument(
+        "--publish_to_uri",
+        type=str,
+        default=None,
+        help="Optional URI for index publish location",
+    )
     args = parser.parse_args()
     if args.root_catalog_uri is not None:
         if args.manifest_json_uri is not None:
@@ -94,4 +103,5 @@ if __name__ == "__main__":
         root_catalog_uri=args.root_catalog_uri,
         manifest_json_uri=args.manifest_json_uri,
         index_config_path=args.index_config,
+        publish_uri=args.publish_to_uri,
     )

@@ -27,7 +27,7 @@ from stac_index.indexer.types.indexing_error import (
     save_error,
 )
 from stac_index.indexer.types.stac_data import ItemWithLocation
-from stac_index.readers import get_reader_for_uri
+from stac_index.io.readers import get_reader_for_uri
 
 _logger: Final[Logger] = getLogger(__name__)
 _indexer_version: Final[int] = (

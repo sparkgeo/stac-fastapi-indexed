@@ -1,10 +1,11 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from json import loads
 from logging import Logger, getLogger
 from typing import Any, Dict, Final, List, Optional, Self, Tuple
 
 from stac_index.indexer.types.index_manifest import IndexManifest
-from stac_index.readers.exceptions import MissingIndexException, UriNotFoundException
+from stac_index.io.readers.exceptions import MissingIndexException, UriNotFoundException
+from stac_index.io.source import Source
 
 _logger: Final[Logger] = getLogger(__name__)
 
@@ -38,7 +39,7 @@ class IndexReader:
         return []
 
 
-class SourceReader(ABC):
+class SourceReader(Source):
     def __init__(self: Self, *args, **kwargs):
         concurrency = None
         concurrency_key = "concurrency"
@@ -47,15 +48,6 @@ class SourceReader(ABC):
             if concurrency <= 0:
                 concurrency = None
         self.reader_concurrency = concurrency
-
-    @staticmethod
-    @abstractmethod
-    def can_handle_uri(uri: str) -> bool:
-        pass
-
-    @abstractmethod
-    def path_separator(self: Self) -> str:
-        pass
 
     @abstractmethod
     async def get_uri_as_string(self: Self, uri: str) -> str:

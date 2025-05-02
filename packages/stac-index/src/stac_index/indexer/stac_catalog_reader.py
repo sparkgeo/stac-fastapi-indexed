@@ -13,8 +13,8 @@ from stac_index.indexer.types.indexing_error import (
     new_error,
 )
 from stac_index.indexer.types.stac_data import CollectionWithLocation, ItemWithLocation
-from stac_index.readers import source_reader_classes
-from stac_index.readers.source_reader import SourceReader
+from stac_index.io.readers import source_reader_classes
+from stac_index.io.readers.source_reader import SourceReader
 from stac_pydantic import Catalog, Collection
 from stac_pydantic.links import Links
 

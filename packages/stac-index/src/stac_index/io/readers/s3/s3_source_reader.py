@@ -5,12 +5,14 @@ from typing import Any, Dict, Final, List, Optional, Self, Tuple, cast
 
 from obstore import Bytes
 from obstore.store import S3Store
-from stac_index.readers.exceptions import UriNotFoundException
-from stac_index.readers.source_reader import IndexReader, SourceReader
+from stac_index.io.readers.exceptions import UriNotFoundException
+from stac_index.io.readers.source_reader import IndexReader, SourceReader
+from stac_index.io.s3_common import can_handle_uri as can_handle_uri_common
+from stac_index.io.s3_common import get_settings
+from stac_index.io.s3_common import obstore_for_bucket as obstore_for_bucket_common
+from stac_index.io.s3_common import path_separator as path_separator_common
+from stac_index.io.s3_common import uri_prefix_regex
 
-from .settings import get_settings
-
-_uri_prefix_regex: Final[str] = r"^s3://"
 _logger: Final[Logger] = getLogger(__name__)
 
 
@@ -42,35 +44,27 @@ class _S3IndexReader(IndexReader):
 class S3SourceReader(SourceReader):
     @staticmethod
     def can_handle_uri(uri: str) -> bool:
-        return not not match(_uri_prefix_regex, uri)
+        return can_handle_uri_common(uri=uri)
 
     def __init__(self: Self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        _logger.info("creating S3 Reader")
         self._obstore_cache: Dict[
             str, S3Store
         ] = {}  # stores are bucket-specific, so need one per unique bucket
 
     def path_separator(self: Self) -> str:
-        return "/"
+        return path_separator_common()
 
     def _obstore_for_bucket(self: Self, bucket: str) -> S3Store:
         if bucket not in self._obstore_cache:
             _logger.info(f"creating S3 Reader obstore for bucket '{bucket}'")
-            client_config = {}
-            store_config = {}
-            s3_endpoint = get_settings().endpoint
-            if s3_endpoint is not None:
-                store_config["endpoint"] = s3_endpoint
-                if s3_endpoint.startswith("http://"):
-                    client_config["allow_http"] = True
-            self._obstore_cache[bucket] = S3Store(
-                bucket=bucket, config=store_config, client_options=client_config
-            )
+            self._obstore_cache[bucket] = obstore_for_bucket_common(bucket=bucket)
         return self._obstore_cache[bucket]
 
     def _get_s3_key_parts(self: Self, key: str) -> Tuple[str, str]:
         try:
-            return cast(Match, match(rf"{_uri_prefix_regex}([^/]+)/(.+)", key)).groups()
+            return cast(Match, match(rf"{uri_prefix_regex}([^/]+)/(.+)", key)).groups()
         except Exception as e:
             raise ValueError(f"'{key}' is not in the expected format", e)
 
