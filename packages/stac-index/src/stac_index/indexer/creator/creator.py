@@ -98,7 +98,7 @@ class IndexCreator:
         return (
             collection_errors + items_errors,
             self._export_db_objects(
-                output_dir=output_dir or get_settings().output_dir,
+                output_base_dir=output_dir or get_settings().output_dir,
                 root_catalog_uri=root_catalog_uri,
             ),
         )
@@ -117,10 +117,24 @@ class IndexCreator:
 
     def _export_db_objects(
         self: Self,
-        output_dir: str,
+        output_base_dir: str,
         root_catalog_uri: Optional[str] = None,
         index_config: Optional[IndexConfig] = None,
     ) -> str:
+        output_relative_dir = path.join(
+            "{}-{}".format(
+                self._creation_time.strftime("%Y-%m-%dT%H.%M.%S.%fZ"),
+                self._load_id,
+            )
+        )
+        output_dir = path.join(output_base_dir, output_relative_dir)
+        try:
+            makedirs(output_dir, exist_ok=True)
+        except Exception:
+            _logger.exception(
+                f"unable to create index destination directory at '{output_dir}'"
+            )
+            raise
         manifest = IndexManifest(
             indexer_version=_indexer_version,
             updated=self._creation_time,
@@ -128,14 +142,6 @@ class IndexCreator:
             root_catalog_uri=root_catalog_uri,
             index_config=index_config,
         )
-        try:
-            makedirs(output_dir, exist_ok=True)
-        except Exception as e:
-            _logger.error(
-                f"unable to create index destination directory at '{output_dir}'"
-            )
-            raise e
-        # TODO: generate a hash or other unique identifier for a Parquet file collection to guarantee consistency / compatibility between files
         for table_name in [
             row[0] for row in self._conn.execute("SHOW tables").fetchall()
         ]:
@@ -148,17 +154,17 @@ class IndexCreator:
                 "index_history",
             ]:
                 continue
-            output_filename = f"{table_name}-{self._load_id}.parquet"
+            table_filename = f"{table_name}.parquet"
             self._conn.execute(f"""
                 COPY (SELECT * FROM {table_name})
-                  TO '{output_dir}/{output_filename}'
+                  TO '{path.join(output_dir, table_filename)}'
                   (FORMAT PARQUET)
                 ;
             """)
             manifest.tables[table_name] = TableMetadata(
-                relative_path=output_filename,
+                relative_path=path.join(output_relative_dir, table_filename),
             )
-        manifest_path = path.join(output_dir, "manifest.json")
+        manifest_path = path.join(output_base_dir, "manifest.json")
         with open(manifest_path, "w") as f:
             dump(
                 manifest.model_dump(),
