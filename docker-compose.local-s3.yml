@@ -49,29 +49,15 @@ services:
     image: sparkgeo/stac_indexer
     environment:
       <<: *minio-environment
-      stac_index_indexer_output_dir: /output
       stac_index_reader_s3_endpoint: http://minio:9000
       INDEX_ROOT_CATALOG_URI: s3://stac/sample/catalog.json
       INDEX_CONFIG_PATH: /index-config.json
+      INDEX_PUBLISH_PATH: s3://index/index/
     volumes:
-      - "indexer-output:/output:rw"
       - "./data/STAC/sample/index-config.json:/index-config.json:ro"
     depends_on:
       minio-sample-loader:
         condition: service_completed_successfully
-
-  minio-index-loader:
-    image: minio/mc:RELEASE.2024-06-12T14-34-03Z
-    entrypoint: /bin/bash /entrypoint.sh
-    environment:
-      <<: *minio-environment
-    volumes:
-      - "./docker/minio/mc/entrypoint.sh:/entrypoint.sh:ro"
-      - "indexer-output:/index:rw"
-    depends_on:
-      indexer:
-        condition: service_completed_successfully
-    command: mc cp --recursive /index minio/index
 
   api:
     environment:
@@ -79,9 +65,8 @@ services:
       stac_api_indexed_index_manifest_uri: s3://index/index/manifest.json
       stac_index_reader_s3_endpoint: http://minio:9000
     depends_on:
-      minio-index-loader:
+      indexer:
         condition: service_completed_successfully
 
 volumes:
   re-rooted-stac:
-  indexer-output:

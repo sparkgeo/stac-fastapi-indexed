@@ -16,7 +16,6 @@ from stac_index.indexer.creator.configurer import (
     add_items_columns,
     configure_indexables,
 )
-from stac_index.indexer.settings import get_settings
 from stac_index.indexer.stac_catalog_reader import StacCatalogReader
 from stac_index.indexer.types.index_config import IndexConfig, collection_wildcard
 from stac_index.indexer.types.index_manifest import IndexManifest, TableMetadata
@@ -53,10 +52,10 @@ class IndexCreator:
         except Exception:
             pass
 
-    def create_empty(self: Self, output_dir: Optional[str] = None) -> str:
+    def create_empty(self: Self) -> str:
         _logger.info("creating empty index")
         self._create_db_objects()
-        return self._export_db_objects(output_dir or get_settings().output_dir)
+        return self._export_db_objects()
 
     async def create_new_index(
         self: Self,
@@ -98,7 +97,6 @@ class IndexCreator:
         return (
             collection_errors + items_errors,
             self._export_db_objects(
-                output_base_dir=output_dir or get_settings().output_dir,
                 root_catalog_uri=root_catalog_uri,
             ),
         )
@@ -117,7 +115,6 @@ class IndexCreator:
 
     def _export_db_objects(
         self: Self,
-        output_base_dir: str,
         root_catalog_uri: Optional[str] = None,
         index_config: Optional[IndexConfig] = None,
     ) -> str:
@@ -127,6 +124,7 @@ class IndexCreator:
                 self._load_id,
             )
         )
+        output_base_dir = mkdtemp()
         output_dir = path.join(output_base_dir, output_relative_dir)
         try:
             makedirs(output_dir, exist_ok=True)

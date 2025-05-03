@@ -1,7 +1,6 @@
 import re
 from logging import Logger, getLogger
 from os import environ
-from tempfile import mkdtemp
 from time import time
 from typing import Any, Dict, Final, List, Optional
 
@@ -219,7 +218,7 @@ async def _set_parquet_uris(index_reader: IndexReader) -> None:
     except MissingIndexException:
         _logger.warning("index missing")
         if get_settings().create_empty_index_if_missing:
-            index_manifest_uri = IndexCreator().create_empty(mkdtemp())
+            index_manifest_uri = IndexCreator().create_empty()
             source_reader = get_reader_for_uri(uri=index_manifest_uri)
             index_reader = source_reader.get_index_reader(
                 index_manifest_uri=index_manifest_uri
