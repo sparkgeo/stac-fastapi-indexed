@@ -4,7 +4,7 @@ from typing import Dict, Final
 
 from async_lru import alru_cache
 
-from stac_fastapi.indexed.db import fetchall, format_query_object_name
+from stac_fastapi.indexed.db import fetchall, format_query_object_name, get_last_load_id
 
 _logger: Final[Logger] = getLogger(__name__)
 
@@ -21,8 +21,13 @@ class QueryableConfig:
     is_temporal: bool
 
 
-@alru_cache(maxsize=1)
 async def get_queryable_config_by_name() -> Dict[str, QueryableConfig]:
+    # ensure a change to the application's last load ID forces a data reload
+    return await _get_queryable_config_by_name(get_last_load_id())
+
+
+@alru_cache(maxsize=1)
+async def _get_queryable_config_by_name(_: str) -> Dict[str, QueryableConfig]:
     _logger.debug("fetching queryable field config")
     field_config = {}
     for row in await fetchall(

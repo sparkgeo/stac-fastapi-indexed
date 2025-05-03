@@ -4,7 +4,7 @@ from typing import Dict, Final, List
 
 from async_lru import alru_cache
 
-from stac_fastapi.indexed.db import fetchall, format_query_object_name
+from stac_fastapi.indexed.db import fetchall, format_query_object_name, get_last_load_id
 
 _logger: Final[Logger] = getLogger(__name__)
 
@@ -17,8 +17,13 @@ class SortableConfig:
     items_column: str
 
 
-@alru_cache(maxsize=1)
 async def get_sortable_configs() -> List[SortableConfig]:
+    # ensure a change to the application's last load ID forces a data reload
+    return await _get_sortable_configs(get_last_load_id())
+
+
+@alru_cache(maxsize=1)
+async def _get_sortable_configs(_: str) -> List[SortableConfig]:
     _logger.debug("fetching sortable field config")
     return [
         SortableConfig(
