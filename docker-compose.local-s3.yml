@@ -9,9 +9,9 @@ services:
     image: python:3.12-slim
     volumes:
       - "./data/STAC/re_root_stac.py:/re_root_stac.py:ro"
-      - "./data/STAC/sample/data:/input:ro"
-      - "re-rooted-stac:/output:rw"
-    command: python -m re_root_stac /data/ s3://stac/sample/ --source_root /input --target_root /output
+      - "./data/STAC/sample/data:/data:ro"
+      - "re-rooted-stac-s3:/output:rw"
+    command: python -m re_root_stac /data/ s3://stac/sample/ --source_root /data --target_root /output
 
   minio:
     image: minio/minio:RELEASE.2024-06-11T03-13-30Z
@@ -34,7 +34,7 @@ services:
       <<: *minio-environment
     volumes:
       - "./docker/minio/mc/entrypoint.sh:/entrypoint.sh:ro"
-      - "re-rooted-stac:/stac/sample:ro"
+      - "re-rooted-stac-s3:/stac/sample:ro"
     depends_on:
       minio:
         condition: service_healthy
@@ -69,4 +69,4 @@ services:
         condition: service_completed_successfully
 
 volumes:
-  re-rooted-stac:
+  re-rooted-stac-s3:
