@@ -58,5 +58,7 @@ class FilesystemSourceReader(SourceReader):
         )
         return (all_uris[:item_limit], [])
 
-    async def get_last_modified_epoch_for_uri(self: Self, uri: str) -> int:
-        return round(path.getmtime(filename=uri))
+    async def get_last_modified_epoch_for_uri(self: Self, uri: str) -> Optional[int]:
+        if path.exists(path=uri):
+            return round(path.getmtime(filename=uri))
+        return None

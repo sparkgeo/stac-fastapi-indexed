@@ -108,11 +108,14 @@ class S3SourceReader(SourceReader):
                 uris.append("s3://{}/{}".format(bucket, entry["path"]))
         return (uris if item_limit is None else uris[:item_limit], [])
 
-    async def get_last_modified_epoch_for_uri(self: Self, uri: str) -> int:
+    async def get_last_modified_epoch_for_uri(self: Self, uri: str) -> Optional[int]:
         bucket, prefix = get_s3_key_parts(uri)
-        object_meta = await self._obstore_for_bucket(bucket=bucket).head_async(
-            path=prefix
-        )
+        try:
+            object_meta = await self._obstore_for_bucket(bucket=bucket).head_async(
+                path=prefix
+            )
+        except FileNotFoundError:
+            return None
         last_modified = object_meta["last_modified"]
         return round(last_modified.timestamp())
 

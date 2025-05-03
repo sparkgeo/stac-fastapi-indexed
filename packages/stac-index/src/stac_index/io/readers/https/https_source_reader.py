@@ -115,6 +115,6 @@ class HttpsSourceReader(SourceReader):
                 next_items_uri = None
         return (item_uris, errors)
 
-    async def get_last_modified_epoch_for_uri(self: Self, uri: str) -> int:
+    async def get_last_modified_epoch_for_uri(self: Self, uri: str) -> Optional[int]:
         # cannot reliably determine last modified over all HTTP endpoints, always report now
         return round(datetime.now(tz=UTC).timestamp())

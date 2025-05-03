@@ -1,4 +1,5 @@
 import re
+from datetime import UTC, datetime
 from logging import Logger, getLogger
 from os import environ
 from time import time
@@ -188,7 +189,7 @@ async def _ensure_latest_data() -> None:
     source_reader = get_reader_for_uri(uri=index_manifest_uri)
     new_last_modified = await source_reader.get_last_modified_epoch_for_uri(
         uri=index_manifest_uri
-    )
+    ) or round(datetime.now(tz=UTC).timestamp())
     if new_last_modified != _index_manifest_last_modified:
         _logger.warning("index manifest has changed, reloading data")
         await _set_parquet_uris(
@@ -217,11 +218,12 @@ async def _set_parquet_uris(index_reader: IndexReader) -> None:
         _parquet_uris = await index_reader.get_parquet_uris()
     except MissingIndexException:
         _logger.warning("index missing")
-        if get_settings().create_empty_index_if_missing:
-            index_manifest_uri = IndexCreator().create_empty()
-            source_reader = get_reader_for_uri(uri=index_manifest_uri)
+        settings = get_settings()
+        if settings.create_empty_index_if_missing:
+            settings.index_manifest_uri = IndexCreator().create_empty()
+            source_reader = get_reader_for_uri(uri=settings.index_manifest_uri)
             index_reader = source_reader.get_index_reader(
-                index_manifest_uri=index_manifest_uri
+                index_manifest_uri=settings.index_manifest_uri
             )
             _parquet_uris = await index_reader.get_parquet_uris()
         else:

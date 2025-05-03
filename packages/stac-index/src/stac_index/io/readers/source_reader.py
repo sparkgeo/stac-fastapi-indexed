@@ -64,7 +64,7 @@ class SourceReader(Source):
         pass
 
     @abstractmethod
-    async def get_last_modified_epoch_for_uri(self: Self, uri: str) -> int:
+    async def get_last_modified_epoch_for_uri(self: Self, uri: str) -> Optional[int]:
         pass
 
     async def load_json_from_uri(self: Self, uri: str) -> Dict[str, Any]:
