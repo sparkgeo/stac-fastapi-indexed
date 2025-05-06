@@ -13,23 +13,22 @@ ENV UV_LINK_MODE=copy \
     UV_PROJECT_ENVIRONMENT=/opt/app
 
 ### End build prep -- this is where your app Dockerfile should start.
-
-WORKDIR /src
 COPY ./ /src
-
+WORKDIR /src
 
 RUN uv sync \
+    --package=stac-index \
     --directory=/src \
     --locked \
     --no-dev \
     --no-install-project
 
 RUN uv sync \
-    --extra lambda \
+    --package=stac-index \
+    --directory=/src \
     --locked \
     --no-dev \
     --no-editable
-
 
 # ##########################################################################
 
@@ -42,11 +41,9 @@ STOPSIGNAL SIGINT
 
 COPY --from=build /opt/app /opt/app
 COPY packages/stac-index/src/ /opt/app/lib/python3.13/site-packages/
-COPY src/stac_fastapi/indexed /opt/app/lib/python3.13/site-packages/stac_fastapi/indexed
 
 ENV PYTHONPATH=/opt/app/lib/python3.13/site-packages
-RUN python -c "import duckdb; duckdb.execute('INSTALL spatial'); duckdb.execute('INSTALL httpfs'); duckdb.execute('INSTALL aws')"
-ENV stac_api_indexed_install_duckdb_extensions=false
+RUN python -c "import duckdb; duckdb.execute('INSTALL spatial')"
 
 ARG DUCKDB_VERSION=1.2.2
 # Store installed extensions at an alternate location so that the Lambda's least-privileged user can access them.
@@ -56,6 +53,6 @@ RUN  mv /root/.duckdb/extensions/v${DUCKDB_VERSION}/linux_amd64_gcc4/* . \
 # Tell DuckDB to look here for its installed extensions.
 ENV HOME=/datastore
 
-WORKDIR /opt/app
+COPY iac/indexer/lambda.py /var/task/lambda.py
 
-CMD ["stac_fastapi.indexed.app.handler"]
+CMD ["lambda.handler"]

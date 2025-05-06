@@ -35,17 +35,7 @@ RUN uv sync \
 FROM python:3.13-slim
 SHELL ["/bin/sh", "-exc"]
 
-ARG api_port=8000
-ARG num_workers=2
-
-ENV PORT=${api_port}
-ENV WORKERS=${num_workers}
 ENV PATH=/opt/app/bin:$PATH
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgeos3.11.1 \
-    jq \
-    && rm -rf /var/lib/apt/lists/*
 
 STOPSIGNAL SIGINT
 

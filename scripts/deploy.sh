@@ -11,6 +11,7 @@ while [[ "$#" -gt 0 ]]; do
         --aws-account) AWS_ACCOUNT="$2"; shift ;;
         --aws-region) AWS_REGION="$2"; shift ;;
         --log-level) LOG_LEVEL="$2"; shift ;;
+        --root-catalog-uri) ROOT_CATALOG_URI="$2"; shift ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
     shift
@@ -35,4 +36,5 @@ cdk deploy \
     -c AWS_REGION=$AWS_REGION \
     -c JWT_SECRET=${JWT_SECRET:-$(openssl rand -base64 32)} \
     -c LOG_LEVEL=${LOG_LEVEL} \
-    -c DUCKDB_THREADS=${DUCKDB_THREADS:-}
+    -c DUCKDB_THREADS=${DUCKDB_THREADS:-} \
+    -c ROOT_CATALOG_URI=${ROOT_CATALOG_URI:-}
