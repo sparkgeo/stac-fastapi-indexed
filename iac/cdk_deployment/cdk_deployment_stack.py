@@ -3,6 +3,8 @@ from typing import Optional, Self
 
 from aws_cdk import Duration, Stack
 from aws_cdk import aws_apigateway as apigw
+from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as targets
 from aws_cdk import aws_lambda as _lambda
 from aws_cdk.aws_s3 import Bucket, BucketEncryption
 from constructs import Construct
@@ -19,8 +21,17 @@ class CdkDeploymentStack(Stack):
         requested_log_level = (
             self.node.try_get_context("LOG_LEVEL") or None
         )  # ignore ''
+        indexer_repeat_interval_minutes = (
+            self.node.try_get_context("INDEXER_REPEAT_MINUTES") or None
+        )
         self.create_api(bucket=bucket, requested_log_level=requested_log_level)
-        self.create_indexer(bucket=bucket, requested_log_level=requested_log_level)
+        self.create_indexer(
+            bucket=bucket,
+            requested_log_level=requested_log_level,
+            repeat_interval_minutes=int(indexer_repeat_interval_minutes)
+            if indexer_repeat_interval_minutes is not None
+            else None,
+        )
 
     def create_api(
         self: Self, bucket: Bucket, requested_log_level: Optional[str] = None
@@ -68,7 +79,10 @@ class CdkDeploymentStack(Stack):
         )
 
     def create_indexer(
-        self: Self, bucket: Bucket, requested_log_level: Optional[str] = None
+        self: Self,
+        bucket: Bucket,
+        requested_log_level: Optional[str] = None,
+        repeat_interval_minutes: Optional[int] = None,
     ) -> None:
         """
         Assumes indexing will be achievable within Lambda's 15 minute hard timeout.
@@ -94,6 +108,15 @@ class CdkDeploymentStack(Stack):
             memory_size=2048,
         )
         bucket.grant_read_write(indexer_lambda)
+        if repeat_interval_minutes is not None:
+            rule = events.Rule(
+                self,
+                "indexer-scheduler",
+                schedule=events.Schedule.rate(
+                    Duration.minutes(repeat_interval_minutes)
+                ),
+            )
+            rule.add_target(targets.LambdaFunction(indexer_lambda))
 
     def _get_manifest_s3_uri(self: Self, bucket: Bucket) -> str:
         return "s3://{}/index/manifest.json".format(
