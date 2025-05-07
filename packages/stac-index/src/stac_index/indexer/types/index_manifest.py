@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict, Optional, Self
+from typing import Dict, Optional
 
 from pydantic import BaseModel, field_serializer
 from stac_index.indexer.types.index_config import IndexConfig
@@ -20,7 +20,3 @@ class IndexManifest(BaseModel):
     @field_serializer("updated")
     def serialize_timestamp(self, timestamp: datetime) -> str:
         return timestamp.isoformat()
-
-    @property
-    def is_updateable(self: Self) -> bool:
-        return self.root_catalog_uri is not None
