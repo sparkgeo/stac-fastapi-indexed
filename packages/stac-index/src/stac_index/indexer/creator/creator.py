@@ -488,6 +488,7 @@ class IndexCreator:
                 raise ValueError(f"{table_name} table not present in index_manifest")
             relative_path = index_manifest.tables[table_name].relative_path
             tmp_file_path = path.join(tmp_dir_path, relative_path)
+            makedirs(path.dirname(tmp_file_path), exist_ok=True)
             await source_reader.get_uri_to_file(
                 source_reader.path_separator().join(
                     manifest_json_uri.split(source_reader.path_separator())[:-1]

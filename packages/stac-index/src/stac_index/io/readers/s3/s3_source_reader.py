@@ -88,6 +88,7 @@ class S3SourceReader(SourceReader):
     async def get_uri_to_file(self: Self, uri, file_path: str):
         chunk_size = 1000000
         source = await self._get_uri_as_bytes(uri)
+        _logger.debug(f"write bytes to {file_path}")
         with open(file_path, "wb") as f:
             offset = 0
             while offset < len(source):
