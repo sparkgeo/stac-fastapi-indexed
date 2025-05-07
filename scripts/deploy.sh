@@ -5,6 +5,7 @@ set -e
 pushd $(dirname $0)/..
 
 LOG_LEVEL="info"
+EXECUTE_TESTS=1
 
 while [[ "$#" -gt 0 ]]; do
     case $1 in
@@ -12,6 +13,7 @@ while [[ "$#" -gt 0 ]]; do
         --aws-region) AWS_REGION="$2"; shift ;;
         --log-level) LOG_LEVEL="$2"; shift ;;
         --root-catalog-uri) ROOT_CATALOG_URI="$2"; shift ;;
+        --no-test) EXECUTE_TESTS=0 ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
     shift
@@ -27,7 +29,9 @@ if [[ -z "$AWS_REGION" ]]; then
     exit 1
 fi
 
-scripts/tests/integration-test.sh
+if [ $EXECUTE_TESTS -eq 1 ]; then
+    scripts/tests/integration-test.sh
+fi
 
 pushd $(dirname $0)/../iac
 
