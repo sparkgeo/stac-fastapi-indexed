@@ -207,6 +207,7 @@ class IndexCreator:
                         collection=collection.id,
                     )
                 )
+        self._insert_errors(errors)
         return (collections, errors)
 
     # Processing items is more complex than collections due to scale.
