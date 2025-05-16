@@ -37,6 +37,7 @@ FROM public.ecr.aws/lambda/python:3.13
 SHELL ["/bin/sh", "-exc"]
 
 ENV PATH=/opt/app/bin:$PATH
+ENV TZ=UTC
 
 STOPSIGNAL SIGINT
 
