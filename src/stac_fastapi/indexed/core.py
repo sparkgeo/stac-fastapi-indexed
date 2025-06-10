@@ -13,7 +13,7 @@ from stac_fastapi.types.errors import NotFoundError
 from stac_fastapi.types.rfc3339 import DateTimeType
 from stac_fastapi.types.search import BaseSearchPostRequest
 from stac_fastapi.types.stac import Collection, Collections, Item, ItemCollection
-from stac_index.common.stac_parser import StacParser
+from stac_index.indexer.stac_parser import StacParser
 from stac_pydantic.shared import BBox
 
 from stac_fastapi.indexed.constants import rel_parent, rel_root, rel_self
@@ -44,7 +44,7 @@ class CoreCrudClient(AsyncBaseCoreClient):
             == "/"
         ):
             _logger.debug(f"answering '{request.url}' as minimal collections response")
-            return self._get_minimal_collections_response()
+            return await self._get_minimal_collections_response()
         else:
             _logger.debug(f"answering '{request.url}' as full collections response")
             return await self._get_full_collections_response(request)
@@ -52,7 +52,7 @@ class CoreCrudClient(AsyncBaseCoreClient):
     async def get_collection(
         self, collection_id: str, request: Request, **kwargs
     ) -> Collection:
-        row = fetchone(
+        row = await fetchone(
             f"SELECT stac_location FROM {format_query_object_name('collections')} WHERE id = ?",
             [collection_id],
         )
@@ -101,7 +101,7 @@ class CoreCrudClient(AsyncBaseCoreClient):
         await self.get_collection(
             collection_id, request=request
         )  # will error if collection does not exist
-        row = fetchone(
+        row = await fetchone(
             f"SELECT stac_location, applied_fixes FROM {format_query_object_name('items')} WHERE collection_id = ? and id = ?",
             [collection_id, item_id],
         )
@@ -195,13 +195,13 @@ class CoreCrudClient(AsyncBaseCoreClient):
             search_request=search_request, request=request
         ).search()
 
-    def _get_minimal_collections_response(self) -> Collections:
+    async def _get_minimal_collections_response(self) -> Collections:
         return Collections(
             collections=[
                 Collection(**{"id": id})
                 for id in [
                     row[0]
-                    for row in fetchall(
+                    for row in await fetchall(
                         f"SELECT id FROM {format_query_object_name('collections')} ORDER BY id"
                     )
                 ]
@@ -214,7 +214,7 @@ class CoreCrudClient(AsyncBaseCoreClient):
             fetch_dict(url)
             for url in [
                 row[0]
-                for row in fetchall(
+                for row in await fetchall(
                     f"SELECT stac_location FROM {format_query_object_name('collections')} ORDER BY id"
                 )
             ]

@@ -25,17 +25,23 @@ Any new functionality should extend integration tests as a first priority. Unit 
 scripts/tests/unit-test.sh
 scripts/tests/smoke-test.sh
 scripts/tests/integration-test.sh
+# hang after each test run to permit interaction with test infrastructure and test debugging
+scripts/tests/integration-test.sh --debug
+# dump container logs after each test run
+scripts/tests/integration-test.sh --dump-log
 ```
 
 # Deployment
 
 This project does not currently support Continuous Deployment. Deployments are automated via AWS CDK but must be initiated manually.
 
+The indexer's "first run" below refers to an indexer execution with no `manifest.json` at the default publish URI. The default publish URI is `s3://<deployment-data-bucket>/index/manifest.json`. The first execution of a newly-deployed indexer will be its first run, and you can recreate the first run by deleting `manifest.json`.
 
 ```sh
 # --aws-account and --aws-region are always required
-scripts/deploy.sh --aws-account 012345678901 --aws-region us-west-2
-
-# --log-level may also be specified
-scripts/deploy.sh --aws-account 012345678901 --aws-region us-west-2 --log-level debug
+# --root-catalog-uri must be provided for the indexer's first run, but may be omitted or included thereafter. Changes to --root-catalog-uri after the first run will have no effect
+# --indexer-repeat-minutes is required to configure a cron-style event that triggers the indexer to run repeatedly. If omitted the indexer must be executed manually
+# --no-test will skip execution of integration tests prior to deployment. This option should only be used when iteratively debugging deployment issues
+# --log-level is optional and defaults to 'info'
+scripts/deploy.sh --aws-account 012345678901 --aws-region us-west-2 --root-catalog-uri s3://... --indexer-repeat-minutes 1440
 ```

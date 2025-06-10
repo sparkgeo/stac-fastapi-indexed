@@ -37,6 +37,7 @@ FROM public.ecr.aws/lambda/python:3.13
 SHELL ["/bin/sh", "-exc"]
 
 ENV PATH=/opt/app/bin:$PATH
+ENV TZ=UTC
 
 STOPSIGNAL SIGINT
 
@@ -55,7 +56,5 @@ RUN  mv /root/.duckdb/extensions/v${DUCKDB_VERSION}/linux_amd64_gcc4/* . \
   && chmod -R 755 /datastore
 # Tell DuckDB to look here for its installed extensions.
 ENV HOME=/datastore
-
-WORKDIR /opt/app
 
 CMD ["stac_fastapi.indexed.app.handler"]

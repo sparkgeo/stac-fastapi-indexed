@@ -7,5 +7,7 @@ CREATE TABLE items (
     end_datetime TIMESTAMPTZ,
     stac_location VARCHAR NOT NULL,
     applied_fixes VARCHAR,
+    load_id VARCHAR(32) NOT NULL,
+    item_hash VARCHAR NOT NULL,
     PRIMARY KEY (collection_id, id),
 );

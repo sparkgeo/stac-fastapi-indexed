@@ -1,12 +1,12 @@
 # Index Configuration
 
-The indexer expects an argument referencing a JSON index configuration file. This document describes that file's content.
+The indexer requires exactly one of the following arguments
+- `--root_catalog_uri` referencing the location of a STAC catalog JSON
+- `--manifest_json_uri` referencing the index manifest from a prior indexer run
 
-## Required
+The indexer can optionally accept an argument referencing a JSON index configuration file, which offers greater control over indexer behaviour. The following describes that file's content.
 
-The `root_catalog_uri` property is required and must reference a STAC catalog. Its path must include a prefix for which a compatible reader exists.
-
-## Optional
+## Optional Properties
 
 Any number of queryable and sortable STAC properties may be configured.
 
@@ -22,15 +22,7 @@ Each queryable and sortable property must include a list of collections for whic
 
 Queryables require a `json_schema` property containing a schema that could be used to validate values of this property. This JSON schema is not used directly by the API but is provided to API clients via the `/queryables` endpoints such that a client can validate any value it intends to send as query value for this property.
 
-## Example 1
-
-```json
-{
-    "root_catalog_uri": "s3://bucket/STAC/catalog.json"
-}
-```
-
-## Example 2
+## Example
 
 ```json
 {

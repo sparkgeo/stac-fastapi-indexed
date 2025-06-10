@@ -9,22 +9,19 @@ if [ "$#" -ne 1 ]; then
     exit 1
 fi
 
-if [ -z "${FIXES_TO_APPLY}" ]; then
-    fixes_json=""
-else
-    fixes_json=$(echo "${FIXES_TO_APPLY}" | sed "s/,/\", \"/g")
-    fixes_json=", \"fixes_to_apply\": [\"${fixes_json}\"]"
-fi
-
-
-root_catalog_uri="$1"
-
+export root_catalog_uri="$1"
 if [[ $root_catalog_uri == s3://* ]]; then
     echo; echo "* Assumes \$AWS_ACCESS_KEY_ID, \$AWS_REGION, \$AWS_SECRET_ACCESS_KEY, and (optionally) \$AWS_SESSION_TOKEN are set for obstore *"; echo
 fi
 
 export tmp_index_config_path=$(mktemp)
-echo "{\"root_catalog_uri\": \"$root_catalog_uri\", \"indexables\": {}, \"queryables\": {}, \"sortables\": {} $fixes_json }" > $tmp_index_config_path
+if [ -z "${FIXES_TO_APPLY}" ]; then
+    echo "{}" > $tmp_index_config_path
+else
+    fixes_json=$(echo "${FIXES_TO_APPLY}" | sed "s/,\s*/\", \"/g")
+    echo "{\"fixes_to_apply\": [\"${fixes_json}\"]}" > $tmp_index_config_path
+fi
+
 dco="docker compose -f docker-compose.base.yml -f docker-compose.remote-source.yml"
 
 $dco build

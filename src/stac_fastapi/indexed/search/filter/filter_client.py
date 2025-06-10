@@ -18,7 +18,7 @@ class FiltersClient(AsyncBaseFiltersClient):
         **kwargs: Any,
     ) -> Dict[str, Any]:
         queryables = {}
-        for field_config in get_queryable_config_by_name().values():
+        for field_config in (await get_queryable_config_by_name()).values():
             if (
                 collection_id is None
                 and field_config.collection_id == collection_wildcard

@@ -5,7 +5,9 @@ services:
       context: .
     image: sparkgeo/stac_indexer
     environment:
-      stac_index_indexer_output_dir: /output
+      INDEX_ROOT_CATALOG_URI: ${root_catalog_uri}
+      INDEX_CONFIG_PATH: /index-config.json
+      INDEX_PUBLISH_PATH: /output
       AWS_ACCESS_KEY_ID:
       AWS_REGION:
       AWS_SECRET_ACCESS_KEY:

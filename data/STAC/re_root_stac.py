@@ -1,7 +1,7 @@
 from glob import glob
 from json import dump, load
 from os import makedirs, path
-from typing import Final
+from typing import Final, List
 
 source_root_default: Final[str] = path.join(path.dirname(__file__), "sample", "data")
 target_root_default: Final[str] = path.join(path.dirname(__file__), "sample-alt")
@@ -12,6 +12,7 @@ def main(
     new_link_prefix: str,
     source_root: str,
     target_root: str,
+    single_item_links: bool,
 ) -> None:
     with open(path.join(source_root, "catalog.json"), "r") as f:
         catalog = load(f)
@@ -31,6 +32,7 @@ def main(
                 print(f"failed to open collection '{collection_in_path}'")
                 continue
 
+        item_paths: List[str] = []
         for items_link_dict in [
             entry for entry in collection["links"] if entry["rel"] == "items"
         ]:
@@ -45,6 +47,7 @@ def main(
                     "*.json",
                 )
             ):
+                item_paths.append(item_in_path)
                 with open(item_in_path, "r") as f:
                     try:
                         item = load(f)
@@ -75,19 +78,27 @@ def main(
 
         collection_out_path = collection_in_path.replace(source_root, target_root)
         makedirs(path.dirname(collection_out_path), exist_ok=True)
+        links_list = [
+            {
+                **link,
+                "href": str(link["href"]).replace(old_link_prefix, new_link_prefix),
+            }
+            for link in collection["links"]
+        ]
+        if single_item_links:
+            links_list = [link for link in links_list if link["rel"] != "items"] + [
+                {
+                    "rel": "item",
+                    "type": "application/geo+json",
+                    "href": str(item_path).replace(old_link_prefix, new_link_prefix),
+                }
+                for item_path in item_paths
+            ]
         with open(collection_out_path, "w") as f:
             dump(
                 {
                     **collection,
-                    "links": [
-                        {
-                            **link,
-                            "href": str(link["href"]).replace(
-                                old_link_prefix, new_link_prefix
-                            ),
-                        }
-                        for link in collection["links"]
-                    ],
+                    "links": links_list,
                 },
                 f,
                 indent=2,
@@ -142,10 +153,17 @@ if __name__ == "__main__":
         default=[target_root_default],
         nargs=1,
     )
+    parser.add_argument(
+        "--single_item_links",
+        action="store_true",
+        default=False,
+        help="Optionally replace a collection's 'items' link with individual 'item' links for each item",
+    )
     args = parser.parse_args()
     main(
         args.old_link_prefix,
         args.new_link_prefix,
         args.source_root[0],
         args.target_root[0],
+        args.single_item_links,
     )

@@ -1,9 +1,10 @@
 from dataclasses import dataclass
-from functools import lru_cache
 from logging import Logger, getLogger
 from typing import Dict, Final
 
-from stac_fastapi.indexed.db import fetchall, format_query_object_name
+from async_lru import alru_cache
+
+from stac_fastapi.indexed.db import fetchall, format_query_object_name, get_last_load_id
 
 _logger: Final[Logger] = getLogger(__name__)
 
@@ -20,11 +21,16 @@ class QueryableConfig:
     is_temporal: bool
 
 
-@lru_cache(maxsize=1)
-def get_queryable_config_by_name() -> Dict[str, QueryableConfig]:
+async def get_queryable_config_by_name() -> Dict[str, QueryableConfig]:
+    # ensure a change to the application's last load ID forces a data reload
+    return await _get_queryable_config_by_name(get_last_load_id())
+
+
+@alru_cache(maxsize=1)
+async def _get_queryable_config_by_name(_: str) -> Dict[str, QueryableConfig]:
     _logger.debug("fetching queryable field config")
     field_config = {}
-    for row in fetchall(
+    for row in await fetchall(
         f"""
         SELECT name
              , qbc.collection_id

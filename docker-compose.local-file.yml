@@ -6,7 +6,9 @@ services:
       context: .
     image: sparkgeo/stac_indexer
     environment:
-      stac_index_indexer_output_dir: /output
+      INDEX_ROOT_CATALOG_URI: /data/catalog.json
+      INDEX_CONFIG_PATH: /index-config.json
+      INDEX_PUBLISH_PATH: /output
     volumes:
       - indexer-output:/output:rw
       - ./data/STAC/sample/data:/data:ro

@@ -32,16 +32,28 @@ RUN uv sync \
 
 # ##########################################################################
 
-FROM python:3.13-slim
+FROM public.ecr.aws/lambda/python:3.13
 SHELL ["/bin/sh", "-exc"]
 
 ENV PATH=/opt/app/bin:$PATH
+ENV TZ=UTC
 
 STOPSIGNAL SIGINT
 
 COPY --from=build /opt/app /opt/app
-COPY docker/indexer/command.sh /command.sh
+COPY packages/stac-index/src/ /opt/app/lib/python3.13/site-packages/
 
-WORKDIR /opt/app
+ENV PYTHONPATH=/opt/app/lib/python3.13/site-packages
+RUN python -c "import duckdb; duckdb.execute('INSTALL spatial')"
 
-CMD ["/command.sh"]
+ARG DUCKDB_VERSION=1.2.2
+# Store installed extensions at an alternate location so that the Lambda's least-privileged user can access them.
+WORKDIR /datastore/.duckdb/extensions/v${DUCKDB_VERSION}/linux_amd64_gcc4
+RUN  mv /root/.duckdb/extensions/v${DUCKDB_VERSION}/linux_amd64_gcc4/* . \
+  && chmod -R 755 /datastore
+# Tell DuckDB to look here for its installed extensions.
+ENV HOME=/datastore
+
+COPY iac/indexer/lambda.py /var/task/lambda.py
+
+CMD ["lambda.handler"]

@@ -5,7 +5,7 @@ from logging import Logger, getLogger
 from re import sub
 from typing import Any, Dict, Final, List, Optional, Union, cast
 
-from fastapi import Request
+from fastapi import HTTPException, Request, status
 from pygeofilter.ast import Node
 from stac_fastapi.extensions.core.filter.filter import FilterExtensionPostRequest
 from stac_fastapi.extensions.core.pagination.token_pagination import POSTTokenPagination
@@ -14,11 +14,11 @@ from stac_fastapi.types.errors import InvalidQueryParameter
 from stac_fastapi.types.rfc3339 import str_to_interval
 from stac_fastapi.types.search import BaseSearchPostRequest
 from stac_fastapi.types.stac import Item, ItemCollection
-from stac_index.common.stac_parser import StacParser
+from stac_index.indexer.stac_parser import StacParser
 from stac_pydantic.api.extensions.sort import SortDirections, SortExtension
 
 from stac_fastapi.indexed.constants import rel_root, rel_self
-from stac_fastapi.indexed.db import fetchall, format_query_object_name
+from stac_fastapi.indexed.db import fetchall, format_query_object_name, get_last_load_id
 from stac_fastapi.indexed.links.catalog import get_catalog_link
 from stac_fastapi.indexed.links.item import fix_item_links
 from stac_fastapi.indexed.links.search import get_search_link, get_token_link
@@ -78,11 +78,14 @@ class SearchHandler:
         return cast(Dict[str, Any], filter)
 
     async def search(self) -> ItemCollection:
+        reject_if_load_id_changed = False
         if cast(POSTTokenPagination, self.search_request).token is None:
             _logger.debug("no token, building new query")
-            query_info = self._new_query()
+            query_info = await self._new_query()
         else:
             _logger.debug("token provided")
+            # do not permit paging across data changes as paged results may be inconsistent
+            reject_if_load_id_changed = True
             query_info = get_query_from_token(
                 cast(POSTTokenPagination, self.search_request).token
             )
@@ -94,10 +97,15 @@ class SearchHandler:
             limit=limit_text,
             offset=offset_text,
         )
-        rows = fetchall(
+        rows = await fetchall(
             current_query,
             query_info.params,
         )
+        if reject_if_load_id_changed and get_last_load_id() != query_info.last_load_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="STAC data recently changed and paging behaviour cannot be guaranteed. Remove the paging token to start again.",
+            )
         has_next_page = len(rows) > query_info.limit
         has_previous_page = query_info.offset is not None
         fetch_tasks = [
@@ -143,12 +151,12 @@ class SearchHandler:
             links=links,
         )
 
-    def _new_query(
+    async def _new_query(
         self,
     ) -> QueryInfo:
         clauses: List[str] = []
         params: List[Any] = []
-        sorts: List[str] = self._determine_order()
+        sorts: List[str] = await self._determine_order()
         for addition in [
             addition
             for addition in [
@@ -157,7 +165,7 @@ class SearchHandler:
                 self._include_bbox(),
                 self._include_intersects(),
                 self._include_datetime(),
-                self._include_filter(),
+                await self._include_filter(),
             ]
             if addition is not None
         ]:
@@ -180,16 +188,17 @@ class SearchHandler:
             params=params,
             limit=self.search_request.limit,
             offset=None,
+            last_load_id=get_last_load_id(),
         )
 
-    def _determine_order(self) -> List[str]:
+    async def _determine_order(self) -> List[str]:
         sort_fields: List[str] = []
         user_provided_sorts = cast(SortExtensionPostRequest, self.search_request).sortby
         if user_provided_sorts is not None and len(user_provided_sorts) > 0:
             effective_sorts = user_provided_sorts
         else:
             effective_sorts = default_sorts
-        sortables = get_sortable_configs_by_field()
+        sortables = await get_sortable_configs_by_field()
         for effective_sort in effective_sorts:
             if effective_sort.field not in sortables:
                 raise InvalidQueryParameter(
@@ -305,13 +314,13 @@ class SearchHandler:
                     pass  # unbounded datetime means all results are valid
         return None
 
-    def _include_filter(self) -> Optional[FilterClause]:
+    async def _include_filter(self) -> Optional[FilterClause]:
         search_request = cast(FilterExtensionPostRequest, self.search_request)
         if search_request.filter:
             ast = self._get_ast_from_filter(
                 search_request.filter, search_request.filter_lang
             )
-            queryable_config = get_queryable_config_by_name()
+            queryable_config = await get_queryable_config_by_name()
             try:
                 return ast_to_filter_clause(
                     ast=ast,
