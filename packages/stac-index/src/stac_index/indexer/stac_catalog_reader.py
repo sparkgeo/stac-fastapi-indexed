@@ -167,14 +167,13 @@ class StacCatalogReader:
         _logger.info("reading items for collections")
         all_errors: List[IndexingError] = []
         item_uris: List[str] = []
+        concurrency_limit = Semaphore(get_settings().max_concurrency)
         if _settings.test_collection_limit is not None:
             collections = collections[: _settings.test_collection_limit]
         _logger.info("collecting item URIs for collections")
         results = await gather(
             *[
-                self._get_collection_item_uris(
-                    collection, Semaphore(get_settings().max_concurrency)
-                )
+                self._get_collection_item_uris(collection, semaphore=concurrency_limit)
                 for collection in collections
             ]
         )
@@ -195,7 +194,6 @@ class StacCatalogReader:
             uri: str, semaphore: Semaphore
         ) -> List[IndexingError]:
             async with semaphore:
-                _logger.debug(f"fetch_and_ingest {uri}")
                 item_errors: List[IndexingError] = []
                 try:
                     dict_item = await self._get_json_content_from_uri(uri)
@@ -225,7 +223,7 @@ class StacCatalogReader:
             item_errors
             for sublist in await gather(
                 *[
-                    fetch_and_ingest(uri, Semaphore(get_settings().max_concurrency))
+                    fetch_and_ingest(uri=uri, semaphore=concurrency_limit)
                     for uri in item_uris
                 ]
             )
