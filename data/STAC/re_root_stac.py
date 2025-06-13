@@ -24,7 +24,9 @@ def main(
             source_root,
             *str(child_link_dict["href"]).replace(old_link_prefix, "").split("/"),
         )
-
+        if not path.exists(collection_in_path):
+            print(f"collection at {collection_in_path} does not exist")
+            continue
         with open(collection_in_path, "r") as f:
             try:
                 collection = load(f)
@@ -47,6 +49,9 @@ def main(
                     "*.json",
                 )
             ):
+                if not path.exists(item_in_path):
+                    print(f"item at {item_in_path} does not exist")
+                    continue
                 item_paths.append(item_in_path)
                 with open(item_in_path, "r") as f:
                     try:
