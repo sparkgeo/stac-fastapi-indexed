@@ -2,9 +2,9 @@
 
 [![Pull Request, Any Branch](https://github.com/sparkgeo/STAC-API-Serverless/actions/workflows/pull-request-all.yml/badge.svg)](https://github.com/sparkgeo/STAC-API-Serverless/actions/workflows/pull-request-all.yml)
 
-A [stac-fastapi](https://github.com/stac-utils/stac-fastapi) backend that indexes a catalog to Parquet to make it searchable. The ability to work with static files, and the lack of a need for another persistent data store such as a database, mean this backend can run in a serverless environment.
+A [stac-fastapi](https://github.com/stac-utils/stac-fastapi) backend that indexes a STAC catalog to Parquet to make it searchable. The ability to work with static files, and the lack of a need for another persistent data store such as a database, mean this backend can run in a serverless environment. See [Overview](#overview) for more information on this approach.
 
-This backend does not support transactions.
+Is this project suitable for your use-case? See [Suitability](./docs/suitability.md) for a review of advantages, disadvantages, and limitations.
 
 ## Known Issues
 
@@ -54,6 +54,8 @@ The indexer selects a suitable reader for each URI as described in [Readers](#re
 
 The indexer creates an index entry for every STAC collection and item in the catalog. By default each item's index entry includes the item's ID and collection, which together form its unique identifier, and values of the minimum set of properties required to support the API's base requirements. This minimum set of properties includes datetimes, BBOX, and the URI of the item's full content.
 
+If the root catalog contains sub-catalogs these are recursively read to ensure all collections are discovered. Information about which sub-catalog(s) provided which collection(s) is not recorded by the indexer and all collections are referenced as direct children of the root catalog.
+
 Only necessary properties from the STAC catalog are indexed, rather than copying the entire catalog to Parquet, to maximise query performance and minimise data duplication.
 
 The indexer can be configured with any number of queryable and / or sortable fields. Any fields identified as queryable or sortable will also be indexed by the indexer. See [Index Configuration](./docs/index-config.md) for more information on indexer configuration.
@@ -69,3 +71,23 @@ The API is configured with an index manifest URI which identifies the location o
 For each reqeust the API constructs an SQL query to run against the STAC catalog's index. DuckDB is responsible for satisfying SQL queries and manages interaction with Parquet data. The SQL query returns zero or more URIs referencing collections or items that satisfy the request. The API retrieves the full STAC content from those URIs, using the appropriate reader, and returns a response.
 
 ![Diagram showing the process of handling an API request](./docs/diagrams/exports/Query%20Process.png "API Request Process")
+
+#### Pagination
+
+As defined by the [STAC API specification](https://github.com/radiantearth/stac-api-spec/tree/v1.0.0/item-search#pagination), STAC items returned by the `/search` and `/collections/{collection_id}/items` endpoints support page limits and pagination behaviour. The specification does not currently describe appropriate paging behaviour around data changes.
+
+Consider the following scenario:
+- An API client issues a search request and receives the first page of a multi-page response, which is sorted according to the request's `sortby` property (if supported) or a default sort field, with a link to the next page.
+- A STAC data update occurs which:
+  - removes one or more STAC items included in the first page of results,
+  - adds one or more STAC items that would have been matched by the search request, and / or
+  - alters one or more STAC items such that they would or would not have been matched by the search request.
+- The API client requests the second page of search results using the "next" link from the first page.
+
+In this scenario the API client receives the wrong data. Possible outcomes include (this list is not exhaustive):
+- One or more items from the first page may be repeated.
+- One or more items that would - with the updated data - have been included in the first page were not provided to the client.
+- There are 0 items as the result is now <= 1 page.
+- There is an internal error as the result is now <= 1 page and the API implementation does not handle this scenario gracefully.
+
+This project prohibits pagination across data changes. If the API determines that a data update has occurred between page requests a `409 Conflict` will be returned with a message instructing the caller to reissue their request.
