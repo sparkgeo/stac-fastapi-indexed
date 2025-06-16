@@ -16,7 +16,7 @@ The indexer requires knowledge of the DuckDB data type that can be used to store
 
 Entries in `queryables` and `sortables` must have a corresponding entry in `indexables`.
 
-Each queryable and sortable property must include a list of collections for which the property is queryable or sortable. The `*` wildcard value can be used to indicate all collections.
+Each queryable and sortable property must include a list of collections for which the property is queryable or sortable. The `*` wildcard value can be used to indicate all collections. It is **not** currently possible to wildcard partial collection IDs, such as `collection-*`.
 
 ### Queryables
 
@@ -26,7 +26,6 @@ Queryables require a `json_schema` property containing a schema that could be us
 
 ```json
 {
-    "root_catalog_uri": "/data/catalog.json",
     "indexables": {
         "gsd": {
             "storage_type": "DOUBLE",
