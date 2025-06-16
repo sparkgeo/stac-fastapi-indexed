@@ -1,6 +1,6 @@
 # Development
 
-Development requires Python >= 3.12, Docker, and Bash.
+Development requires Python >= 3.12, Docker, Bash, and uv.
 
 ## Configure Local Environment
 
@@ -35,7 +35,8 @@ scripts/tests/integration-test.sh --dump-log
 
 This project does not currently support Continuous Deployment. Deployments are automated via AWS CDK but must be initiated manually.
 
-The indexer's "first run" below refers to an indexer execution with no `manifest.json` at the default publish URI. The default publish URI is `s3://<deployment-data-bucket>/index/manifest.json`. The first execution of a newly-deployed indexer will be its first run, and you can recreate the first run by deleting `manifest.json`.
+> [!NOTE]
+> The indexer's "first run" below refers to an indexer execution with no `manifest.json` at the default publish URI. The default publish URI is `s3://<deployment-data-bucket>/index/manifest.json`. The first execution of a newly-deployed indexer will be its first run, and you can recreate first run behaviour by deleting `manifest.json` before a run.
 
 ```sh
 # --aws-account and --aws-region are always required
