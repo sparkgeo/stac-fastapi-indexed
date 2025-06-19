@@ -200,6 +200,13 @@ class StacCatalogReader:
                     (item, dict_item) = self._stac_parser.parse_stac_item(dict_item)
                 except StacParserException as e:
                     item_errors.extend(e.indexing_errors)
+                except Exception as e:
+                    item_errors.extend(
+                        new_error(
+                            type=IndexingErrorType.item_fetching,
+                            description=str(e),
+                        )
+                    )
                 else:
                     if not _has_matching_self_link(item, uri):
                         _logger.debug(

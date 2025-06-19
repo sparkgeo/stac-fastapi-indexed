@@ -85,34 +85,38 @@ class HttpsSourceReader(SourceReader):
         errors: List[str] = []
         next_items_uri: str | None = uri
         while next_items_uri is not None:
-            items_response: Dict[str, Any] = await self.load_json_from_uri(
-                next_items_uri
-            )
-            if not isinstance(items_response, dict):
-                errors.append(f"unexpected response from '{uri}'")
-                continue
-            for item in items_response.get("features", []):
-                for link in cast(Dict[str, Any], item).get("links", []):
-                    link = cast(Dict[str, str], link)
-                    if link.get("rel", "") == "self":
-                        if "href" in link:
-                            item_uris.append(link["href"])
-                            break
-            if item_limit is not None and len(item_uris) == item_limit:
-                break
-            next_links = [
-                link
-                for link in items_response.get("links", [])
-                if link.get("rel", "") == "next"
-                and link.get("method", "GET").upper() == "GET"
-            ]
-            if len(next_links) == 1:
-                if "href" in next_links[0]:
-                    next_items_uri = next_links[0]["href"]
+            try:
+                items_response: Dict[str, Any] = await self.load_json_from_uri(
+                    next_items_uri
+                )
+                if not isinstance(items_response, dict):
+                    errors.append(f"unexpected response from '{uri}'")
+                    continue
+                for item in items_response.get("features", []):
+                    for link in cast(Dict[str, Any], item).get("links", []):
+                        link = cast(Dict[str, str], link)
+                        if link.get("rel", "") == "self":
+                            if "href" in link:
+                                item_uris.append(link["href"])
+                                break
+                if item_limit is not None and len(item_uris) == item_limit:
+                    break
+                next_links = [
+                    link
+                    for link in items_response.get("links", [])
+                    if link.get("rel", "") == "next"
+                    and link.get("method", "GET").upper() == "GET"
+                ]
+                if len(next_links) == 1:
+                    if "href" in next_links[0]:
+                        next_items_uri = next_links[0]["href"]
+                    else:
+                        next_items_uri = None
                 else:
                     next_items_uri = None
-            else:
-                next_items_uri = None
+            except Exception as e:
+                errors.append(str(e))
+                break
         return (item_uris, errors)
 
     async def get_last_modified_epoch_for_uri(self: Self, uri: str) -> Optional[int]:
