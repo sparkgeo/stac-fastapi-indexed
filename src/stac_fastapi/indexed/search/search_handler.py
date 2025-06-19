@@ -147,6 +147,7 @@ class SearchHandler:
                 )
             )
         return ItemCollection(
+            type="FeatureCollection",
             features=items,
             links=links,
         )
