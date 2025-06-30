@@ -3,8 +3,11 @@
 **/*.egg-info
 **/__pycache__
 **/cdk.out
-**/.venv
+**/*.egg-info
 
+packages/stac-index/tests
+
+**/.venv
 **/.env
 **/.idea
 **/.vscode
