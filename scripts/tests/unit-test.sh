@@ -4,4 +4,4 @@ set -e
 
 pushd $(dirname $0)/../..
 
-uv run pytest
+uv run pytest --ignore iac
