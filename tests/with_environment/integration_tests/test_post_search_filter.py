@@ -1,7 +1,9 @@
 from datetime import datetime
 from typing import Any, Dict, List, cast
 
+import requests
 from shapely.geometry import Polygon, mapping
+from with_environment.common import api_base_url
 from with_environment.integration_tests.common import (
     all_post_search_results,
     compare_results_to_expected,
@@ -429,3 +431,19 @@ def test_post_search_filter_temporal_range_intersect() -> None:
             }
         ),
     )
+
+
+def test_post_search_filter_non_queryable_property() -> None:
+    response = requests.post(
+        f"{api_base_url}/search",
+        json={
+            "filter": {
+                "op": "=",
+                "args": [
+                    {"property": "non-existent-property"},
+                    "test-value",
+                ],
+            },
+        },
+    )
+    assert response.status_code == 400
