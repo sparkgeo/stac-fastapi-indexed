@@ -18,5 +18,8 @@
 dist
 **/*.egg-info
 
+# draw.io files
+**/.$*.bkp
+
 # indexer when run locally
 packages/stac-index/src/stac_index/indexer/index_data/

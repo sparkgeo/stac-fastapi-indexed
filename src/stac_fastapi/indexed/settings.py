@@ -17,6 +17,7 @@ class _Settings(ApiSettings):
         True  # container images set this to false after installing extensions in build
     )
     create_empty_index_if_missing: bool = False
+    max_concurrency: int = 10
 
 
 @lru_cache(maxsize=1)
