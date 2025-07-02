@@ -1,8 +1,10 @@
 from datetime import datetime
 from typing import Any, Dict, List, cast
 
+import requests
 from pytest import mark
 from shapely.geometry import Polygon
+from with_environment.common import api_base_url
 from with_environment.integration_tests.common import (
     all_get_search_results,
     compare_results_to_expected,
@@ -315,3 +317,19 @@ def test_get_search_filter_temporal_range_intersect() -> None:
             }
         ),
     )
+
+
+def test_get_search_filter_non_queryable_property() -> None:
+    response = requests.get(
+        f"{api_base_url}/search",
+        params={
+            "filter": {
+                "op": "=",
+                "args": [
+                    {"property": "non-existent-property"},
+                    "test-value",
+                ],
+            },
+        },
+    )
+    assert response.status_code == 400

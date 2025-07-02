@@ -17,7 +17,7 @@ from stac_fastapi.types.stac import Item, ItemCollection
 from stac_index.indexer.stac_parser import StacParser
 from stac_pydantic.api.extensions.sort import SortDirections, SortExtension
 
-from stac_fastapi.indexed.constants import rel_root, rel_self
+from stac_fastapi.indexed.constants import collection_wildcard, rel_root, rel_self
 from stac_fastapi.indexed.db import fetchall, format_query_object_name, get_last_load_id
 from stac_fastapi.indexed.links.catalog import get_catalog_link
 from stac_fastapi.indexed.links.item import fix_item_links
@@ -322,6 +322,7 @@ class SearchHandler:
                 search_request.filter, search_request.filter_lang
             )
             queryable_config = await get_queryable_config_by_name()
+            collection_ids_for_queryables = self.search_request.collections or []
             try:
                 return ast_to_filter_clause(
                     ast=ast,
@@ -334,6 +335,9 @@ class SearchHandler:
                             is_temporal=entry.is_temporal,
                         )
                         for entry in queryable_config.values()
+                        if len(collection_ids_for_queryables) == 0
+                        or entry.collection_id == collection_wildcard
+                        or entry.collection_id in collection_ids_for_queryables
                     ],
                 )
             except UnknownField as e:
