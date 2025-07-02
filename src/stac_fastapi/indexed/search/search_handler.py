@@ -15,6 +15,7 @@ from stac_fastapi.types.rfc3339 import str_to_interval
 from stac_fastapi.types.search import BaseSearchPostRequest
 from stac_fastapi.types.stac import Item, ItemCollection
 from stac_index.indexer.stac_parser import StacParser
+from stac_index.io.readers.exceptions import UriNotFoundException
 from stac_pydantic.api.extensions.sort import SortDirections, SortExtension
 
 from stac_fastapi.indexed.constants import collection_wildcard, rel_root, rel_self
@@ -108,15 +109,36 @@ class SearchHandler:
             )
         has_next_page = len(rows) > query_info.limit
         has_previous_page = query_info.offset is not None
+
+        async def get_each_item(uri: str) -> Optional[Dict[str, Any]]:
+            try:
+                return await fetch_dict(uri=uri)
+            except UriNotFoundException:
+                _logger.warning(
+                    "Item '{uri}' exists in the index but does not exist in the data store, index is outdated".format(
+                        uri=uri
+                    )
+                )
+                return None
+
         fetch_tasks = [
-            fetch_dict(url) for url in [row[0] for row in rows[0 : query_info.limit]]
+            get_each_item(url) for url in [row[0] for row in rows[0 : query_info.limit]]
         ]
+        fetched_dicts = []
+        missing_entry_indices = []
+        for i, entry in enumerate(await gather(*fetch_tasks)):
+            if entry is None:
+                missing_entry_indices.append(i)
+            else:
+                fetched_dicts.append(entry)
         fixes_to_apply = [
             fix_list.split(",")
-            for fix_list in [row[1] for row in rows[0 : query_info.limit]]
+            for fix_list in [
+                row[1]
+                for i, row in enumerate(rows[0 : query_info.limit])
+                if i not in missing_entry_indices
+            ]
         ]
-        fetched_dicts = await gather(*fetch_tasks)
-
         items = [
             fix_item_links(
                 Item(**StacParser(fixers).parse_stac_item(item_dict)[1]),
