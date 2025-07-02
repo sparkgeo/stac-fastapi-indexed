@@ -15,21 +15,18 @@ ENV UV_LINK_MODE=copy \
 ### End build prep -- this is where your app Dockerfile should start.
 
 WORKDIR /src
-COPY ./ /src
+COPY pyproject.toml .
+COPY uv.lock .
 
+# File is required to successfully parse root package.toml, even though not installed.
+COPY packages/stac-index/pyproject.toml ./packages/stac-index/
 
-RUN uv sync \
-    --directory=/src \
-    --locked \
-    --no-dev \
-    --no-install-project
-
+# Install dependencies.
 RUN uv sync \
     --extra lambda \
     --locked \
     --no-dev \
-    --no-editable
-
+    --no-install-workspace
 
 # ##########################################################################
 

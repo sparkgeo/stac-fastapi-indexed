@@ -13,19 +13,26 @@ ENV UV_LINK_MODE=copy \
     UV_PROJECT_ENVIRONMENT=/opt/app
 
 ### End build prep -- this is where your app Dockerfile should start.
-COPY ./ /src
-WORKDIR /src
 
+WORKDIR /src
+COPY pyproject.toml .
+COPY uv.lock .
+
+# Files are required to successfully parse package.toml, even though the project is not installed at this stage.
+COPY packages/stac-index/pyproject.toml ./packages/stac-index/
+COPY packages/stac-index/README.md ./packages/stac-index/
+
+# Install dependencies first, then application code, as dependencies change less frequently.
 RUN uv sync \
     --package=stac-index \
-    --directory=/src \
     --locked \
     --no-dev \
     --no-install-project
 
+# Copy and install application code.
+COPY packages/stac-index/* ./packages/stac-index/
 RUN uv sync \
     --package=stac-index \
-    --directory=/src \
     --locked \
     --no-dev \
     --no-editable
