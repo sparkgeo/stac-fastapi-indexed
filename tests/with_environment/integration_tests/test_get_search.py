@@ -222,8 +222,10 @@ def test_get_search_token_immutable() -> None:
 
 def test_get_search_alternate_order() -> None:
     sortable_field_names: List[str] = [
-        entry["title"]
-        for entry in requests.get(f"{api_base_url}/sortables").json()["fields"]
+        entry
+        for entry in requests.get(f"{api_base_url}/sortables")
+        .json()["properties"]
+        .keys()
     ]
     assert "datetime" in sortable_field_names
     assert "id" in sortable_field_names
