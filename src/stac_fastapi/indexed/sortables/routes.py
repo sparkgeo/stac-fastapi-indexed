@@ -18,14 +18,11 @@ def add_routes(app: FastAPI) -> None:
     )
     async def get_all_sortables() -> SortablesResponse:
         return SortablesResponse(
-            fields=[
-                SortableField(
-                    title=config.name,
-                    description=config.description,
-                )
+            properties={
+                config.name: SortableField(type=config.type)
                 for config in await get_sortable_configs()
                 if config.collection_id == collection_wildcard
-            ]
+            }
         )
 
     @app.get(
@@ -36,12 +33,9 @@ def add_routes(app: FastAPI) -> None:
     )
     async def get_collection_sortables(collection_id: str) -> SortablesResponse:
         return SortablesResponse(
-            fields=[
-                SortableField(
-                    title=config.name,
-                    description=config.description,
-                )
+            properties={
+                config.name: SortableField(type=config.type)
                 for config in await get_sortable_configs()
                 if config.collection_id in [collection_id, collection_wildcard]
-            ]
+            }
         )

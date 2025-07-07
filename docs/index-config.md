@@ -18,6 +18,8 @@ Entries in `queryables` and `sortables` must have a corresponding entry in `inde
 
 Each queryable and sortable property must include a list of collections for which the property is queryable or sortable. The `*` wildcard value can be used to indicate all collections. It is **not** currently possible to wildcard partial collection IDs, such as `collection-*`.
 
+`storage_type` **must** reference a valid [DuckDB data type](https://duckdb.org/docs/stable/sql/data_types/overview.html).
+
 ### Queryables
 
 Queryables require a `json_schema` property containing a schema that could be used to validate values of this property. This JSON schema is not used directly by the API but is provided to API clients via the `/queryables` endpoints such that a client can validate any value it intends to send as query value for this property.

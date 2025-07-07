@@ -10,7 +10,7 @@ def add_items_columns(config: IndexConfig, connection: DuckDBPyConnection) -> No
         connection.execute(
             f"""
             ALTER TABLE items
-            ADD COLUMN {indexable.table_column_name} {indexable.storage_type.value}
+            ADD COLUMN {indexable.table_column_name} {indexable.storage_type}
         """
         )
 
@@ -57,14 +57,15 @@ def _configure_sortables(config: IndexConfig, connection: DuckDBPyConnection) ->
             sortables_collections.append((collection_id, name))
         connection.execute(
             """
-                INSERT INTO sortables (name, description, json_path, items_column)
-                    VALUES (?, ?, ?, ?)
+                INSERT INTO sortables (name, description, json_path, items_column, json_type)
+                    VALUES (?, ?, ?, ?, ?)
             """,
             [
                 name,
                 indexable.description,
                 indexable.json_path,
                 indexable.table_column_name,
+                indexable.json_type,
             ],
         )
     for collection_id, name in sortables_collections:

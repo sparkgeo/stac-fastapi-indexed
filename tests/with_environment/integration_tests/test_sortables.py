@@ -21,8 +21,10 @@ def setup_module():
 
 def test_sortables_all_collections() -> None:
     sortable_property_titles = [
-        entry["title"]
-        for entry in requests.get(f"{api_base_url}/sortables").json()["fields"]
+        entry
+        for entry in requests.get(f"{api_base_url}/sortables")
+        .json()["properties"]
+        .keys()
     ]
     assert (
         len(set(_global_sortable_titles).difference(set(sortable_property_titles))) == 0
@@ -37,14 +39,16 @@ def test_sortables_by_collection() -> None:
         for collection_id in queryable["collections"]:
             if collection_id not in sortables_by_collection:
                 sortables_by_collection[collection_id] = []
-        sortables_by_collection[collection_id].append(name)
+            sortables_by_collection[collection_id].append(name)
     for collection_id, sortable_names in sortables_by_collection.items():
         expected_sortables = sortable_names
         collection_sortable_property_titles = [
-            entry["title"]
-            for entry in requests.get(
+            name
+            for name in requests.get(
                 f"{api_base_url}/collections/{collection_id}/sortables"
-            ).json()["fields"]
+            )
+            .json()["properties"]
+            .keys()
         ]
         assert (
             len(

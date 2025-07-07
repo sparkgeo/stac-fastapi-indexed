@@ -9,9 +9,10 @@ from stac_fastapi.indexed.db import fetchall, format_query_object_name, get_last
 _logger: Final[Logger] = getLogger(__name__)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SortableConfig:
     name: str
+    type: str
     collection_id: str
     description: str
     items_column: str
@@ -31,6 +32,7 @@ async def _get_sortable_configs(_: str) -> List[SortableConfig]:
             collection_id=row[1],
             description=row[2],
             items_column=row[3],
+            type=row[4],
         )
         for row in await fetchall(
             f"""
@@ -38,6 +40,7 @@ async def _get_sortable_configs(_: str) -> List[SortableConfig]:
              , collection_id
              , description
              , items_column
+             , json_type
           FROM {format_query_object_name('sortables_by_collection')}
     """
         )

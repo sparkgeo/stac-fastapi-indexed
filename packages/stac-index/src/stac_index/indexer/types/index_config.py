@@ -1,6 +1,5 @@
-from enum import Enum
-from re import sub
-from typing import Any, Dict, Final, List, Optional
+from re import IGNORECASE, match, sub
+from typing import Any, Dict, Final, List, Optional, Self
 
 from pydantic import BaseModel
 
@@ -11,19 +10,35 @@ class StorageTypeProperties(BaseModel):
     pass
 
 
-class StorageType(str, Enum):
-    DOUBLE = "DOUBLE"
-
-
 class Indexable(BaseModel):
     json_path: str
     description: str
-    storage_type: StorageType
+    # storage_type is required to match the name of a valid DuckDB type as per https://duckdb.org/docs/stable/sql/data_types/overview.html.
+    # This could be an enum for more strict control, but this enum would require ongoing maintenance to match DuckDB's types.
+    # If a caller provided an invalid enum value it would result in a runtime failure from this class, which is
+    # functionally no different to a runtime failure when DuckDB attempts to add a table column of this type.
+    # Don't attempt to validate that storage_type is a valid DuckDB type and provide documentation around this.
+    storage_type: str
     storage_type_properties: Optional[StorageTypeProperties] = None
 
     @property
-    def table_column_name(self) -> str:
+    def table_column_name(self: Self) -> str:
         return "i_{}".format(sub("[^A-Za-z0-9]", "_", self.json_path))
+
+    @property
+    def json_type(self: Self) -> str:
+        if self.storage_type in (
+            "JSON",
+            "UUID",
+            "VARCHAR",
+        ):
+            return "string"
+        elif match("^(DATE|TIME)", self.storage_type, flags=IGNORECASE):
+            return "string"
+        elif self.storage_type == "BOOLEAN":
+            return "boolean"
+        else:
+            return "number"
 
 
 class Queryable(BaseModel):

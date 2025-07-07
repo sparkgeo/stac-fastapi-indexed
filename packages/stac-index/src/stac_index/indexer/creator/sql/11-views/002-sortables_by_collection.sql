@@ -4,6 +4,7 @@ CREATE VIEW sortables_by_collection AS
          , s.description
          , s.json_path
          , COALESCE(s.items_column, s.name) AS items_column
+         , s.json_type
       FROM sortables s
       JOIN sortables_collections sc ON s.name == sc.name
      UNION
@@ -12,6 +13,7 @@ CREATE VIEW sortables_by_collection AS
          , s.description
          , s.json_path
          , COALESCE(s.items_column, s.name) AS items_column
+         , s.json_type
       FROM sortables s
       JOIN (
            SELECT sac.name
