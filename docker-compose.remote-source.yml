@@ -8,18 +8,18 @@ services:
       INDEX_ROOT_CATALOG_URI: ${root_catalog_uri}
       INDEX_CONFIG_PATH: /index-config.json
       INDEX_PUBLISH_PATH: /output
+      INDEX_MANIFEST_JSON_URI: ${index_manifest_json_uri}
       AWS_ACCESS_KEY_ID:
       AWS_REGION:
       AWS_SECRET_ACCESS_KEY:
       AWS_SESSION_TOKEN:
     volumes:
-      - "indexer-output:/output:rw"
-      # this compose file will not work without $tmp_index_config_path being set (this is intentional, it is set by scripts/run-with-remote-source.sh)
-      - "${tmp_index_config_path}:/index-config.json:ro"
+      - "${tmp_index_path:-indexer-output}:/output:rw"
+      - "${tmp_index_config_path:-indexer-config-fallback}:/index-config.json:ro"
 
   api:
     volumes:
-      - indexer-output:/index:ro
+      - "${tmp_index_path:-indexer-output}:/index:ro"
     environment:
       stac_api_indexed_index_manifest_uri: /index/manifest.json
       AWS_ACCESS_KEY_ID:
@@ -32,3 +32,4 @@ services:
 
 volumes:
   indexer-output:
+  indexer-config-fallback:

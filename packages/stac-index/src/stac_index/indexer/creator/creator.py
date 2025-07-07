@@ -471,7 +471,10 @@ class IndexCreator:
 
     def _insert_errors(self: Self, errors: list[IndexingError]) -> None:
         for error in errors:
-            save_error(self._conn, error)
+            try:
+                save_error(self._conn, error)
+            except Exception as e:
+                _logger.exception("failed to insert indexing error: {}".format(e))
 
     async def _load_existing_index(self: Self, manifest_json_uri: str) -> IndexManifest:
         source_reader = get_reader_for_uri(uri=manifest_json_uri)

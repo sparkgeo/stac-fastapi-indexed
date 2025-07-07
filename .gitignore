@@ -23,3 +23,5 @@ dist
 
 # indexer when run locally
 packages/stac-index/src/stac_index/indexer/index_data/
+# indexer when run by `run-with-remote-source.sh`
+.remote-source-index

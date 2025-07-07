@@ -1,5 +1,6 @@
 from functools import lru_cache
 from typing import Optional
+from uuid import uuid4
 
 from stac_fastapi.types.config import ApiSettings, SettingsConfigDict
 
@@ -10,7 +11,7 @@ class _Settings(ApiSettings):
     )
     log_level: str = "info"
     index_manifest_uri: str = "/index/manifest.json"
-    token_jwt_secret: str
+    token_jwt_secret: str = uuid4().hex
     duckdb_threads: Optional[int] = None
     deployment_root_path: Optional[str] = None
     install_duckdb_extensions: bool = (
