@@ -80,7 +80,6 @@ class IndexCreator:
         self: Self,
         root_catalog_uri: str,
         index_config: Optional[IndexConfig] = None,
-        output_dir: Optional[str] = None,
     ) -> Tuple[List[IndexingError], str]:
         _logger.info(f"indexing stac source for load {self._load_id}")
         self._create_db_objects()
@@ -98,6 +97,7 @@ class IndexCreator:
             collection_errors + items_errors,
             self._export_db_objects(
                 root_catalog_uri=root_catalog_uri,
+                index_config=index_config,
             ),
         )
 

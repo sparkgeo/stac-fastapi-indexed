@@ -10,6 +10,21 @@ if [ "$#" -lt 1 ]; then
 fi
 
 export root_catalog_uri="$1"
+shift
+
+fixes_to_apply=""
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --fixes_to_apply)
+            fixes_to_apply="$2"
+            shift; shift
+            ;;
+        *)
+            echo "Unknown option $1"
+            exit 1
+            ;;
+    esac
+done
 
 if [[ $root_catalog_uri == s3://* ]]; then
     echo; echo "* Assumes \$AWS_ACCESS_KEY_ID, \$AWS_REGION, \$AWS_SECRET_ACCESS_KEY, and (optionally) \$AWS_SESSION_TOKEN are set for obstore *"; echo
@@ -25,9 +40,9 @@ if [ -f $"$tmp_index_path/manifest.json" ]; then
     unset root_catalog_uri
 else
     # No point evaluating this if updating an existing index as it will be ignored.
-    if [ -n "${FIXES_TO_APPLY}" ]; then
+    if [ -n "$fixes_to_apply" ]; then
         export tmp_index_config_path=$(mktemp)
-        fixes_json=$(echo "${FIXES_TO_APPLY}" | sed "s/,\s*/\", \"/g")
+        fixes_json=$(echo "$fixes_to_apply" | sed "s/,\s*/\", \"/g")
         echo "{\"fixes_to_apply\": [\"${fixes_json}\"]}" > $tmp_index_config_path
     fi
 fi
