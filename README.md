@@ -16,13 +16,42 @@ See [Development](./docs/development.md) for detailed guidance on how to work on
 
 ### Quickstart
 
-To get a quick demo up and running execute any of the following scripts and navigate to http://localhost:8123/api.html
+To get a quick demo up and running with a test dataset execute any of the following scripts and navigate to http://localhost:8123/api.html
 
 ```sh
-scripts/run-with-local-s3.sh    # loads a sample dataset into minio, indexes it, loads the index into minio, and runs the API
-scripts/run-with-local-file.sh  # indexes a sample dataset on the filesystem and runs the API
-scripts/run-with-local-http.sh  # loads a sample dataset into a HTTP fileserver, indexes it, and runs the API
-scripts/run-with-remote-source.sh https://capella-open-data.s3.us-west-2.amazonaws.com/stac/catalog.json # indexes a public static STAC catalog over HTTPS and runs the API
+# loads a sample dataset into minio, indexes it, loads the index into minio, and runs the API
+scripts/run-with-local-s3.sh
+# indexes a sample dataset on the filesystem and runs the API
+scripts/run-with-local-file.sh
+# loads a sample dataset into a HTTP fileserver, indexes it, and runs the API
+scripts/run-with-local-http.sh
+```
+
+### Index Remote STAC Catalog
+
+This project includes a convenience script to index and serve a remote STAC catalog. This script will fully index the remote STAC catalog each time it is run. This may not be the most efficient way to meet your needs, but it does help demonstrate some of this project's capabilities.
+
+```sh
+# indexes a public static STAC catalog over HTTPS and runs the API
+scripts/run-with-remote-source.sh https://esa.pages.eox.at/cubes-and-clouds-catalog/MOOC_Cubes_and_clouds/catalog.json
+```
+
+Output includes the following information about the index.
+```sh
+* Indexing may take some time, depending on the size of the catalog
+* Indexing to /.../source/sparkgeo/STAC-API-Serverless/.remote-source-index/httpsesapageseoxatcubesandcloudscatalogMOOCCubesandcloudscatalogjson
+```
+
+The generated index files can be inspected at `.../.remote-source-index/httpsesapageseoxatcubesandcloudscatalogMOOCCubesandcloudscatalogjson` if necessary. If at a later time you want to run the API against this same index, without re-indexing the remote STAC catalog, this can be achieved with the following:
+
+```sh
+docker run \
+    --rm \
+    -it \
+    -v $PWD/.remote-source-index/httpsesapageseoxatcubesandcloudscatalogMOOCCubesandcloudscatalogjson:/index:ro \
+    -e stac_api_indexed_index_manifest_uri=/index/manifest.json \
+    -p 8123:80 \
+    sparkgeo/stac_fastapi_indexed
 ```
 
 ## Overview
