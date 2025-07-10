@@ -2,7 +2,6 @@ from asyncio import gather
 from dataclasses import dataclass
 from datetime import datetime
 from logging import Logger, getLogger
-from re import sub
 from typing import Any, Dict, Final, List, Optional, Union, cast
 
 from fastapi import HTTPException, Request, status
@@ -40,14 +39,14 @@ from stac_fastapi.indexed.search.filter.parser import (
     parse_filter_language,
 )
 from stac_fastapi.indexed.search.filter_clause import FilterClause
-from stac_fastapi.indexed.search.query_info import QueryInfo
+from stac_fastapi.indexed.search.query_info import QueryInfo, current_query_version
 from stac_fastapi.indexed.search.spatial import (
     get_intersects_clause_for_bbox,
     get_intersects_clause_for_wkt,
 )
 from stac_fastapi.indexed.search.token import (
     create_token_from_query,
-    get_query_from_token,
+    get_query_info_from_token,
 )
 from stac_fastapi.indexed.search.types import SearchDirection, SearchMethod
 from stac_fastapi.indexed.sortables.sortable_config import get_sortable_configs_by_field
@@ -82,25 +81,40 @@ class SearchHandler:
         reject_if_load_id_changed = False
         if cast(POSTTokenPagination, self.search_request).token is None:
             _logger.debug("no token, building new query")
-            query_info = await self._new_query()
+            query_info = await self._new_query_info()
         else:
             _logger.debug("token provided")
             # do not permit paging across data changes as paged results may be inconsistent
             reject_if_load_id_changed = True
-            query_info = get_query_from_token(
+            query_info = get_query_info_from_token(
                 cast(POSTTokenPagination, self.search_request).token
             )
-        limit_text = f"LIMIT {query_info.limit + 1}"  # request one more so that we know if there's a next page of results, extra row is not included in response
-        offset_text = (
-            f"OFFSET {query_info.offset}" if query_info.offset is not None else ""
-        )
-        current_query = query_info.query.format(
-            limit=limit_text,
-            offset=offset_text,
+        clauses: List[str] = []
+        params: List[Any] = []
+        for addition in query_info.query_additions:
+            clauses.append(addition.sql)
+            params.extend(addition.params)
+        query = """
+            SELECT stac_location, applied_fixes
+            FROM {table_name}
+              {where}
+              {order}
+              {limit}
+              {offset}
+            """.format(
+            table_name=format_query_object_name("items"),
+            where="WHERE {}".format(" AND ".join(clauses)) if len(clauses) > 0 else "",
+            order="ORDER BY {}".format(", ".join(query_info.order)),
+            limit="OFFSET {}".format(query_info.offset)
+            if query_info.offset is not None
+            else "",
+            offset="LIMIT {}".format(
+                query_info.limit + 1
+            ),  # request one more so that we know if there's a next page of results
         )
         rows = await fetchall(
-            current_query,
-            query_info.params,
+            query,
+            params,
         )
         if reject_if_load_id_changed and get_last_load_id() != query_info.last_load_id:
             raise HTTPException(
@@ -174,42 +188,21 @@ class SearchHandler:
             links=links,
         )
 
-    async def _new_query(
+    async def _new_query_info(
         self,
     ) -> QueryInfo:
-        clauses: List[str] = []
-        params: List[Any] = []
-        sorts: List[str] = await self._determine_order()
-        for addition in [
-            addition
-            for addition in [
-                self._include_ids(),
-                self._include_collections(),
-                self._include_bbox(),
-                self._include_intersects(),
-                self._include_datetime(),
-                await self._include_filter(),
-            ]
-            if addition is not None
-        ]:
-            clauses.append(addition.sql)
-            params.extend(addition.params)
-        query = """
-            SELECT stac_location, applied_fixes
-            FROM {table_name}
-              {where}
-              {order}
-              {{limit}}
-              {{offset}}
-            """.format(
-            table_name=format_query_object_name("items"),
-            where="WHERE {}".format(" AND ".join(clauses)) if len(clauses) > 0 else "",
-            order="ORDER BY {}".format(", ".join(sorts)),
-        )
         return QueryInfo(
-            query=sub(r"\s+", " ", query).strip(),
-            params=params,
-            limit=self.search_request.limit,
+            query_version=current_query_version,
+            ids=self._include_ids(),
+            collections=self._include_collections(),
+            bbox=self._include_bbox(),
+            intersects=self._include_intersects(),
+            datetime=self._include_datetime(),
+            filter=await self._include_filter(),
+            order=await self._determine_order(),
+            limit=cast(
+                int, self.search_request.limit
+            ),  # will have default value if not provided by caller
             offset=None,
             last_load_id=get_last_load_id(),
         )
@@ -315,7 +308,7 @@ class SearchHandler:
                     )
                 elif (
                     self.search_request.datetime[0] is not None
-                    and self.search_request[1] is not None
+                    and self.search_request.datetime[1] is not None
                 ):
                     # 2000-01-01T00:00:00Z/2000-01-02T00:00:00Z
                     # Neither start or end are open
