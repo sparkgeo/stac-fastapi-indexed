@@ -23,6 +23,7 @@ def setup(
 
 
 @pytest.mark.asyncio
+@mock.patch("stac_fastapi.indexed.core.format_query_object_name")
 @mock.patch("stac_fastapi.indexed.core.Item")
 @mock.patch("stac_fastapi.indexed.core.StacParser")
 @mock.patch("stac_fastapi.indexed.core.fetch_dict")
@@ -55,6 +56,7 @@ async def test_get_item_success(
 
 
 @pytest.mark.asyncio
+@mock.patch("stac_fastapi.indexed.core.format_query_object_name")
 @mock.patch("stac_fastapi.indexed.core.fetch_dict")
 @mock.patch("stac_fastapi.indexed.core.fetchone")
 async def test_get_item_indexed_but_missing(
@@ -78,6 +80,7 @@ async def test_get_item_indexed_but_missing(
 
 
 @pytest.mark.asyncio
+@mock.patch("stac_fastapi.indexed.core.format_query_object_name")
 @mock.patch("stac_fastapi.indexed.core.fetch_dict")
 @mock.patch("stac_fastapi.indexed.core.fix_collection_links")
 @mock.patch("stac_fastapi.indexed.core.fetchone")
@@ -101,6 +104,7 @@ async def test_get_collection_success(
 
 
 @pytest.mark.asyncio
+@mock.patch("stac_fastapi.indexed.core.format_query_object_name")
 @mock.patch("stac_fastapi.indexed.core.fetch_dict")
 @mock.patch("stac_fastapi.indexed.core.fetchone")
 async def test_get_collection_indexed_but_missing(
@@ -122,6 +126,7 @@ async def test_get_collection_indexed_but_missing(
 
 
 @pytest.mark.asyncio
+@mock.patch("stac_fastapi.indexed.core.format_query_object_name")
 @mock.patch("stac_fastapi.indexed.core.get_collections_link")
 @mock.patch("stac_fastapi.indexed.core.get_catalog_link")
 @mock.patch("stac_fastapi.indexed.core.fix_collection_links")
@@ -159,6 +164,7 @@ async def test_all_collections_success(
 
 
 @pytest.mark.asyncio
+@mock.patch("stac_fastapi.indexed.core.format_query_object_name")
 @mock.patch("stac_fastapi.indexed.core.get_collections_link")
 @mock.patch("stac_fastapi.indexed.core.get_catalog_link")
 @mock.patch("stac_fastapi.indexed.core.fix_collection_links")

@@ -15,6 +15,7 @@ def setup(
 
 
 @pytest.mark.asyncio
+@mock.patch("stac_fastapi.indexed.search.search_handler.format_query_object_name")
 @mock.patch("stac_fastapi.indexed.search.search_handler.get_last_load_id")
 @mock.patch("stac_fastapi.indexed.search.search_handler.get_search_link")
 @mock.patch("stac_fastapi.indexed.search.search_handler.get_catalog_link")
@@ -73,6 +74,7 @@ async def test_search_multi_item_success(
 
 
 @pytest.mark.asyncio
+@mock.patch("stac_fastapi.indexed.search.search_handler.format_query_object_name")
 @mock.patch("stac_fastapi.indexed.search.search_handler.get_last_load_id")
 @mock.patch("stac_fastapi.indexed.search.search_handler.get_search_link")
 @mock.patch("stac_fastapi.indexed.search.search_handler.get_catalog_link")
