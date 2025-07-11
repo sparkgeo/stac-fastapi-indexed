@@ -2,7 +2,7 @@ from asyncio import gather
 from dataclasses import dataclass
 from datetime import datetime
 from logging import Logger, getLogger
-from typing import Any, Dict, Final, List, Optional, Union, cast
+from typing import Any, Dict, Final, List, Optional, Self, cast
 
 from fastapi import HTTPException, Request, status
 from pygeofilter.ast import Node
@@ -16,6 +16,8 @@ from stac_fastapi.types.stac import Item, ItemCollection
 from stac_index.indexer.stac_parser import StacParser
 from stac_index.io.readers.exceptions import UriNotFoundException
 from stac_pydantic.api.extensions.sort import SortDirections, SortExtension
+from stac_pydantic.api.search import Intersection
+from stac_pydantic.shared import BBox
 
 from stac_fastapi.indexed.constants import collection_wildcard, rel_root, rel_self
 from stac_fastapi.indexed.db import fetchall, format_query_object_name, get_last_load_id
@@ -91,27 +93,37 @@ class SearchHandler:
             )
         clauses: List[str] = []
         params: List[Any] = []
-        for addition in query_info.query_additions:
-            clauses.append(addition.sql)
-            params.extend(addition.params)
+        for addition in [
+            self._include_ids(ids=query_info.ids),
+            self._include_collections(collections=query_info.collections),
+            self._include_bbox(bbox=query_info.bbox),
+            self._include_intersects(intersects=query_info.intersects),
+            self._include_datetime(datetime_str=query_info.datetime),
+            await self._include_filter(
+                filter_lang=query_info.filter_lang,
+                filter=query_info.filter,
+                collections=query_info.collections,
+            ),
+        ]:
+            if addition is not None:
+                clauses.append(addition.sql)
+                params.extend(addition.params)
         query = """
             SELECT stac_location, applied_fixes
             FROM {table_name}
               {where}
-              {order}
-              {limit}
-              {offset}
+              ORDER BY {order}
+              LIMIT ?
+              OFFSET ?
             """.format(
             table_name=format_query_object_name("items"),
             where="WHERE {}".format(" AND ".join(clauses)) if len(clauses) > 0 else "",
-            order="ORDER BY {}".format(", ".join(query_info.order)),
-            limit="OFFSET {}".format(query_info.offset)
-            if query_info.offset is not None
-            else "",
-            offset="LIMIT {}".format(
-                query_info.limit + 1
-            ),  # request one more so that we know if there's a next page of results
+            order=(", ".join(await self._determine_order(query_info.order))),
         )
+        params.append(
+            query_info.limit + 1
+        )  # request one more so that we know if there's a next page of results
+        params.append(query_info.offset if query_info.offset is not None else 0)
         rows = await fetchall(
             query,
             params,
@@ -193,13 +205,16 @@ class SearchHandler:
     ) -> QueryInfo:
         return QueryInfo(
             query_version=current_query_version,
-            ids=self._include_ids(),
-            collections=self._include_collections(),
-            bbox=self._include_bbox(),
-            intersects=self._include_intersects(),
-            datetime=self._include_datetime(),
-            filter=await self._include_filter(),
-            order=await self._determine_order(),
+            ids=self.search_request.ids,
+            collections=self.search_request.collections,
+            bbox=self.search_request.bbox,
+            intersects=self.search_request.intersects,
+            datetime=self.search_request.datetime,
+            filter=cast(FilterExtensionPostRequest, self.search_request).filter,
+            filter_lang=cast(
+                str, cast(FilterExtensionPostRequest, self.search_request).filter_lang
+            ),
+            order=cast(SortExtensionPostRequest, self.search_request).sortby,
             limit=cast(
                 int, self.search_request.limit
             ),  # will have default value if not provided by caller
@@ -207,13 +222,20 @@ class SearchHandler:
             last_load_id=get_last_load_id(),
         )
 
-    async def _determine_order(self) -> List[str]:
+    async def _determine_order(
+        self, sortby: Optional[List[SortExtension]] = None
+    ) -> List[str]:
+        # DuckDB does not support parameters in ORDER BY statements, so we must use string concatenation
+        # to support user-provided sorts. This introductes the risk of SQL injection, however this risk
+        # is mitigated by checking provided sort fields against configured sortable fields.
+        # A caller cannot provide a sort column identifier that has not been configured as sortable, and
+        # therefore should not be able to interfere with query parsing.
         sort_fields: List[str] = []
-        user_provided_sorts = cast(SortExtensionPostRequest, self.search_request).sortby
-        if user_provided_sorts is not None and len(user_provided_sorts) > 0:
-            effective_sorts = user_provided_sorts
+        if sortby is not None and len(sortby) > 0:
+            effective_sorts = sortby
         else:
             effective_sorts = default_sorts
+
         sortables = await get_sortable_configs_by_field()
         for effective_sort in effective_sorts:
             if effective_sort.field not in sortables:
@@ -228,44 +250,50 @@ class SearchHandler:
             )
         return sort_fields
 
-    def _include_ids(self) -> Optional[FilterClause]:
-        if self.search_request.ids is not None:
+    def _include_ids(
+        self: Self, ids: Optional[List[str]] = None
+    ) -> Optional[FilterClause]:
+        if ids is not None:
             return FilterClause(
-                sql="id IN ({})".format(
-                    ", ".join(["?" for _ in range(len(self.search_request.ids))])
-                ),
-                params=self.search_request.ids,
+                sql="id IN ({})".format(", ".join(["?" for _ in range(len(ids))])),
+                params=ids,
             )
         return None
 
-    def _include_collections(self) -> Optional[FilterClause]:
-        if self.search_request.collections is not None:
+    def _include_collections(
+        self: Self, collections: Optional[List[str]] = None
+    ) -> Optional[FilterClause]:
+        if collections is not None:
             return FilterClause(
                 sql="collection_id IN ({})".format(
-                    ", ".join(
-                        ["?" for _ in range(len(self.search_request.collections))]
-                    )
+                    ", ".join(["?" for _ in range(len(collections))])
                 ),
-                params=self.search_request.collections,
+                params=collections,
             )
         return None
 
-    def _include_bbox(self) -> Optional[FilterClause]:
-        if self.search_request.bbox is not None:
-            bbox_2d = self._get_bbox_2d(self.search_request.bbox)
+    def _include_bbox(
+        self: Self, bbox: Optional[BBox] = None
+    ) -> Optional[FilterClause]:
+        if bbox is not None:
+            bbox_2d = self._get_bbox_2d(bbox)
             if bbox_2d is not None:
                 return get_intersects_clause_for_bbox(*bbox_2d)
         return None
 
-    def _include_intersects(self) -> Optional[FilterClause]:
-        if self.search_request.intersects is not None:
-            return get_intersects_clause_for_wkt(self.search_request.intersects.wkt)
+    def _include_intersects(
+        self: Self, intersects: Optional[Intersection] = None
+    ) -> Optional[FilterClause]:
+        if intersects is not None:
+            return get_intersects_clause_for_wkt(intersects.wkt)
         return None
 
-    def _include_datetime(self) -> Optional[FilterClause]:
-        if self.search_request.datetime:
-            self.search_request.datetime = str_to_interval(self.search_request.datetime)
-            if isinstance(self.search_request.datetime, datetime):
+    def _include_datetime(
+        self: Self, datetime_str: Optional[str] = None
+    ) -> Optional[FilterClause]:
+        if datetime_str:
+            datetime_arg = str_to_interval(datetime_str)
+            if isinstance(datetime_arg, datetime):
                 return FilterClause(
                     sql="""
                     CASE
@@ -273,13 +301,10 @@ class SearchHandler:
                         ELSE start_datetime <= ? AND end_datetime >= ?
                     END
                     """,
-                    params=[self.search_request.datetime for _ in range(3)],
+                    params=[datetime_arg for _ in range(3)],
                 )
-            elif isinstance(self.search_request.datetime, tuple):
-                if (
-                    self.search_request.datetime[0] is None
-                    and self.search_request.datetime[1] is not None
-                ):
+            elif isinstance(datetime_arg, tuple):
+                if datetime_arg[0] is None and datetime_arg[1] is not None:
                     # ../2000-01-02T00:00:00Z
                     # Start is open, end is not
                     return FilterClause(
@@ -289,12 +314,9 @@ class SearchHandler:
                             ELSE start_datetime <= ?
                         END
                         """,
-                        params=[self.search_request.datetime[1] for _ in range(2)],
+                        params=[datetime_arg[1] for _ in range(2)],
                     )
-                elif (
-                    self.search_request.datetime[0] is not None
-                    and self.search_request.datetime[1] is None
-                ):
+                elif datetime_arg[0] is not None and datetime_arg[1] is None:
                     # 2000-01-01T00:00:00Z/..
                     # End is open, start is not
                     return FilterClause(
@@ -304,12 +326,9 @@ class SearchHandler:
                             ELSE end_datetime >= ?
                         END
                         """,
-                        params=[self.search_request.datetime[0] for _ in range(2)],
+                        params=[datetime_arg[0] for _ in range(2)],
                     )
-                elif (
-                    self.search_request.datetime[0] is not None
-                    and self.search_request.datetime[1] is not None
-                ):
+                elif datetime_arg[0] is not None and datetime_arg[1] is not None:
                     # 2000-01-01T00:00:00Z/2000-01-02T00:00:00Z
                     # Neither start or end are open
                     return FilterClause(
@@ -320,24 +339,26 @@ class SearchHandler:
                         END
                         """,
                         params=[
-                            self.search_request.datetime[0],
-                            self.search_request.datetime[1],
-                            self.search_request.datetime[0],
-                            self.search_request.datetime[1],
+                            datetime_arg[0],
+                            datetime_arg[1],
+                            datetime_arg[0],
+                            datetime_arg[1],
                         ],
                     )
                 else:
                     pass  # unbounded datetime means all results are valid
         return None
 
-    async def _include_filter(self) -> Optional[FilterClause]:
-        search_request = cast(FilterExtensionPostRequest, self.search_request)
-        if search_request.filter:
-            ast = self._get_ast_from_filter(
-                search_request.filter, search_request.filter_lang
-            )
+    async def _include_filter(
+        self: Self,
+        filter_lang: str,
+        filter: Optional[Dict[str, Any]] = None,
+        collections: Optional[List[str]] = None,
+    ) -> Optional[FilterClause]:
+        if filter:
+            ast = self._get_ast_from_filter(filter, filter_lang)
             queryable_config = await get_queryable_config_by_name()
-            collection_ids_for_queryables = self.search_request.collections or []
+            collection_ids_for_queryables = collections or []
             try:
                 return ast_to_filter_clause(
                     ast=ast,
@@ -373,13 +394,11 @@ class SearchHandler:
         else:
             return filter_to_ast(filter_dict, filter_lang)
 
-    def _get_bbox_2d(
-        self, bbox: List[Union[float, int]]
-    ) -> Optional[List[Union[float, int]]]:
+    def _get_bbox_2d(self, bbox: BBox) -> Optional[BBox]:
         if len(bbox) == 4:
             return bbox
         elif len(bbox) == 6:
-            return [bbox[0], bbox[1], bbox[3], bbox[4]]
+            return (bbox[0], bbox[1], bbox[3], bbox[4])
         else:
             _logger.info(f"unhandled bbox parameter in search request: {bbox}")
             return None

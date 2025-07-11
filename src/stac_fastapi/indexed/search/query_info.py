@@ -1,12 +1,11 @@
 from dataclasses import asdict, dataclass, replace
-from datetime import datetime
-from json import JSONEncoder
-from re import escape, match
-from typing import Any, Dict, Final, List, Optional, Type, cast
+from json import JSONEncoder, loads
+from typing import Any, Dict, Final, List, Optional, Self, Type, cast
 
-from stac_fastapi.indexed.search.filter_clause import FilterClause
-
-_datetime_field_prefix: Final[str] = "datetime::"
+from geojson_pydantic.geometries import parse_geometry_obj
+from stac_pydantic.api.extensions.sort import SortExtension
+from stac_pydantic.api.search import Intersection
+from stac_pydantic.shared import BBox
 
 # Increment this value if query structure changes, so that paging tokens from
 # older query structures can be rejected.
@@ -16,31 +15,17 @@ current_query_version: Final[int] = 1
 @dataclass(kw_only=True)
 class QueryInfo:
     query_version: int
-    ids: Optional[FilterClause] = None
-    collections: Optional[FilterClause] = None
-    bbox: Optional[FilterClause] = None
-    intersects: Optional[FilterClause] = None
-    datetime: Optional[FilterClause] = None
-    filter: Optional[FilterClause] = None
-    order: List[str]
+    ids: Optional[List[str]] = None
+    collections: Optional[List[str]] = None
+    bbox: Optional[BBox] = None
+    intersects: Optional[Intersection] = None
+    datetime: Optional[str] = None
+    filter: Optional[Dict[str, Any]] = None
+    filter_lang: str
+    order: Optional[List[SortExtension]] = None
     limit: int
     offset: Optional[int] = None
     last_load_id: str
-
-    @property
-    def query_additions(self) -> List[FilterClause]:
-        return [
-            entry
-            for entry in [
-                self.ids,
-                self.collections,
-                self.bbox,
-                self.intersects,
-                self.datetime,
-                self.filter,
-            ]
-            if entry is not None
-        ]
 
     def next(self) -> "QueryInfo":
         return replace(
@@ -68,30 +53,22 @@ class QueryInfo:
     def json_encoder() -> Type:
         return _CustomJSONEncoder
 
-    def _param_or_datetime(self, param: Any) -> Any:
-        if param is not None and isinstance(param, str):
-            datetime_match = match(rf"^{escape(_datetime_field_prefix)}(.+)", param)
-            if datetime_match:
-                return datetime.fromisoformat(datetime_match.group(1))
-        return param
-
-    def json_post_decoder(self) -> "QueryInfo":
-        if self.datetime is not None:
-            self.datetime.params = [
-                self._param_or_datetime(param=param) for param in self.datetime.params
-            ]
-        if self.filter is not None:
-            self.filter.params = [
-                self._param_or_datetime(param=param) for param in self.filter.params
-            ]
-        return self
+    def json_post_decoder(self: Self) -> "QueryInfo":
+        return replace(
+            self,
+            intersects=parse_geometry_obj(loads(cast(str, self.intersects)))
+            if self.intersects is not None
+            else None,
+            order=[SortExtension(**loads(cast(str, entry))) for entry in self.order]
+            if self.order is not None
+            else None,
+        )
 
 
 class _CustomJSONEncoder(JSONEncoder):
     def default(self, obj: Any) -> Any:
-        if isinstance(obj, datetime):
-            return "{}{}".format(
-                _datetime_field_prefix,
-                obj.isoformat(),
-            )
+        if isinstance(obj, Intersection):
+            return cast(Intersection, obj).model_dump_json()
+        if isinstance(obj, SortExtension):
+            return cast(SortExtension, obj).model_dump_json()
         return JSONEncoder.default(self, obj)

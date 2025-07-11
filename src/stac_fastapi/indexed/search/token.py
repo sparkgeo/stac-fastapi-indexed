@@ -5,7 +5,6 @@ from fastapi import HTTPException, status
 from jwt import decode, encode
 from stac_fastapi.types.errors import InvalidQueryParameter
 
-from stac_fastapi.indexed.search.filter_clause import FilterClause
 from stac_fastapi.indexed.search.query_info import QueryInfo, current_query_version
 from stac_fastapi.indexed.settings import get_settings
 
@@ -17,33 +16,12 @@ def get_query_info_from_token(
     token: str,
 ) -> QueryInfo:
     try:
-        token_dict = decode(
-            jwt=token,
-            key=get_settings().token_jwt_secret,
-            algorithms=[_hashing_algorithm],
-        )
         result = QueryInfo(
-            **{
-                **token_dict,
-                "ids": FilterClause(**token_dict["ids"])
-                if token_dict["ids"] is not None
-                else None,
-                "collections": FilterClause(**token_dict["collections"])
-                if token_dict["collections"] is not None
-                else None,
-                "bbox": FilterClause(**token_dict["bbox"])
-                if token_dict["bbox"] is not None
-                else None,
-                "intersects": FilterClause(**token_dict["intersects"])
-                if token_dict["intersects"] is not None
-                else None,
-                "datetime": FilterClause(**token_dict["datetime"])
-                if token_dict["datetime"] is not None
-                else None,
-                "filter": FilterClause(**token_dict["filter"])
-                if token_dict["filter"] is not None
-                else None,
-            }
+            **decode(
+                jwt=token,
+                key=get_settings().token_jwt_secret,
+                algorithms=[_hashing_algorithm],
+            )
         ).json_post_decoder()
         if result.query_version != current_query_version:
             raise HTTPException(
