@@ -1,4 +1,3 @@
-import re
 from datetime import UTC, datetime
 from logging import Logger, getLogger
 from os import environ
@@ -16,11 +15,6 @@ from stac_fastapi.indexed.settings import get_settings
 
 _logger: Final[Logger] = getLogger(__name__)
 _query_timing_precision: Final[int] = 3
-_query_object_identifier_prefix: Final[str] = "src:"
-_query_object_identifier_suffix: Final[str] = ":src"
-_query_object_identifier_template: Final[str] = (
-    f"{_query_object_identifier_prefix}{{}}{_query_object_identifier_suffix}"
-)
 
 _root_db_connection: DuckDBPyConnection = None
 _parquet_uris: Dict[str, str] = {}
@@ -76,18 +70,19 @@ async def disconnect_from_db() -> None:
             _logger.error(e)
 
 
-# SQL queries include placeholder strings that are replaced with Parquet URIs prior to query execution.
-# This improves query performance relative to creating views in DuckDB from Parquet files and querying those.
-# Placeholders are used until the point of query execution so that API search pagination tokens,
-# which are JWT-encoded SQL queries and visible to the client, do not leak implementation detail around
-# parquet URI locations.
 def format_query_object_name(object_name: str) -> str:
-    return _query_object_identifier_template.format(object_name)
+    if object_name in _parquet_uris:
+        return "'{}'".format(_parquet_uris[object_name])
+    raise Exception(
+        "Attempt to use non-existent query object name '{bad_name}'. Available object names: '{availables}'".format(
+            bad_name=object_name,
+            availables="', '".join(list(_parquet_uris.keys())),
+        )
+    )
 
 
 def _execute(statement: str, params: Optional[List[Any]] = None) -> None:
     start = time()
-    statement = _prepare_statement(statement)
     _get_db_connection().execute(statement, params)
     _sql_log_message(statement, time() - start, None, params)
 
@@ -100,7 +95,6 @@ async def fetchone(
     if perform_latest_data_check:
         await _ensure_latest_data()
     start = time()
-    statement = _prepare_statement(statement)
     result = _get_db_connection().execute(statement, params).fetchone()
     _sql_log_message(statement, time() - start, 1 if result is not None else 0, params)
     return result
@@ -114,7 +108,6 @@ async def fetchall(
     if perform_latest_data_check:
         await _ensure_latest_data()
     start = time()
-    statement = _prepare_statement(statement)
     result = _get_db_connection().execute(statement, params).fetchall()
     _sql_log_message(statement, time() - start, len(result), params)
     return result
@@ -128,22 +121,6 @@ def get_last_load_id() -> str:
 
 def _get_db_connection():
     return _root_db_connection.cursor()
-
-
-def _prepare_statement(statement: str) -> str:
-    query_object_identifier_regex = rf"\b{re.escape(_query_object_identifier_prefix)}([^:]+){re.escape(_query_object_identifier_suffix)}\b"
-    for query_object_name in re.findall(query_object_identifier_regex, statement):
-        if query_object_name not in _parquet_uris:
-            _logger.warning(
-                f"{query_object_name} not in parquet URI map, query will likely fail"
-            )
-            continue
-        statement = re.sub(
-            rf"\b{re.escape(_query_object_identifier_prefix)}{re.escape(query_object_name)}{re.escape(_query_object_identifier_suffix)}\b",
-            f"'{_parquet_uris[query_object_name]}'",
-            statement,
-        )
-    return statement
 
 
 def _sql_log_message(
