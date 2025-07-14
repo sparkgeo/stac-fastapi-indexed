@@ -31,7 +31,7 @@ scripts/run-with-local-http.sh
 
 This project includes a convenience script to index and serve a remote STAC catalog. This script will fully index the remote STAC catalog each time it is run. This may not be the most efficient way to meet your needs, but it does help demonstrate some of this project's capabilities.
 
-> ![NOTE]
+> [!NOTE]
 > This script should not be used in a production environment. It is intended for local testing only.
 
 This script can optionally be called with a comma-separated list of STAC item JSON fixers, invoking the behaviour described [here](./docs/index-config.md#fixes).
