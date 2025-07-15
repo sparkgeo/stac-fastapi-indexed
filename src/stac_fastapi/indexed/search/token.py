@@ -16,13 +16,13 @@ def get_query_info_from_token(
     token: str,
 ) -> QueryInfo:
     try:
-        result = QueryInfo(
-            **decode(
+        result = QueryInfo.from_dict(
+            decode(
                 jwt=token,
                 key=get_settings().token_jwt_secret,
                 algorithms=[_hashing_algorithm],
             )
-        ).json_post_decoder()
+        )
         if result.query_version != current_query_version:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -39,5 +39,4 @@ def create_token_from_query(query_info: QueryInfo) -> str:
         payload=(query_info.to_dict()),
         key=get_settings().token_jwt_secret,
         algorithm=_hashing_algorithm,
-        json_encoder=QueryInfo.json_encoder(),
     )
