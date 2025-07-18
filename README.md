@@ -1,6 +1,6 @@
-# STAC API Serverless
+# stac-fastapi-indexed
 
-[![Pull Request, Any Branch](https://github.com/sparkgeo/STAC-API-Serverless/actions/workflows/pull-request-all.yml/badge.svg)](https://github.com/sparkgeo/STAC-API-Serverless/actions/workflows/pull-request-all.yml)
+[![Pull Request, Any Branch](https://github.com/sparkgeo/stac-fastapi-indexed/actions/workflows/pull-request-all.yml/badge.svg)](https://github.com/sparkgeo/stac-fastapi-indexed/actions/workflows/pull-request-all.yml)
 
 A [stac-fastapi](https://github.com/stac-utils/stac-fastapi) backend that indexes a STAC catalog to Parquet to make it searchable. The ability to work with static files, and the lack of a need for another persistent data store such as a database, mean this backend can run in a serverless environment. See [Overview](#overview) for more information on this approach.
 
@@ -46,7 +46,7 @@ scripts/run-with-remote-source.sh https://esa.pages.eox.at/cubes-and-clouds-cata
 Output includes the following information about the index.
 ```sh
 * Indexing may take some time, depending on the size of the catalog
-* Indexing to /.../source/sparkgeo/STAC-API-Serverless/.remote-source-index/httpsesapageseoxatcubesandcloudscatalogMOOCCubesandcloudscatalogjson
+* Indexing to /.../source/sparkgeo/stac-fastapi-indexed/.remote-source-index/httpsesapageseoxatcubesandcloudscatalogMOOCCubesandcloudscatalogjson
 ```
 
 The generated index files can be inspected at `.../.remote-source-index/httpsesapageseoxatcubesandcloudscatalogMOOCCubesandcloudscatalogjson` if necessary. If at a later time you want to run the API against this same index, without re-indexing the remote STAC catalog, this can be achieved with the following:

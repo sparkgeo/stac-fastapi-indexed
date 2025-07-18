@@ -12,9 +12,9 @@ This stac-fastapi backend does not support transactions and never will. If you n
 
 The indexing approach requires that some STAC data be duplicated in Parquet index files, and these files are the API's source of truth about that STAC data. If the STAC data changes and the Parquet index files are not updated before an API request is received it is possible for the API to return incorrect data or an error.
 
-This risk can be mitigated somewhat by a shorter indexer repeat cycle, or by event-driven item updates as are intended by [#157](https://github.com/sparkgeo/STAC-API-Serverless/issues/157), but the risk cannot be eliminated entirely.
+This risk can be mitigated somewhat by a shorter indexer repeat cycle, or by event-driven item updates as are intended by [#157](https://github.com/sparkgeo/stac-fastapi-indexed/issues/157), but the risk cannot be eliminated entirely.
 
-[#160](https://github.com/sparkgeo/STAC-API-Serverless/issues/160) could also help to address some data duplication risks.
+[#160](https://github.com/sparkgeo/stac-fastapi-indexed/issues/160) could also help to address some data duplication risks.
 
 ### Performance
 
