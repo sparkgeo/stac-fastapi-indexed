@@ -75,7 +75,7 @@ class CdkDeploymentStack(Stack):
             default_cors_preflight_options=cors,
             proxy=True,
             binary_media_types=[],
-            rest_api_name="STAC-API-Serverless",
+            rest_api_name="stac-fastapi-indexed",
         )
 
     def create_indexer(

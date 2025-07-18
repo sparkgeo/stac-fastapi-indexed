@@ -4,7 +4,7 @@ from cdk_deployment.cdk_deployment_stack import CdkDeploymentStack
 app = cdk.App()
 CdkDeploymentStack(
     app,
-    "STAC-API-Serverless",
+    "stac-fastapi-indexed",
     env=cdk.Environment(
         account=app.node.get_context("AWS_ACCOUNT"),
         region=app.node.get_context("AWS_REGION"),

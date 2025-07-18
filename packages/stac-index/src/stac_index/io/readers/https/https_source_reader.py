@@ -76,7 +76,7 @@ class HttpsSourceReader(SourceReader):
         await self._get_uri_and_process(uri, process)
 
     # This function interacts with HTTP endpoints inefficiently.
-    # See https://github.com/sparkgeo/STAC-API-Serverless/issues/98 for thoughts on this.
+    # See https://github.com/sparkgeo/stac-fastapi-indexed/issues/98 for thoughts on this.
     async def get_item_uris_from_items_uri(
         self: Self, uri: str, item_limit: Optional[int] = None
     ) -> Tuple[List[str], List[str]]:
