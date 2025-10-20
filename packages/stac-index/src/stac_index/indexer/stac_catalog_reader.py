@@ -201,7 +201,7 @@ class StacCatalogReader:
                 except StacParserException as e:
                     item_errors.extend(e.indexing_errors)
                 except Exception as e:
-                    item_errors.extend(
+                    item_errors.append(
                         new_error(
                             type=IndexingErrorType.item_fetching,
                             description=str(e),
