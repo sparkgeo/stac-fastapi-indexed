@@ -36,7 +36,7 @@ SHELL ["/bin/sh", "-exc"]
 ENV PATH=/opt/app/bin:$PATH
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgeos3.11.1 \
+    libgeos3.13.1 \
     && rm -rf /var/lib/apt/lists/*
 
 STOPSIGNAL SIGINT
