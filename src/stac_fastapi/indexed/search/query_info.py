@@ -38,11 +38,10 @@ class QueryInfo:
         # Assume logic of validating that a "previous" link is required (i.e. there is currently a non-None offset) is applied elsewhere.
         # Technically we could apply that logic here, but we cannot determine if a "next" link is required in this module, so that would be insconsistent.
         current_offset = cast(int, self.offset)
+        previous_offset = current_offset - self.limit
         return replace(
             self,
-            offset=(current_offset - self.limit)
-            if current_offset > self.limit
-            else None,
+            offset=previous_offset if previous_offset > 0 else None,
         )
 
     def to_dict(self) -> Dict[str, Any]:

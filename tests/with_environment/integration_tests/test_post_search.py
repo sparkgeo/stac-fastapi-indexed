@@ -174,6 +174,31 @@ def test_post_search_limit() -> None:
     assert len(get_link_dict_by_rel(search_result, "next")) == 1
 
 
+def test_post_search_offset() -> None:
+    limit = 1
+    offset = 1
+    assert len(_all_items) > offset + limit
+    search_result = requests.post(
+        f"{api_base_url}/search", json={"limit": limit, "offset": offset}
+    ).json()
+    assert len(search_result["features"]) == limit
+    assert search_result["features"][0]["id"] == _all_items[offset]["id"]
+    assert len(get_link_dict_by_rel(search_result, "previous")) == 1
+    next_body = get_link_dict_by_rel(search_result, "next")[0]["body"]
+    next_result = requests.post(f"{api_base_url}/search", json=next_body).json()
+    assert next_result["features"][0]["id"] == _all_items[offset + limit]["id"]
+
+
+def test_post_search_offset_exceeds_total() -> None:
+    offset = len(_all_items) + 5
+    search_result = requests.post(
+        f"{api_base_url}/search", json={"offset": offset}
+    ).json()
+    assert len(search_result["features"]) == 0
+    assert len(get_link_dict_by_rel(search_result, "next")) == 0
+    assert len(get_link_dict_by_rel(search_result, "previous")) == 1
+
+
 def test_post_search_token() -> None:
     limit = 1
     assert len(_all_items) > limit

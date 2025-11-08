@@ -166,6 +166,7 @@ class CoreCrudClient(AsyncBaseCoreClient):
         bbox: Optional[BBox] = None,
         datetime: Optional[str] = None,
         limit: Optional[int] = None,
+        offset: Optional[int] = None,
         query: Optional[str] = None,
         token: Optional[str] = None,
         fields: Optional[List[str]] = None,
@@ -181,6 +182,7 @@ class CoreCrudClient(AsyncBaseCoreClient):
             "bbox": bbox,
             "datetime": datetime,
             "limit": limit,
+             "offset": offset,
             "token": token,
         }
         if sortby:
