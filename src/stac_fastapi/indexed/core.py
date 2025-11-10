@@ -182,7 +182,7 @@ class CoreCrudClient(AsyncBaseCoreClient):
             "bbox": bbox,
             "datetime": datetime,
             "limit": limit,
-             "offset": offset,
+            "offset": offset,
             "token": token,
         }
         if sortby:

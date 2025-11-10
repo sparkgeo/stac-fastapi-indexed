@@ -122,7 +122,9 @@ async def test_search_applies_offset(
         ),
         request=SimpleNamespace(method="POST"),
     ).search()
-    assert fetchall_mock.await_args.args[1][-1] == 5
+    await_call = fetchall_mock.await_args
+    assert await_call is not None
+    assert await_call.args[1][-1] == 5
 
 
 @pytest.mark.asyncio
