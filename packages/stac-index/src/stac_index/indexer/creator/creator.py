@@ -404,14 +404,17 @@ class IndexCreator:
             "collections_previous",
             "index_history_previous",
         )
-        has_history = self._conn.execute(
-            f"""
+        has_history = cast(
+            tuple[bool],
+            self._conn.execute(
+                f"""
             SELECT COUNT(*) = {len(history_tables)}
               FROM duckdb_tables() t
         INNER JOIN UNNEST(['{"', '".join(history_tables)}']) AS vals(expected_table_name)
                 ON t.table_name = vals.expected_table_name
         """
-        ).fetchone()[0]
+            ).fetchone(),
+        )[0]
         if has_history:
             self._conn.execute(
                 """
