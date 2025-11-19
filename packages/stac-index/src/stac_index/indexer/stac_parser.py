@@ -7,7 +7,6 @@ from typing import Any, Dict, List, Tuple
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 from stac_index.indexer.types.indexing_error import IndexingError, IndexingErrorType
-from stac_pydantic import Item
 
 _logger = getLogger(__name__)
 
@@ -103,14 +102,16 @@ class StacParser:
                     _logger.info("Enabling fixer: {}".format(fixer_name))
                     break
 
-    def parse_stac_item(self, fields: Dict[str, Any]) -> Tuple[Item, set[str]]:
+    def parse_stac_item(
+        self, fields: Dict[str, Any]
+    ) -> Tuple[Dict[str, Any], set[str]]:
         applied_fix_names: set[str] = set()
         for fixer in self._active_fixers:
             fields, changed = fixer.fix(fields)
             if changed is True:
                 applied_fix_names.add(fixer.name())
         try:
-            return (Item(**fields), applied_fix_names)
+            return (fields, applied_fix_names)
         except ValidationError as e:
             raise StacParserException(
                 [

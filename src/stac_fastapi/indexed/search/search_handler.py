@@ -1,4 +1,3 @@
-from asyncio import gather
 from dataclasses import dataclass
 from datetime import datetime
 from logging import Logger, getLogger
@@ -12,9 +11,7 @@ from stac_fastapi.extensions.core.sort.sort import SortExtensionPostRequest
 from stac_fastapi.types.errors import InvalidQueryParameter
 from stac_fastapi.types.rfc3339 import str_to_interval
 from stac_fastapi.types.search import BaseSearchPostRequest
-from stac_fastapi.types.stac import Item, ItemCollection
-from stac_index.indexer.stac_parser import StacParser
-from stac_index.io.readers.exceptions import UriNotFoundException
+from stac_fastapi.types.stac import ItemCollection
 from stac_pydantic.api.extensions.sort import SortDirections, SortExtension
 from stac_pydantic.api.search import Intersection
 from stac_pydantic.shared import BBox
@@ -22,7 +19,6 @@ from stac_pydantic.shared import BBox
 from stac_fastapi.indexed.constants import collection_wildcard, rel_root, rel_self
 from stac_fastapi.indexed.db import fetchall, format_query_object_name, get_last_load_id
 from stac_fastapi.indexed.links.catalog import get_catalog_link
-from stac_fastapi.indexed.links.item import fix_item_links
 from stac_fastapi.indexed.links.search import get_search_link, get_token_link
 from stac_fastapi.indexed.queryables.queryable_field_map import (
     get_queryable_config_by_name,
@@ -52,7 +48,7 @@ from stac_fastapi.indexed.search.token import (
 )
 from stac_fastapi.indexed.search.types import SearchDirection, SearchMethod
 from stac_fastapi.indexed.sortables.sortable_config import get_sortable_configs_by_field
-from stac_fastapi.indexed.stac.fetcher import fetch_dict
+from stac_fastapi.indexed.stac.fetcher import ItemQueryRow, get_items_from_query_rows
 
 _logger: Final[Logger] = getLogger(__name__)
 _text_filter_wrap_key: Final[str] = "__text_filter"
@@ -109,7 +105,7 @@ class SearchHandler:
                 clauses.append(addition.sql)
                 params.extend(addition.params)
         query = """
-            SELECT stac_location, applied_fixes
+            SELECT item_content, stac_location, applied_fixes
             FROM {table_name}
               {where}
               ORDER BY {order}
@@ -124,10 +120,13 @@ class SearchHandler:
             query_info.limit + 1
         )  # request one more so that we know if there's a next page of results
         params.append(query_info.offset if query_info.offset is not None else 0)
-        rows = await fetchall(
-            query,
-            params,
-        )
+        rows = [
+            ItemQueryRow(*row)
+            for row in await fetchall(
+                query,
+                params,
+            )
+        ]
         if reject_if_load_id_changed and get_last_load_id() != query_info.last_load_id:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -136,42 +135,10 @@ class SearchHandler:
         has_next_page = len(rows) > query_info.limit
         has_previous_page = query_info.offset is not None
 
-        async def get_each_item(uri: str) -> Optional[Dict[str, Any]]:
-            try:
-                return await fetch_dict(uri=uri)
-            except UriNotFoundException:
-                _logger.warning(
-                    "Item '{uri}' exists in the index but does not exist in the data store, index is outdated".format(
-                        uri=uri
-                    )
-                )
-                return None
+        items = await get_items_from_query_rows(
+            rows=rows[0 : query_info.limit], request=self.request
+        )
 
-        fetch_tasks = [
-            get_each_item(url) for url in [row[0] for row in rows[0 : query_info.limit]]
-        ]
-        fetched_dicts = []
-        missing_entry_indices = []
-        for i, entry in enumerate(await gather(*fetch_tasks)):
-            if entry is None:
-                missing_entry_indices.append(i)
-            else:
-                fetched_dicts.append(entry)
-        fixes_to_apply = [
-            fix_list.split(",")
-            for fix_list in [
-                row[1]
-                for i, row in enumerate(rows[0 : query_info.limit])
-                if i not in missing_entry_indices
-            ]
-        ]
-        items = [
-            fix_item_links(
-                Item(**StacParser(fixers).parse_stac_item(item_dict)[1]),
-                self.request,
-            )
-            for (item_dict, fixers) in zip(fetched_dicts, fixes_to_apply)
-        ]
         links = [
             get_catalog_link(self.request, rel_root),
             get_search_link(self.request, rel_self),

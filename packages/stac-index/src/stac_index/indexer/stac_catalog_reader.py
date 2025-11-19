@@ -20,6 +20,7 @@ from stac_index.io.readers import source_reader_classes
 from stac_index.io.readers.source_reader import SourceReader
 from stac_pydantic.catalog import Catalog
 from stac_pydantic.collection import Collection
+from stac_pydantic.item import Item
 from stac_pydantic.links import Links
 
 
@@ -203,7 +204,10 @@ class StacCatalogReader:
                 item_errors: List[IndexingError] = []
                 try:
                     dict_item = await self._get_json_content_from_uri(uri)
-                    (item, applied_fixes) = self._stac_parser.parse_stac_item(dict_item)
+                    (dict_item, applied_fixes) = self._stac_parser.parse_stac_item(
+                        dict_item
+                    )
+                    item = Item(**dict_item)
                 except StacParserException as e:
                     item_errors.extend(e.indexing_errors)
                 except Exception as e:

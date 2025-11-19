@@ -1,33 +1,29 @@
-from asyncio import gather
 from json import loads
 from logging import Logger, getLogger
 from re import IGNORECASE, match, search
-from typing import Any, Dict, Final, List, Optional, cast
+from typing import Final, List, Optional, cast
 from urllib.parse import unquote_plus
 
 import attr
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import ValidationError
 from stac_fastapi.types.core import AsyncBaseCoreClient
-from stac_fastapi.types.errors import NotFoundError
 from stac_fastapi.types.rfc3339 import DateTimeType
 from stac_fastapi.types.search import BaseSearchPostRequest
 from stac_fastapi.types.stac import Collection, Collections, Item, ItemCollection
-from stac_index.indexer.stac_parser import StacParser
-from stac_index.io.readers.exceptions import UriNotFoundException
 from stac_pydantic.shared import BBox
 
 from stac_fastapi.indexed.constants import rel_parent, rel_root, rel_self
-from stac_fastapi.indexed.db import fetchall, fetchone, format_query_object_name
+from stac_fastapi.indexed.db import fetchall, format_query_object_name
 from stac_fastapi.indexed.links.catalog import get_catalog_link
-from stac_fastapi.indexed.links.collection import (
-    fix_collection_links,
-    get_collections_link,
-)
-from stac_fastapi.indexed.links.item import fix_item_links
+from stac_fastapi.indexed.links.collection import get_collections_link
 from stac_fastapi.indexed.search.filter.parser import FilterLanguage
 from stac_fastapi.indexed.search.search_handler import SearchHandler
-from stac_fastapi.indexed.stac.fetcher import fetch_dict
+from stac_fastapi.indexed.stac.fetcher import (
+    get_all_collections,
+    get_single_collection,
+    get_single_item,
+)
 
 _logger: Final[Logger] = getLogger(__name__)
 
@@ -45,41 +41,33 @@ class CoreCrudClient(AsyncBaseCoreClient):
             == "/"
         ):
             _logger.debug(f"answering '{request.url}' as minimal collections response")
-            return await self._get_minimal_collections_response()
+            return Collections(
+                collections=[
+                    Collection(**{"id": id})
+                    for id in [
+                        row[0]
+                        for row in await fetchall(
+                            f"SELECT id FROM {format_query_object_name('collections')} ORDER BY id"
+                        )
+                    ]
+                ],
+                links=[],
+            )
         else:
             _logger.debug(f"answering '{request.url}' as full collections response")
-            return await self._get_full_collections_response(request)
+            return Collections(
+                collections=await get_all_collections(request),
+                links=[
+                    get_catalog_link(request, rel_root),
+                    get_catalog_link(request, rel_parent),
+                    get_collections_link(request, rel_self),
+                ],
+            )
 
     async def get_collection(
         self, collection_id: str, request: Request, **kwargs
     ) -> Collection:
-        row = await fetchone(
-            f"SELECT stac_location FROM {format_query_object_name('collections')} WHERE id = ?",
-            [collection_id],
-        )
-        if row is not None:
-            try:
-                return fix_collection_links(
-                    Collection(**await fetch_dict(row[0])),
-                    request,
-                )
-            except UriNotFoundException as e:
-                _logger.warning(
-                    "Collection {collection_id} exists in the index but does not exist in the data store, index is outdated".format(
-                        collection_id=collection_id
-                    )
-                )
-                raise NotFoundError(
-                    "Collection {collection_id} not found in the indexed data store at {uri}. This means the index is outdated, and suggests this collection has been removed by the data store and may disappear at the next index update.".format(
-                        collection_id=collection_id,
-                        uri=e.uri,
-                    )
-                )
-        raise NotFoundError(
-            "Collection {collection_id} does not exist.".format(
-                collection_id=collection_id
-            )
-        )
+        return await get_single_collection(collection_id=collection_id, request=request)
 
     async def item_collection(
         self,
@@ -116,39 +104,11 @@ class CoreCrudClient(AsyncBaseCoreClient):
     async def get_item(
         self, item_id: str, collection_id: str, request: Request, **kwargs
     ) -> Item:
-        await self.get_collection(
-            collection_id, request=request
-        )  # will error if collection does not exist
-        row = await fetchone(
-            f"SELECT stac_location, applied_fixes FROM {format_query_object_name('items')} WHERE collection_id = ? and id = ?",
-            [collection_id, item_id],
-        )
-        if row is not None:
-            try:
-                return fix_item_links(
-                    Item(
-                        StacParser(row[1].split(",")).parse_stac_item(
-                            await fetch_dict(row[0])
-                        )[1]
-                    ),
-                    request,
-                )
-            except UriNotFoundException as e:
-                _logger.warning(
-                    "Item {collection_id}/{item_id} exists in the index but does not exist in the data store, index is outdated".format(
-                        collection_id=collection_id, item_id=item_id
-                    )
-                )
-                raise NotFoundError(
-                    "Item {item_id} not found in the indexed data store at {uri}. This means the index is outdated, and suggests this item has been removed by the data store and may disappear at the next index update.".format(
-                        item_id=item_id,
-                        uri=e.uri,
-                    )
-                )
-        raise NotFoundError(
-            "Item {item_id} in Collection {collection_id} does not exist.".format(
-                item_id=item_id, collection_id=collection_id
-            )
+        return await get_single_item(
+            collection_id=collection_id,
+            item_id=item_id,
+            request=request,
+            verify_collection_exists=True,
         )
 
     async def post_search(
@@ -227,56 +187,3 @@ class CoreCrudClient(AsyncBaseCoreClient):
         return await SearchHandler(
             search_request=search_request, request=request
         ).search()
-
-    async def _get_minimal_collections_response(self) -> Collections:
-        return Collections(
-            collections=[
-                Collection(**{"id": id})
-                for id in [
-                    row[0]
-                    for row in await fetchall(
-                        f"SELECT id FROM {format_query_object_name('collections')} ORDER BY id"
-                    )
-                ]
-            ],
-            links=[],
-        )
-
-    async def _get_full_collections_response(self, request: Request) -> Collections:
-        async def get_each_collection(uri: str) -> Optional[Dict[str, Any]]:
-            try:
-                return await fetch_dict(uri=uri)
-            except UriNotFoundException:
-                _logger.warning(
-                    "Collection '{uri}' exists in the index but does not exist in the data store, index is outdated".format(
-                        uri=uri
-                    )
-                )
-                return None
-
-        fetch_tasks = [
-            get_each_collection(uri)
-            for uri in [
-                row[0]
-                for row in await fetchall(
-                    f"SELECT stac_location FROM {format_query_object_name('collections')} ORDER BY id"
-                )
-            ]
-        ]
-        collections = [
-            fix_collection_links(
-                Collection(**collection_dict),
-                request,
-            )
-            for collection_dict in [
-                entry for entry in await gather(*fetch_tasks) if entry is not None
-            ]
-        ]
-        return Collections(
-            collections=collections,
-            links=[
-                get_catalog_link(request, rel_root),
-                get_catalog_link(request, rel_parent),
-                get_collections_link(request, rel_self),
-            ],
-        )
