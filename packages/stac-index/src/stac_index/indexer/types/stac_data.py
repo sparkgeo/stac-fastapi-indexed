@@ -1,20 +1,14 @@
-from typing import Optional, Set
-
 from pydantic import BaseModel
-from stac_pydantic import Collection, Item
+from stac_pydantic.collection import Collection
+from stac_pydantic.item import Item
 
 
-class WithLocation(BaseModel):
+class CollectionWithLocation(BaseModel):
+    collection: Collection
     location: str
 
 
-class WithFixes(BaseModel):
-    applied_fixes: Optional[Set[str]] = None
-
-
-class CollectionWithLocation(Collection, WithLocation):
-    pass
-
-
-class ItemWithLocation(Item, WithLocation, WithFixes):
-    pass
+class ItemWithLocationAndFixes(BaseModel):
+    item: Item
+    location: str
+    applied_fixes: set[str]

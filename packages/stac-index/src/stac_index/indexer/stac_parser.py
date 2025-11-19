@@ -24,17 +24,17 @@ class Fixer(ABC):
         pass
 
     @abstractmethod
-    def fix(self, fields: Dict[str, Any]) -> Dict[str, Any]:
+    def fix(self, fields: Dict[str, Any]) -> tuple[Dict[str, Any], bool]:
         """Apply the fix to a dictionary.
 
         Given a dictionary that should represent am Item, return a new
         dictionary with the fix applied.
 
-        If the fix does not apply to the input dict, just return the dict
-        unchanged.
+        If the fix does not apply to the input dict, return the dict
+        unchanged along with a False outcome.
 
-        If the fix is applied, an "applied_fixes" field is added or updated,
-        containing a list of the names of applied fixes.
+        If the fix is applied, return the changed dict along with a
+        True outcome.
 
         """
         pass
@@ -63,17 +63,16 @@ class EOExtensionUriFixer(Fixer):
         else:
             raise Exception("some expected keys missing from error")
 
-    def fix(self, fields: Dict[str, Any]) -> Dict[str, Any]:
+    def fix(self, fields: Dict[str, Any]) -> tuple[Dict[str, Any], bool]:
         result = deepcopy(fields)
+        fix_applied = False
         for i, elem in enumerate(result.get("stac_extensions", [])):
             if str(elem).lower() == "eo":
                 result["stac_extensions"][i] = (
                     "https://stac-extensions.github.io/eo/v1.0.0/schema.json"
                 )
-                applied_fixes = result.get("applied_fixes", set())
-                applied_fixes.add(self.name())
-                result["applied_fixes"] = applied_fixes
-        return result
+                fix_applied = True
+        return (result, fix_applied)
 
 
 class StacParserException(Exception):
@@ -95,8 +94,8 @@ class StacParser:
     """
 
     def __init__(self, fixers: List[str]):
-        self._all_fixers = [EOExtensionUriFixer()]
-        self._active_fixers = []
+        self._all_fixers: list[Fixer] = [EOExtensionUriFixer()]
+        self._active_fixers: list[Fixer] = []
         for fixer_name in fixers:
             for fixer in self._all_fixers:
                 if fixer.name() == fixer_name:
@@ -104,11 +103,14 @@ class StacParser:
                     _logger.info("Enabling fixer: {}".format(fixer_name))
                     break
 
-    def parse_stac_item(self, fields: Dict[str, Any]) -> Tuple[Item, Dict[str, Any]]:
+    def parse_stac_item(self, fields: Dict[str, Any]) -> Tuple[Item, set[str]]:
+        applied_fix_names: set[str] = set()
         for fixer in self._active_fixers:
-            fields = fixer.fix(fields)
+            fields, changed = fixer.fix(fields)
+            if changed is True:
+                applied_fix_names.add(fixer.name())
         try:
-            return (Item(**fields), fields)
+            return (Item(**fields), applied_fix_names)
         except ValidationError as e:
             raise StacParserException(
                 [

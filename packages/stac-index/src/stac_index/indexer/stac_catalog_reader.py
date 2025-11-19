@@ -12,10 +12,14 @@ from stac_index.indexer.types.indexing_error import (
     IndexingErrorType,
     new_error,
 )
-from stac_index.indexer.types.stac_data import CollectionWithLocation, ItemWithLocation
+from stac_index.indexer.types.stac_data import (
+    CollectionWithLocation,
+    ItemWithLocationAndFixes,
+)
 from stac_index.io.readers import source_reader_classes
 from stac_index.io.readers.source_reader import SourceReader
-from stac_pydantic import Catalog, Collection
+from stac_pydantic.catalog import Catalog
+from stac_pydantic.collection import Collection
 from stac_pydantic.links import Links
 
 
@@ -155,14 +159,16 @@ class StacCatalogReader:
                             )
                         )
                     collections.append(
-                        collection.model_copy(update={"location": child_link})
+                        CollectionWithLocation(
+                            collection=collection, location=child_link
+                        )
                     )
         return (collections, errors)
 
     async def process_items(
         self,
         collections: List[Collection],
-        item_ingestor: Callable[[ItemWithLocation], List[IndexingError]],
+        item_ingestor: Callable[[ItemWithLocationAndFixes], List[IndexingError]],
     ) -> List[IndexingError]:
         _logger.info("reading items for collections")
         all_errors: List[IndexingError] = []
@@ -197,7 +203,7 @@ class StacCatalogReader:
                 item_errors: List[IndexingError] = []
                 try:
                     dict_item = await self._get_json_content_from_uri(uri)
-                    (item, dict_item) = self._stac_parser.parse_stac_item(dict_item)
+                    (item, applied_fixes) = self._stac_parser.parse_stac_item(dict_item)
                 except StacParserException as e:
                     item_errors.extend(e.indexing_errors)
                 except Exception as e:
@@ -219,7 +225,11 @@ class StacCatalogReader:
                     # ensure item_ingestor cannot be called concurrently by concurrent async function calls
                     with _item_processor_mutex:
                         item_errors.extend(
-                            item_ingestor(ItemWithLocation(**dict_item, location=uri))
+                            item_ingestor(
+                                ItemWithLocationAndFixes(
+                                    item=item, location=uri, applied_fixes=applied_fixes
+                                )
+                            )
                         )
                 return item_errors
 
