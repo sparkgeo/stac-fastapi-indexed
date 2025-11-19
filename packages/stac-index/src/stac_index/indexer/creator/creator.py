@@ -89,7 +89,9 @@ class IndexCreator:
             root_catalog_uri=root_catalog_uri,
             fixes_to_apply=index_config.fixes_to_apply,
         )
-        collections, collection_errors = await self._request_collections(reader)
+        collections, collection_errors = await self._request_collections(
+            index_config, reader
+        )
         items_errors = await self._request_items(index_config, reader, collections)
         configure_indexables(index_config, self._conn)
         self._log_index_event(root_catalog_uri=root_catalog_uri)
@@ -172,7 +174,9 @@ class IndexCreator:
         return manifest_path
 
     async def _request_collections(
-        self: Self, reader: StacCatalogReader
+        self: Self,
+        index_config: IndexConfig,
+        reader: StacCatalogReader,
     ) -> Tuple[List[Collection], List[IndexingError]]:
         collections, errors = await reader.get_collections(
             await reader.get_root_catalog()
@@ -185,18 +189,23 @@ class IndexCreator:
                 , stac_location
                 , load_id
                 , collection_hash
+                , collection_content
                 ) VALUES (
-                    ?, ?, ?, ?
+                    ?, ?, ?, ?, ?
                 );
             """
             try:
+                collection_json = collection.to_json()
                 self._conn.execute(
                     insert_sql,
                     (
                         collection.id,
                         collection.location,
                         self._load_id,
-                        self._hash_data(collection.to_json()),
+                        self._hash_data(collection_json),
+                        collection_json
+                        if index_config.persist_stac_content is True
+                        else None,
                     ),
                 )
             except Exception as e:
@@ -238,6 +247,7 @@ class IndexCreator:
             "applied_fixes": "?",
             "load_id": "?",
             "item_hash": "?",
+            "item_content": "?",
         }
         for indexable in index_config.indexables.values():
             insert_fields_and_values_template[indexable.table_column_name] = "?"
@@ -258,6 +268,7 @@ class IndexCreator:
                 counts["invalid"] += 1
                 return errors
 
+            item_json = item.to_json()
             insert_params = [
                 item.id,
                 item.collection,
@@ -269,7 +280,8 @@ class IndexCreator:
                 if item.applied_fixes is not None
                 else "NONE",
                 self._load_id,
-                self._hash_data(item.to_json()),
+                self._hash_data(item_json),
+                item_json if index_config.persist_stac_content is True else None,
             ]
             for (
                 collection_id,

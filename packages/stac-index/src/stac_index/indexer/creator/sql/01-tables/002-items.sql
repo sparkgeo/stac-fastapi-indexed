@@ -9,5 +9,6 @@ CREATE TABLE items (
     applied_fixes VARCHAR,
     load_id VARCHAR(32) NOT NULL,
     item_hash VARCHAR NOT NULL,
+    item_content JSON NULL,
     PRIMARY KEY (collection_id, id),
 );

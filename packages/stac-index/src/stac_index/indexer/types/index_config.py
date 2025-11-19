@@ -61,6 +61,7 @@ class IndexConfig(BaseModel):
     queryables: QueryableByFieldName = {}
     sortables: SortablesByFieldName = {}
     fixes_to_apply: List[str] = []
+    persist_stac_content: bool = False
 
     def __init__(self, **data):
         super().__init__(**data)

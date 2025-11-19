@@ -3,4 +3,5 @@ CREATE TABLE collections (
     stac_location VARCHAR NOT NULL,
     load_id VARCHAR(32) NOT NULL,
     collection_hash VARCHAR NOT NULL,
+    collection_content JSON NULL,
 );
