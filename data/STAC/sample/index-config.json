@@ -1,5 +1,4 @@
 {
-    "root_catalog_uri": "/data/catalog.json",
     "indexables": {
         "gsd": {
             "storage_type": "DOUBLE",
@@ -24,5 +23,6 @@
                 "joplin"
             ]
         }
-    }
+    },
+    "persist_stac_content": true
 }
