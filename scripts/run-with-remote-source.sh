@@ -40,10 +40,12 @@ if [ -f $"$tmp_index_path/manifest.json" ]; then
     unset root_catalog_uri
 else
     # No point evaluating this if updating an existing index as it will be ignored.
+    export tmp_index_config_path=$(mktemp)
     if [ -n "$fixes_to_apply" ]; then
-        export tmp_index_config_path=$(mktemp)
         fixes_json=$(echo "$fixes_to_apply" | sed "s/,\s*/\", \"/g")
-        echo "{\"fixes_to_apply\": [\"${fixes_json}\"]}" > $tmp_index_config_path
+        echo "{\"persist_stac_content\": true, \"fixes_to_apply\": [\"${fixes_json}\"]}" > $tmp_index_config_path
+    else
+        echo "{\"persist_stac_content\": true}" > $tmp_index_config_path
     fi
 fi
 
