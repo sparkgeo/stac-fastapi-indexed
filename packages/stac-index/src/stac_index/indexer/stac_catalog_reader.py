@@ -39,7 +39,7 @@ _child_types_by_lower_type: Final[Dict[str, Type[_HasLinks]]] = {
 @dataclass
 class StacCatalogReader:
     root_catalog_uri: str
-    fixes_to_apply: List[str]
+    fixes_to_apply: List[str] | None
 
     def __post_init__(self):
         self._source_reader = None

@@ -29,7 +29,7 @@ async def test_get_single_item_with_fetch_success(
     get_reader_for_uri_mock: mock.MagicMock,
     *args,
 ) -> None:
-    fetchone_mock.return_value = [None, "matching STAC item uri", ""]
+    fetchone_mock.return_value = [None, "matching STAC item uri", None]
     fix_item_links_mock.return_value = "fixed item"
     stac_parser_mock.return_value = SimpleNamespace(
         parse_stac_item=mock.Mock(return_value=[{}])
@@ -79,7 +79,7 @@ async def test_get_single_item_with_fetch_indexed_but_missing(
     get_reader_for_uri_mock: mock.MagicMock,
     *args,
 ) -> None:
-    fetchone_mock.return_value = [None, "matching STAC item uri", ""]
+    fetchone_mock.return_value = [None, "matching STAC item uri", None]
     get_reader_for_uri_mock.return_value = SimpleNamespace(
         load_json_from_uri=mock.AsyncMock(side_effect=UriNotFoundException("uri"))
     )

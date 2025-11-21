@@ -93,10 +93,10 @@ class StacParser:
 
     """
 
-    def __init__(self, fixers: List[str]):
+    def __init__(self, fixers: List[str] | None):
         self._all_fixers: list[Fixer] = [EOExtensionUriFixer()]
         self._active_fixers: list[Fixer] = []
-        for fixer_name in fixers:
+        for fixer_name in fixers or []:
             for fixer in self._all_fixers:
                 if fixer.name() == fixer_name:
                     self._active_fixers.append(fixer)

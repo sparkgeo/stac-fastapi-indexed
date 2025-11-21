@@ -30,7 +30,7 @@ async def test_search_multi_item_with_fetch_success(
 ) -> None:
     from stac_fastapi.indexed.search.search_handler import SearchHandler
 
-    fetchall_mock.return_value = [[None, "", ""], [None, "", ""]]
+    fetchall_mock.return_value = [[None, "", None], [None, "", None]]
     fixed_items_mock_value = [
         SimpleNamespace(id="mock fixed item 1"),
         SimpleNamespace(id="mock fixed item 2"),
@@ -76,7 +76,7 @@ async def test_search_multi_item_with_fetch_partial_indexed_but_missing(
 ) -> None:
     from stac_fastapi.indexed.search.search_handler import SearchHandler
 
-    fetchall_mock.return_value = [[None, "", ""], [None, "", ""]]
+    fetchall_mock.return_value = [[None, "", None], [None, "", None]]
     fixed_items_mock_value = [SimpleNamespace(id="mock fixed item 1")]
     get_items_from_query_rows_mock.return_value = fixed_items_mock_value
     get_sortable_configs_by_field_mock.return_value = {

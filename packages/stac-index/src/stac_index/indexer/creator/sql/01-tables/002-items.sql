@@ -6,7 +6,7 @@ CREATE TABLE items (
     start_datetime TIMESTAMPTZ,
     end_datetime TIMESTAMPTZ,
     stac_location VARCHAR NOT NULL,
-    applied_fixes VARCHAR,
+    applied_fixes VARCHAR NULL,
     load_id VARCHAR(32) NOT NULL,
     item_hash VARCHAR NOT NULL,
     item_content JSON NULL,
