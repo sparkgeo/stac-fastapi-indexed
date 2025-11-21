@@ -7,12 +7,13 @@ services:
     image: sparkgeo/stac_indexer
     environment:
       INDEX_ROOT_CATALOG_URI: /data/catalog.json
-      INDEX_CONFIG_PATH: /index-config.json
+      INDEX_CONFIG_PATH: ${INDEX_CONFIG_PATH:-/index-config.json}
       INDEX_PUBLISH_PATH: /output
     volumes:
       - indexer-output:/output:rw
       - ./data/STAC/sample/data:/data:ro
       - ./data/STAC/sample/index-config.json:/index-config.json:ro
+      - ./data/STAC/sample/index-config-with-persistence.json:/index-config-with-persistence.json:ro
 
   api:
     volumes:
