@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Tuple
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 from stac_index.indexer.types.indexing_error import IndexingError, IndexingErrorType
+from stac_pydantic.item import Item
 
 _logger = getLogger(__name__)
 
@@ -111,7 +112,7 @@ class StacParser:
             if changed is True:
                 applied_fix_names.add(fixer.name())
         try:
-            return (fields, applied_fix_names)
+            Item(**fields)
         except ValidationError as e:
             raise StacParserException(
                 [
@@ -146,3 +147,5 @@ class StacParser:
                     )
                 ]
             )
+        else:
+            return (fields, applied_fix_names)
