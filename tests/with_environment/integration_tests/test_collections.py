@@ -21,6 +21,6 @@ def test_all_collections_match() -> None:
         ]
         assert len(matching_api_collections) == 1
         # exclude links from comparison as they are modified by the API
-        assert dumps({**matching_api_collections[0], "links": []}) == dumps(
-            {**file_collection, "links": []}
-        )
+        assert dumps(
+            {**matching_api_collections[0], "links": []}, sort_keys=True
+        ) == dumps({**file_collection, "links": []}, sort_keys=True)

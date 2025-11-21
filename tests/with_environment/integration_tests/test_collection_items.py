@@ -48,8 +48,8 @@ def test_collection_items_paged() -> None:
         assert len(items_from_api.keys()) == len(items_from_file.keys())
         for id, item_from_api in items_from_api.items():
             # exclude links from comparison as they are modified by the API
-            assert dumps({**item_from_api, "links": []}) == dumps(
-                {**items_from_file[id], "links": []}
+            assert dumps({**item_from_api, "links": []}, sort_keys=True) == dumps(
+                {**items_from_file[id], "links": []}, sort_keys=True
             )
 
 

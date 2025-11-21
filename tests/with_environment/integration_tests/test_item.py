@@ -24,4 +24,6 @@ def test_item() -> None:
                     item_from_collection["id"],
                 )
             ).json()
-            assert dumps(item_from_collection) == dumps(item_from_item)
+            assert dumps(item_from_collection, sort_keys=True) == dumps(
+                item_from_item, sort_keys=True
+            )
