@@ -2,7 +2,6 @@ from asyncio import Semaphore, gather
 from dataclasses import dataclass
 from logging import Logger, getLogger
 from re import Pattern, compile, sub
-from threading import Lock
 from typing import Any, Callable, Dict, Final, List, Protocol, Tuple, Type, cast
 
 from stac_index.indexer.settings import get_settings
@@ -30,7 +29,6 @@ class _HasLinks(Protocol):
 
 _settings: Final = get_settings()
 _logger: Final[Logger] = getLogger(__name__)
-_item_processor_mutex: Final[Lock] = Lock()
 _link_strip_regex: Final[Pattern] = compile(r"[^/]+$")
 _child_types_by_lower_type: Final[Dict[str, Type[_HasLinks]]] = {
     "catalog": Catalog,
@@ -226,15 +224,13 @@ class StacCatalogReader:
                             )
                         )
 
-                    # ensure item_ingestor cannot be called concurrently by concurrent async function calls
-                    with _item_processor_mutex:
-                        item_errors.extend(
-                            item_ingestor(
-                                ItemWithLocationAndFixes(
-                                    item=item, location=uri, applied_fixes=applied_fixes
-                                )
+                    item_errors.extend(
+                        item_ingestor(
+                            ItemWithLocationAndFixes(
+                                item=item, location=uri, applied_fixes=applied_fixes
                             )
                         )
+                    )
                 return item_errors
 
         _logger.info(
