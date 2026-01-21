@@ -9,9 +9,8 @@ from typing import Dict, Final, List, Optional, Self, Tuple, cast
 from uuid import uuid4
 
 from duckdb import ConstraintException, connect
-from shapely import Geometry, is_valid_reason
+from shapely import is_valid_reason
 from shapely.wkt import loads as wkt_loads
-from stac_fastapi.types.stac import Collection
 from stac_index.indexer.creator.configurer import (
     add_items_columns,
     configure_indexables,
@@ -25,8 +24,9 @@ from stac_index.indexer.types.indexing_error import (
     new_error,
     save_error,
 )
-from stac_index.indexer.types.stac_data import ItemWithLocation
+from stac_index.indexer.types.stac_data import ItemWithLocationAndFixes
 from stac_index.io.readers import get_reader_for_uri
+from stac_pydantic.collection import Collection
 
 _logger: Final[Logger] = getLogger(__name__)
 _indexer_version: Final[int] = (
@@ -89,7 +89,9 @@ class IndexCreator:
             root_catalog_uri=root_catalog_uri,
             fixes_to_apply=index_config.fixes_to_apply,
         )
-        collections, collection_errors = await self._request_collections(reader)
+        collections, collection_errors = await self._request_collections(
+            index_config, reader
+        )
         items_errors = await self._request_items(index_config, reader, collections)
         configure_indexables(index_config, self._conn)
         self._log_index_event(root_catalog_uri=root_catalog_uri)
@@ -172,43 +174,50 @@ class IndexCreator:
         return manifest_path
 
     async def _request_collections(
-        self: Self, reader: StacCatalogReader
+        self: Self,
+        index_config: IndexConfig,
+        reader: StacCatalogReader,
     ) -> Tuple[List[Collection], List[IndexingError]]:
-        collections, errors = await reader.get_collections(
+        collections_with_locations, errors = await reader.get_collections(
             await reader.get_root_catalog()
         )
-        _logger.info(f"discovered {len(collections)} collection(s)")
-        for collection in collections:
+        _logger.info(f"discovered {len(collections_with_locations)} collection(s)")
+        for collection_with_location in collections_with_locations:
             insert_sql = """
                 INSERT INTO collections (
                     id
                 , stac_location
                 , load_id
                 , collection_hash
+                , collection_content
                 ) VALUES (
-                    ?, ?, ?, ?
+                    ?, ?, ?, ?, ?
                 );
             """
             try:
+                collection_json = collection_with_location.collection.to_json()
                 self._conn.execute(
                     insert_sql,
                     (
-                        collection.id,
-                        collection.location,
+                        collection_with_location.collection.id,
+                        collection_with_location.location,
                         self._load_id,
-                        self._hash_data(collection.to_json()),
+                        self._hash_data(collection_json),
+                        collection_json
+                        if index_config.persist_stac_content is True
+                        else None,
                     ),
                 )
             except Exception as e:
                 errors.append(
                     new_error(
                         IndexingErrorType.unknown,
-                        f"failed to insert collection '{collection.id}': {e}",
-                        collection=collection.id,
+                        f"failed to insert collection '{collection_with_location.collection.id}': {e}",
+                        collection=collection_with_location.collection.id,
                     )
                 )
         self._insert_errors(errors)
-        return (collections, errors)
+        return ([entry.collection for entry in collections_with_locations], errors)
 
     # Processing items is more complex than collections due to scale.
     # It is possible to have an enormous number of items (collections too, though this is less likely).
@@ -230,7 +239,7 @@ class IndexCreator:
         insert_fields_and_values_template = {
             "id": "?",
             "collection_id": "?",
-            "geometry": "ST_GeomFromText('{geometry_wkt}')",
+            "geometry": "{geometry_wkt_constructor}",
             "datetime": "?",
             "start_datetime": "?",
             "end_datetime": "?",
@@ -238,38 +247,47 @@ class IndexCreator:
             "applied_fixes": "?",
             "load_id": "?",
             "item_hash": "?",
+            "item_content": "?",
         }
         for indexable in index_config.indexables.values():
             insert_fields_and_values_template[indexable.table_column_name] = "?"
 
-        def processor(item: ItemWithLocation) -> List[IndexingError]:
+        def processor(
+            item_with_location_and_fixes: ItemWithLocationAndFixes,
+        ) -> List[IndexingError]:
             errors: List[IndexingError] = []
-            geometry: Geometry = wkt_loads(item.geometry.wkt)
-            if not geometry.is_valid:
+            geometry = (
+                wkt_loads(item_with_location_and_fixes.item.geometry.wkt)
+                if item_with_location_and_fixes.item.geometry
+                else None
+            )
+            if geometry and not geometry.is_valid:
                 errors.append(
                     new_error(
                         IndexingErrorType.item_validation,
-                        f"Invalid geometry for '{item.collection}'/'{item.id}': {is_valid_reason(geometry)}",
+                        f"Invalid geometry for '{item_with_location_and_fixes.item.collection}'/'{item_with_location_and_fixes.item.id}': {is_valid_reason(geometry)}",
                         subtype="invalid_geometry",
-                        collection=item.collection,
-                        item=item.id,
+                        collection=item_with_location_and_fixes.item.collection,
+                        item=item_with_location_and_fixes.item.id,
                     )
                 )
                 counts["invalid"] += 1
                 return errors
 
+            item_json = item_with_location_and_fixes.item.to_json()
             insert_params = [
-                item.id,
-                item.collection,
-                item.properties.datetime,
-                item.properties.start_datetime,
-                item.properties.end_datetime,
-                item.location,
-                ",".join(item.applied_fixes)
-                if item.applied_fixes is not None
+                item_with_location_and_fixes.item.id,
+                item_with_location_and_fixes.item.collection,
+                item_with_location_and_fixes.item.properties.datetime,
+                item_with_location_and_fixes.item.properties.start_datetime,
+                item_with_location_and_fixes.item.properties.end_datetime,
+                item_with_location_and_fixes.location,
+                ",".join(item_with_location_and_fixes.applied_fixes)
+                if item_with_location_and_fixes.applied_fixes is not None
                 else "NONE",
                 self._load_id,
-                self._hash_data(item.to_json()),
+                self._hash_data(item_json),
+                item_json if index_config.persist_stac_content is True else None,
             ]
             for (
                 collection_id,
@@ -277,7 +295,7 @@ class IndexCreator:
             ) in index_config.all_indexables_by_collection.items():
                 if (
                     collection_id == collection_wildcard
-                    or collection_id == item.collection
+                    or collection_id == item_with_location_and_fixes.item.collection
                 ):
                     for field_name, indexable in indexable_by_field_name.items():
                         insert_param = None
@@ -285,7 +303,7 @@ class IndexCreator:
                             # where multiple JSON paths are possible accept the first that is not-None
                             path_parts = path_option.split(".")
                             path_parents, path_key = path_parts[:-1], path_parts[-1:][0]
-                            param_source = item.to_dict()
+                            param_source = item_with_location_and_fixes.item.to_dict()
                             for parent_part in path_parents:
                                 try:
                                     param_source = param_source[parent_part]
@@ -303,11 +321,11 @@ class IndexCreator:
                                     "could not locate path '{}' for field '{}' in '{}'/'{}'".format(
                                         indexable.json_path,
                                         field_name,
-                                        item.collection,
-                                        item.id,
+                                        item_with_location_and_fixes.item.collection,
+                                        item_with_location_and_fixes.item.id,
                                     ),
-                                    collection=item.collection,
-                                    item=item.id,
+                                    collection=item_with_location_and_fixes.item.collection,
+                                    item=item_with_location_and_fixes.item.id,
                                 )
                             )
                         else:
@@ -317,7 +335,11 @@ class IndexCreator:
                     "INSERT INTO items ({}) VALUES ({})".format(
                         ", ".join(insert_fields_and_values_template.keys()),
                         ", ".join(insert_fields_and_values_template.values()),
-                    ).format(geometry_wkt=item.geometry.wkt),
+                    ).format(
+                        geometry_wkt_constructor=f"ST_GeomFromText('{item_with_location_and_fixes.item.geometry.wkt}')"
+                        if item_with_location_and_fixes.item.geometry
+                        else "NULL"
+                    ),
                     insert_params,
                 )
                 counts["inserted"] += 1
@@ -326,9 +348,9 @@ class IndexCreator:
                     errors.append(
                         new_error(
                             IndexingErrorType.item_validation,
-                            f"duplicate in '{item.collection}'/'{item.id}'",
-                            collection=item.collection,
-                            item=item.id,
+                            f"duplicate in '{item_with_location_and_fixes.item.collection}'/'{item_with_location_and_fixes.item.id}'",
+                            collection=item_with_location_and_fixes.item.collection,
+                            item=item_with_location_and_fixes.item.id,
                         )
                     )
                     counts["duplicates"] += 1
@@ -338,9 +360,9 @@ class IndexCreator:
                 errors.append(
                     new_error(
                         IndexingErrorType.unknown,
-                        f"failed to insert into '{item.collection}'/'{item.id}': {e}",
-                        collection=item.collection,
-                        item=item.id,
+                        f"failed to insert into '{item_with_location_and_fixes.item.collection}'/'{item_with_location_and_fixes.item.id}': {e}",
+                        collection=item_with_location_and_fixes.item.collection,
+                        item=item_with_location_and_fixes.item.id,
                     )
                 )
                 counts["failed"] += 1
@@ -382,14 +404,17 @@ class IndexCreator:
             "collections_previous",
             "index_history_previous",
         )
-        has_history = self._conn.execute(
-            f"""
+        has_history = cast(
+            tuple[bool],
+            self._conn.execute(
+                f"""
             SELECT COUNT(*) = {len(history_tables)}
               FROM duckdb_tables() t
         INNER JOIN UNNEST(['{"', '".join(history_tables)}']) AS vals(expected_table_name)
                 ON t.table_name = vals.expected_table_name
         """
-        ).fetchone()[0]
+            ).fetchone(),
+        )[0]
         if has_history:
             self._conn.execute(
                 """

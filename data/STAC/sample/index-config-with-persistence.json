@@ -23,5 +23,6 @@
                 "joplin"
             ]
         }
-    }
+    },
+    "persist_stac_content": true
 }

@@ -42,10 +42,10 @@ def compare_results_to_expected(
     assert len(actual_results) == len(expected_results)
     for expected_result in expected_results:
         # exclude links from comparison as they are modified by the API
-        expected_result_json = dumps({**expected_result, "links": []})
+        expected_result_json = dumps({**expected_result, "links": []}, sort_keys=True)
         found = False
         for result in actual_results:
-            if expected_result_json == dumps({**result, "links": []}):
+            if expected_result_json == dumps({**result, "links": []}, sort_keys=True):
                 found = True
         assert found
 

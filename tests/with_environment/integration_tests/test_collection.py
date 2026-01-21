@@ -27,7 +27,7 @@ def test_collection_detail_match() -> None:
             else:
                 continue
             # exclude links from comparison as they are modified by the API
-            assert dumps({**api_collection, "links": []}) == dumps(
-                {**file_collection, "links": []}
+            assert dumps({**api_collection, "links": []}, sort_keys=True) == dumps(
+                {**file_collection, "links": []}, sort_keys=True
             )
         assert found_file_collection

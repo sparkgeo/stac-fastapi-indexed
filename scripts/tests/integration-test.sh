@@ -18,6 +18,10 @@ stack_commands=(
     "docker compose -f docker-compose.base.yml -f docker-compose.local-file.yml -f docker-compose.tester.yml"
     "docker compose -f docker-compose.base.yml -f docker-compose.local-http.yml -f docker-compose.tester.yml"
 )
+index_configs=(
+    "/index-config.json"
+    "/index-config-with-persistence.json"
+)
 
 exit_code=0
 
@@ -30,15 +34,17 @@ for dco in "${stack_commands[@]}"; do
     if [ $build_result -ne 0 ]; then
         exit $build_result
     fi
-    $dco run --rm tester python -m pytest -k integration_tests
-    exit_code=$?
-    if [ $hang -eq 1 ]; then
-        echo; echo "  ...stack will stay up for debugging support until you hit any key (except the 'any' key)"; echo
-        read -n 1 -s
-    fi
-    if [ $dump_log -eq 1 ]; then
-        $dco logs
-    fi
+    for index_config in "${index_configs[@]}"; do
+        INDEX_CONFIG_PATH=$index_config $dco run --rm tester python -m pytest -k integration_tests
+        exit_code=$?
+        if [ $hang -eq 1 ]; then
+            echo; echo "  ...stack will stay up for debugging support until you hit any key (except the 'any' key)"; echo
+            read -n 1 -s
+        fi
+        if [ $dump_log -eq 1 ]; then
+            $dco logs
+        fi
+    done
     $dco down --volumes
 done
 

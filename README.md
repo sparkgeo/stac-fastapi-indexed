@@ -61,6 +61,10 @@ docker run \
     sparkgeo/stac_fastapi_indexed
 ```
 
+#### Persisted STAC Content
+
+The remote source script is configured to persist STAC content in the index. See [enabling STAC persistence](./docs/index-config.md#persist-stac-content) for more information on this subject. If you do not want STAC JSON persisted in the index for remote sources you should alter this configuration.
+
 ## Overview
 
 This repository supports two related but distinct behaviours. The `stac-index.*` packages defined in [stac_index/](./packages/stac-index/) manage indexing of a STAC catalog. The `stac-fastapi.indexed` package defined in [stac_fastapi/](./src/stac_fastapi/) implements a stac-fastapi backend that works with the index created by `stac-index.*` packages.

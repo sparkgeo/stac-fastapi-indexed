@@ -2,7 +2,6 @@ from asyncio import Semaphore, gather
 from dataclasses import dataclass
 from logging import Logger, getLogger
 from re import Pattern, compile, sub
-from threading import Lock
 from typing import Any, Callable, Dict, Final, List, Protocol, Tuple, Type, cast
 
 from stac_index.indexer.settings import get_settings
@@ -12,10 +11,15 @@ from stac_index.indexer.types.indexing_error import (
     IndexingErrorType,
     new_error,
 )
-from stac_index.indexer.types.stac_data import CollectionWithLocation, ItemWithLocation
+from stac_index.indexer.types.stac_data import (
+    CollectionWithLocation,
+    ItemWithLocationAndFixes,
+)
 from stac_index.io.readers import source_reader_classes
 from stac_index.io.readers.source_reader import SourceReader
-from stac_pydantic import Catalog, Collection
+from stac_pydantic.catalog import Catalog
+from stac_pydantic.collection import Collection
+from stac_pydantic.item import Item
 from stac_pydantic.links import Links
 
 
@@ -25,7 +29,6 @@ class _HasLinks(Protocol):
 
 _settings: Final = get_settings()
 _logger: Final[Logger] = getLogger(__name__)
-_item_processor_mutex: Final[Lock] = Lock()
 _link_strip_regex: Final[Pattern] = compile(r"[^/]+$")
 _child_types_by_lower_type: Final[Dict[str, Type[_HasLinks]]] = {
     "catalog": Catalog,
@@ -36,7 +39,7 @@ _child_types_by_lower_type: Final[Dict[str, Type[_HasLinks]]] = {
 @dataclass
 class StacCatalogReader:
     root_catalog_uri: str
-    fixes_to_apply: List[str]
+    fixes_to_apply: List[str] | None
 
     def __post_init__(self):
         self._source_reader = None
@@ -155,14 +158,16 @@ class StacCatalogReader:
                             )
                         )
                     collections.append(
-                        collection.model_copy(update={"location": child_link})
+                        CollectionWithLocation(
+                            collection=collection, location=child_link
+                        )
                     )
         return (collections, errors)
 
     async def process_items(
         self,
         collections: List[Collection],
-        item_ingestor: Callable[[ItemWithLocation], List[IndexingError]],
+        item_ingestor: Callable[[ItemWithLocationAndFixes], List[IndexingError]],
     ) -> List[IndexingError]:
         _logger.info("reading items for collections")
         all_errors: List[IndexingError] = []
@@ -197,7 +202,10 @@ class StacCatalogReader:
                 item_errors: List[IndexingError] = []
                 try:
                     dict_item = await self._get_json_content_from_uri(uri)
-                    (item, dict_item) = self._stac_parser.parse_stac_item(dict_item)
+                    (dict_item, applied_fixes) = self._stac_parser.parse_stac_item(
+                        dict_item
+                    )
+                    item = Item(**dict_item)
                 except StacParserException as e:
                     item_errors.extend(e.indexing_errors)
                 except Exception as e:
@@ -216,11 +224,13 @@ class StacCatalogReader:
                             )
                         )
 
-                    # ensure item_ingestor cannot be called concurrently by concurrent async function calls
-                    with _item_processor_mutex:
-                        item_errors.extend(
-                            item_ingestor(ItemWithLocation(**dict_item, location=uri))
+                    item_errors.extend(
+                        item_ingestor(
+                            ItemWithLocationAndFixes(
+                                item=item, location=uri, applied_fixes=applied_fixes
+                            )
                         )
+                    )
                 return item_errors
 
         _logger.info(

@@ -15,19 +15,19 @@ class StacParserTest(unittest.TestCase):
     def test_read_basic_item(self):
         target = StacParser([])
         (item, _) = target.parse_stac_item(json.loads(basic_item_json))
-        assert item.id == "386dfa13-c2b4-4ce6-8e6f-fcac73f4e64e"
-        assert item.type == "Feature"
-        assert len(item.links) == 1
+        assert item["id"] == "386dfa13-c2b4-4ce6-8e6f-fcac73f4e64e"
+        assert item["type"] == "Feature"
+        assert len(item["links"]) == 1
         assert (
-            item.links[0].href
+            item["links"][0]["href"]
             == "/data/collections/joplin/items/386dfa13-c2b4-4ce6-8e6f-fcac73f4e64e.json"
         )
-        assert len(item.stac_extensions) == 2
+        assert len(item["stac_extensions"]) == 2
         assert "https://stac-extensions.github.io/eo/v1.0.0/schema.json" in [
-            str(url) for url in item.stac_extensions
+            str(url) for url in item["stac_extensions"]
         ]
         assert "https://stac-extensions.github.io/projection/v1.0.0/schema.json" in [
-            str(url) for url in item.stac_extensions
+            str(url) for url in item["stac_extensions"]
         ]
 
     def test_read_item_with_invalid_extension_with_fixer(self):
@@ -48,19 +48,19 @@ class StacParserTest(unittest.TestCase):
         (item, fields) = target.parse_stac_item(
             json.loads(item_with_invalid_extension_json)
         )
-        assert item.id == "386dfa13-c2b4-4ce6-8e6f-fcac73f4e64e"
-        assert item.type == "Feature"
-        assert len(item.links) == 1
+        assert item["id"] == "386dfa13-c2b4-4ce6-8e6f-fcac73f4e64e"
+        assert item["type"] == "Feature"
+        assert len(item["links"]) == 1
         assert (
-            item.links[0].href
+            item["links"][0]["href"]
             == "/data/collections/joplin/items/386dfa13-c2b4-4ce6-8e6f-fcac73f4e64e.json"
         )
-        assert len(item.stac_extensions) == 2
+        assert len(item["stac_extensions"]) == 2
         assert "https://stac-extensions.github.io/projection/v1.0.0/schema.json" in [
-            str(url) for url in item.stac_extensions
+            str(url) for url in item["stac_extensions"]
         ]
         assert "https://stac-extensions.github.io/eo/v1.0.0/schema.json" in [
-            str(url) for url in item.stac_extensions
+            str(url) for url in item["stac_extensions"]
         ]
 
     def test_read_item_with_invalid_extension_without_fixer(self):
