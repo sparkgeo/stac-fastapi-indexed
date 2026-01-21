@@ -24,6 +24,7 @@ from stac_index.indexer.types.indexing_error import IndexingError
 from stac_fastapi.indexed.core import CoreCrudClient
 from stac_fastapi.indexed.db import connect_to_db, disconnect_from_db
 from stac_fastapi.indexed.errors import get_all_errors
+from stac_fastapi.indexed.extensions.offset_pagination import OffsetPaginationExtension
 from stac_fastapi.indexed.middleware.request_log_middleware import RequestLogMiddleware
 from stac_fastapi.indexed.search.filter.filter_client import FiltersClient
 from stac_fastapi.indexed.search.search_get_request import SearchGetRequest
@@ -35,6 +36,7 @@ _logger: Final[Logger] = getLogger(__name__)
 extensions_map = {
     "sort": SortExtension(),
     "pagination": TokenPaginationExtension(),
+    "offset-pagination": OffsetPaginationExtension(),
     "filter": FilterExtension(client=FiltersClient()),
 }
 

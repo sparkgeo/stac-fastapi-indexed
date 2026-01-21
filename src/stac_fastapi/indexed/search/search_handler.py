@@ -133,7 +133,7 @@ class SearchHandler:
                 detail="STAC data recently changed and paging behaviour cannot be guaranteed. Remove the paging token to start again.",
             )
         has_next_page = len(rows) > query_info.limit
-        has_previous_page = query_info.offset is not None
+        has_previous_page = query_info.offset is not None and query_info.offset > 0
 
         items = await get_items_from_query_rows(
             rows=rows[0 : query_info.limit], request=self.request
@@ -185,9 +185,13 @@ class SearchHandler:
             limit=cast(
                 int, self.search_request.limit
             ),  # will have default value if not provided by caller
-            offset=None,
+            offset=self._get_offset_from_request(),
             last_load_id=get_last_load_id(),
         )
+
+    def _get_offset_from_request(self) -> Optional[int]:
+        offset_value = cast(Optional[int], getattr(self.search_request, "offset", None))
+        return offset_value
 
     async def _determine_order(
         self, sortby: Optional[List[SortExtension]] = None
