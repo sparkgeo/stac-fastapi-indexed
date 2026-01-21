@@ -63,7 +63,7 @@ docker run \
 
 #### Persisted STAC Content
 
-The remote source script is configured to persist STAC content in the index. See [enabling STAC persistence](./index-config.md#persist-stac-content) for more information on this subject. If you do not want STAC JSON persisted in the index for remote sources you should alter this configuration.
+The remote source script is configured to persist STAC content in the index. See [enabling STAC persistence](./docs/index-config.md#persist-stac-content) for more information on this subject. If you do not want STAC JSON persisted in the index for remote sources you should alter this configuration.
 
 ## Overview
 
