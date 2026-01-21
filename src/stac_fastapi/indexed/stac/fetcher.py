@@ -158,7 +158,7 @@ async def _get_collection_from_query_row(
 ) -> Collection | None:
     if row.collection_content is None:
         try:
-            collection = Collection(**await _fetch_dict(row[1]))
+            collection = Collection(**await _fetch_dict(row.stac_location))
         except UriNotFoundException as e:
             _logger.warning(
                 "Collection {uri} exists in the index but does not exist in the data store, index is outdated".format(
